@@ -1,48 +1,79 @@
-import { Select, MenuItem, FormControl, InputLabel, TextField } from '@mui/material'
-import { ModelSettings } from '@/shared/types'
-import { useTranslation } from 'react-i18next'
-import { models } from '@/packages/models/siliconflow'
+import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { ModelSettings } from '@/shared/types';
+import { models } from '@/packages/models/siliconflow';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 
 export interface Props {
-    model: ModelSettings['siliconCloudModel']
-    siliconflowCustomModel: ModelSettings['openaiCustomModel']
-    onChange(model: ModelSettings['siliconCloudModel'], siliconflowCustomModel: ModelSettings['openaiCustomModel']): void
-    className?: string
+  model: ModelSettings['siliconCloudModel'];
+  siliconflowCustomModel: ModelSettings['openaiCustomModel'];
+  onChange(model: ModelSettings['siliconCloudModel'], siliconflowCustomModel: ModelSettings['openaiCustomModel']): void;
+  className?: string;
 }
 
 export default function SiliconFlowModelSelect(props: Props) {
-    const { t } = useTranslation()
-    return (
-        <FormControl fullWidth variant="outlined" margin="dense" className={props.className}>
-            <InputLabel htmlFor="model-select">{t('siliconCloudModel')}</InputLabel>
-            <Select
-                label={t('siliconCloudModel')}
-                id="model-select"
-                value={props.model}
-                onChange={(e) => props.onChange(e.target.value as ModelSettings['siliconCloudModel'], props.siliconflowCustomModel)}
-            >
-                {models.map((model) => (
-                    <MenuItem key={model} value={model}>
-                        {model}
-                    </MenuItem>
-                ))}
-                <MenuItem key="custom-model" value={'custom-model'}>
-                    {t('Custom Model')}
-                </MenuItem>
-            </Select>
-            {props.model === 'custom-model' && (
-                <TextField
-                    margin="dense"
-                    label={t('Custom Model Name')}
-                    type="text"
-                    fullWidth
-                    variant="outlined"
-                    value={props.siliconflowCustomModel || ''}
-                    onChange={(e) =>
-                        props.onChange(props.model, e.target.value.trim())
-                    }
-                />
-            )}
-        </FormControl>
-    )
+  const { t } = useTranslation();
+  const [customModel, setCustomModel] = useState(props.siliconflowCustomModel || '');
+
+  const handleModelChange = (value: string) => {
+    if (value === 'custom-model') {
+      props.onChange('custom-model', customModel);
+    } else {
+      props.onChange(value as any, props.siliconflowCustomModel);
+    }
+  };
+
+  const handleCustomModelChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.trim();
+    setCustomModel(value);
+    if (props.model === 'custom-model') {
+      props.onChange('custom-model', value);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="model-select">{t('model')}</Label>
+        <Select
+          value={props.model}
+          onValueChange={handleModelChange}
+        >
+          <SelectTrigger id="model-select" className="w-full">
+            <SelectValue placeholder={t('selectAModel')} />
+          </SelectTrigger>
+          <SelectContent>
+            {models.map((model) => (
+              <SelectItem key={model} value={model}>
+                {model}
+              </SelectItem>
+            ))}
+            <SelectItem key="custom-model" value="custom-model">
+              {t('Custom Model')}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {props.model === 'custom-model' && (
+        <div className="space-y-2">
+          <Label htmlFor="custom-model-name">{t('Custom Model Name')}</Label>
+          <Input
+            id="custom-model-name"
+            type="text"
+            value={customModel}
+            onChange={handleCustomModelChange}
+          />
+        </div>
+      )}
+    </div>
+  );
 }

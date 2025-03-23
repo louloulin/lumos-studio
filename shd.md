@@ -67,6 +67,7 @@
    - 用 shadcn Slider 替换滑块组件（`TemperatureSlider` 等）- ✅ 已完成
    - 用 shadcn Avatar 替换 `<Avatar>` - ✅ 已完成
    - 用 shadcn DropdownMenu 替换 `<StyledMenu>` - ✅ 已完成
+   - 用 shadcn Badge 替换 MUI 的 Badge/Chip - ✅ 已完成
 
 8. **消息组件** - ✅ 已完成
    - 使用 shadcn Card、Typography 重构 `<Message>`、`<MessageList>` 等
@@ -157,6 +158,8 @@
 | `<CssBaseline>`        | 移除（由 Tailwind reset 处理）        | ✅ 已完成 |
 | `<ThemeProvider>`      | shadcn ThemeProvider 方法            | ✅ 已完成 |
 | `<Checkbox>`           | shadcn Checkbox                       | ✅ 已完成 |
+| `<Badge>`, `<Chip>`    | shadcn Badge                          | ✅ 已完成 |
+| `<InputLabel>`         | shadcn Label                          | ✅ 已完成 |
 
 ## 已完成组件
 
@@ -179,6 +182,9 @@
 17. **RemoteDialogWindow** - 将远程对话框从 MUI Dialog 迁移到 shadcn/ui Dialog，优化了按钮布局
 18. **SessionItem** - 将会话项从 MUI MenuItem 迁移到 Tailwind 布局，改进了样式和交互方式
 19. **SessionList** - 将会话列表从 MUI MenuList 迁移到纯 Tailwind 实现，保留了拖拽功能
+20. **Select 组件** - 将 MUI Select 替换为 shadcn/ui Select，包括 OpenAIModelSelect、SiliconFlowModelSelect 和 PPIOModelSelect
+21. **StyledMenu 组件** - 将 MUI Menu 替换为 shadcn/ui DropdownMenu，改进了样式和交互方式
+22. **AI设置相关组件** - 将 OpenAISetting、ClaudeSetting、SiliconFlowSetting 和 PPIOSetting 从 MUI 迁移到 shadcn/ui 组件
 
 ## 实现示例
 

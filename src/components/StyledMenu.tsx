@@ -1,50 +1,70 @@
-import { Menu, MenuProps } from '@mui/material'
-import 'katex/dist/katex.min.css'
-import { styled, alpha } from '@mui/material/styles'
+import React from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
-const StyledMenu = styled((props: MenuProps) => (
-    <Menu
-        elevation={0}
-        anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'right',
-        }}
-        transformOrigin={{
-            vertical: 'top',
-            horizontal: 'right',
-        }}
-        PopoverClasses={{
-            root: '',
-            paper: 'bg-white dark:bg-slate-800'
-        }}
-        {...props}
-    />
-))(({ theme }) => ({
-    '& .MuiPaper-root': {
-        backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[800] : theme.palette.grey[100],
-        borderRadius: 6,
-        marginTop: theme.spacing(1),
-        minWidth: 140,
-        color: theme.palette.mode === 'light' ? 'rgb(55, 65, 81)' : theme.palette.grey[300],
-        boxShadow:
-            'rgb(255, 255, 255) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 0px 0px 1px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.05) 0px 4px 6px -2px',
-        '& .MuiMenu-list': {
-            padding: '0px 0',
-        },
-        '& .MuiMenuItem-root': {
-            padding: '8px',
-            '& .MuiSvgIcon-root': {
-                color: theme.palette.text.secondary,
-                marginRight: theme.spacing(1.5),
-            },
-            '&:active': {
-                backgroundColor: alpha(theme.palette.primary.main, theme.palette.action.selectedOpacity),
-            },
-        },
-        '& hr': {
-            margin: '2px 0',
-        },
-    },
-}))
+interface StyledMenuProps {
+  anchorEl: HTMLElement | null;
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+  className?: string;
+}
 
-export default StyledMenu
+const StyledMenu: React.FC<StyledMenuProps> = ({ 
+  anchorEl, 
+  open, 
+  onClose, 
+  children,
+  className 
+}) => {
+  // 创建一个trigger ref，这样我们可以通过anchorEl元素定位下拉菜单
+  const triggerRef = React.useRef<HTMLButtonElement>(null);
+  
+  // 当anchorEl改变时，更新trigger元素的位置
+  React.useEffect(() => {
+    if (anchorEl && triggerRef.current) {
+      const rect = anchorEl.getBoundingClientRect();
+      triggerRef.current.style.position = 'absolute';
+      triggerRef.current.style.left = `${rect.left}px`;
+      triggerRef.current.style.top = `${rect.top}px`;
+      triggerRef.current.style.width = `${rect.width}px`;
+      triggerRef.current.style.height = `${rect.height}px`;
+      triggerRef.current.style.opacity = '0';
+      triggerRef.current.style.pointerEvents = 'none';
+    }
+  }, [anchorEl]);
+  
+  // 不使用anchorEl时，关闭下拉菜单
+  React.useEffect(() => {
+    if (!anchorEl) {
+      onClose();
+    }
+  }, [anchorEl, onClose]);
+
+  return (
+    <DropdownMenu open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DropdownMenuTrigger asChild ref={triggerRef}>
+        <button className="w-0 h-0 opacity-0" />
+      </DropdownMenuTrigger>
+      
+      <DropdownMenuContent
+        className={cn("min-w-[140px] p-0", className)}
+        align="end"
+        side="bottom"
+        sideOffset={5}
+      >
+        <DropdownMenuGroup>
+          {children}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+};
+
+export default StyledMenu;

@@ -1,63 +1,59 @@
-import Box from '@mui/material/Box'
-import IconButton from '@mui/material/IconButton'
-import { useAtomValue, useSetAtom } from 'jotai'
-import * as atoms from '@/stores/atoms'
-import { useTranslation } from 'react-i18next'
-import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import StyledMenu from './StyledMenu'
-import { useState } from 'react'
-import { MenuItem } from '@mui/material'
-import CleaningServicesIcon from '@mui/icons-material/CleaningServices';
+import React, { useState } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
+import * as atoms from '@/stores/atoms';
+import { useTranslation } from 'react-i18next';
+import { MoreHorizontal, Eraser } from 'lucide-react';
+import StyledMenu from './StyledMenu';
+import { Button } from './ui/button';
+import { DropdownMenuItem } from './ui/dropdown-menu';
 
 export default function Toolbar() {
-    const { t } = useTranslation()
-    const currentSession = useAtomValue(atoms.currentSessionAtom)
+    const { t } = useTranslation();
+    const currentSession = useAtomValue(atoms.currentSessionAtom);
+    const setSessionCleanDialog = useSetAtom(atoms.sessionCleanDialogAtom);
 
-    const setSessionCleanDialog = useSetAtom(atoms.sessionCleanDialogAtom)
-
-    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
-    const open = Boolean(anchorEl)
+    const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const open = Boolean(anchorEl);
 
     const handleMoreMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation()
-        event.preventDefault()
-        setAnchorEl(event.currentTarget)
-    }
+        event.stopPropagation();
+        event.preventDefault();
+        setAnchorEl(event.currentTarget);
+    };
+    
     const handleMoreMenuClose = () => {
-        setAnchorEl(null)
-    }
+        setAnchorEl(null);
+    };
+    
     const handleSessionClean = () => {
-        setSessionCleanDialog(currentSession)
-        handleMoreMenuClose()
-    }
+        setSessionCleanDialog(currentSession);
+        handleMoreMenuClose();
+    };
 
     return (
-        <Box>
-            <IconButton
-                edge="start"
-                color="inherit"
+        <div>
+            <Button
+                variant="ghost"
+                size="icon"
                 aria-label="more-menu-button"
-                sx={{}}
                 onClick={handleMoreMenuOpen}
             >
-                <MoreHorizIcon />
-            </IconButton>
+                <MoreHorizontal className="h-5 w-5" />
+            </Button>
+            
             <StyledMenu
                 anchorEl={anchorEl}
                 open={open}
                 onClose={handleMoreMenuClose}
             >
-                <MenuItem onClick={handleSessionClean} disableRipple
-                    sx={{
-                        '&:hover': {
-                            backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                        },
-                    }}
+                <DropdownMenuItem 
+                    onClick={handleSessionClean}
+                    className="flex items-center gap-2 text-destructive focus:text-destructive"
                 >
-                    <CleaningServicesIcon fontSize="small" />
-                    {t('Clear All Messages')}
-                </MenuItem>
+                    <Eraser className="h-4 w-4" />
+                    <span>{t('Clear All Messages')}</span>
+                </DropdownMenuItem>
             </StyledMenu>
-        </Box>
-    )
+        </div>
+    );
 }

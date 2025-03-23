@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{env, fs, thread};
 use tauri::Manager;
+use std::net::TcpListener;
 
 /// 表示服务的状态
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -17,7 +18,7 @@ enum ServiceStatus {
 #[derive(Clone)]
 pub struct MastraService {
     process: Arc<Mutex<Option<Child>>>,
-    port: u16,
+    port: Arc<Mutex<u16>>,
     is_production: bool,
     status: Arc<Mutex<ServiceStatus>>,
     last_start: Arc<Mutex<Option<Instant>>>,
@@ -33,7 +34,7 @@ impl MastraService {
     pub fn new(port: u16, is_production: bool) -> Self {
         MastraService {
             process: Arc::new(Mutex::new(None)),
-            port,
+            port: Arc::new(Mutex::new(port)),
             is_production,
             status: Arc::new(Mutex::new(ServiceStatus::Stopped)),
             last_start: Arc::new(Mutex::new(None)),
@@ -44,12 +45,204 @@ impl MastraService {
         }
     }
 
+    /// 检查端口是否被占用
+    fn is_port_in_use(&self, port: u16) -> bool {
+        // 检查IPv4
+        let ipv4_in_use = match TcpListener::bind(format!("127.0.0.1:{}", port)) {
+            Ok(_) => false, // 端口可用
+            Err(_) => true,  // 端口被占用
+        };
+        
+        // 检查IPv6
+        let ipv6_in_use = match TcpListener::bind(format!("::1:{}", port)) {
+            Ok(_) => false, // 端口可用
+            Err(_) => true,  // 端口被占用
+        };
+        
+        // 检查通配符地址 (捕获所有接口上的绑定)
+        let any_in_use = match TcpListener::bind(format!("0.0.0.0:{}", port)) {
+            Ok(_) => false,
+            Err(_) => true,
+        };
+        
+        // 如果任何一个检查显示端口被占用，则返回true
+        ipv4_in_use || ipv6_in_use || any_in_use
+    }
+
+    /// 尝试终止占用端口的进程
+    fn kill_process_on_port(&self, port: u16) -> Result<bool, String> {
+        println!("Attempting to kill process on port {}...", port);
+        
+        let mut success = false;
+        
+        #[cfg(target_os = "windows")]
+        {
+            // Windows平台使用netstat和taskkill
+            let netstat_output = Command::new("cmd")
+                .args(&["/c", &format!("netstat -ano | findstr :{}", port)])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .map_err(|e| format!("Failed to execute netstat command: {}", e))?;
+            
+            let output_str = String::from_utf8_lossy(&netstat_output.stdout);
+            
+            // 解析输出找到PID
+            for line in output_str.lines() {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 5 {
+                    if let Ok(pid) = parts[4].parse::<u32>() {
+                        println!("Found process with PID {} using port {}", pid, port);
+                        
+                        // 杀死进程
+                        let kill_result = Command::new("taskkill")
+                            .args(&["/F", "/PID", &pid.to_string()])
+                            .output();
+                            
+                        match kill_result {
+                            Ok(_) => {
+                                println!("Successfully killed process with PID {}", pid);
+                                success = true;
+                            },
+                            Err(e) => {
+                                println!("Failed to kill process with PID {}: {}", pid, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            // macOS平台使用lsof和kill
+            // 同时检查IPv4和IPv6
+            let lsof_output = Command::new("lsof")
+                .args(&["-i", &format!(":{}", port)])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output()
+                .map_err(|e| format!("Failed to execute lsof command: {}", e))?;
+            
+            let output_str = String::from_utf8_lossy(&lsof_output.stdout);
+            println!("lsof output: {}", output_str);
+            
+            // 解析输出找到所有PID
+            let mut pids = Vec::new();
+            for line in output_str.lines().skip(1) { // 跳过标题行
+                let parts: Vec<&str> = line.split_whitespace().collect();
+                if parts.len() >= 2 {
+                    if let Ok(pid) = parts[1].parse::<u32>() {
+                        pids.push(pid);
+                    }
+                }
+            }
+            
+            // 去重
+            pids.sort();
+            pids.dedup();
+            
+            // 杀死所有找到的进程
+            for pid in pids {
+                println!("Found process with PID {} using port {}", pid, port);
+                
+                // 杀死进程
+                let kill_result = Command::new("kill")
+                    .args(&["-9", &pid.to_string()])
+                    .output();
+                    
+                match kill_result {
+                    Ok(_) => {
+                        println!("Successfully killed process with PID {}", pid);
+                        success = true;
+                    },
+                    Err(e) => {
+                        println!("Failed to kill process with PID {}: {}", pid, e);
+                    }
+                }
+            }
+        }
+        
+        #[cfg(target_os = "linux")]
+        {
+            // Linux平台使用ss和kill获取更多信息
+            let ss_output = Command::new("ss")
+                .args(&["-tuln", "sport", &format!("= :{}", port)])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .output();
+            
+            let pid_output = match ss_output {
+                Ok(output) => {
+                    let ss_str = String::from_utf8_lossy(&output.stdout);
+                    println!("Listening processes: {}", ss_str);
+                    
+                    // 使用fuser获取PID
+                    Command::new("fuser")
+                        .args(&[&format!("{}/tcp", port), "-k"])
+                        .stdout(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .output()
+                },
+                Err(_) => {
+                    // 如果ss命令失败，回退到使用lsof
+                    println!("ss command failed, falling back to lsof");
+                    Command::new("lsof")
+                        .args(&["-i", &format!(":{}", port), "-t"])
+                        .stdout(Stdio::piped())
+                        .stderr(Stdio::piped())
+                        .output()
+                }
+            };
+            
+            if let Ok(output) = pid_output {
+                let output_str = String::from_utf8_lossy(&output.stdout);
+                
+                // 解析输出找到PID
+                for line in output_str.lines() {
+                    if let Ok(pid) = line.trim().parse::<u32>() {
+                        println!("Found process with PID {} using port {}", pid, port);
+                        
+                        // 杀死进程
+                        let kill_result = Command::new("kill")
+                            .args(&["-9", &pid.to_string()])
+                            .output();
+                            
+                        match kill_result {
+                            Ok(_) => {
+                                println!("Successfully killed process with PID {}", pid);
+                                success = true;
+                            },
+                            Err(e) => {
+                                println!("Failed to kill process with PID {}: {}", pid, e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 如果成功杀死了至少一个进程，则等待一段时间让端口释放
+        if success {
+            println!("Waiting for port {} to be released...", port);
+            thread::sleep(Duration::from_millis(500));
+        }
+        
+        // 没找到进程或者没有成功杀死进程
+        if !success {
+            println!("No process found or could not kill processes using port {}", port);
+        }
+        
+        Ok(success)
+    }
+
     /// 启动Mastra服务
     pub fn start(&self, app_handle: &tauri::AppHandle) -> Result<(), String> {
         let mut process = self.process.lock().unwrap();
         let mut status = self.status.lock().unwrap();
         let mut last_start = self.last_start.lock().unwrap();
         let mut restart_attempts = self.restart_attempts.lock().unwrap();
+        let mut port = self.port.lock().unwrap();
         
         // 如果服务已在运行，直接返回
         if *status == ServiceStatus::Running && process.is_some() {
@@ -66,6 +259,66 @@ impl MastraService {
         
         // 更新上次启动时间
         *last_start = Some(Instant::now());
+        
+        // 检查端口是否被占用
+        if self.is_port_in_use(*port) {
+            println!("Port {} is already in use. Attempting to kill the process...", *port);
+            
+            // 尝试终止占用端口的进程
+            match self.kill_process_on_port(*port) {
+                Ok(true) => {
+                    println!("Successfully killed process on port {}. Waiting for port to be available...", *port);
+                    // 等待端口释放 - 增加等待时间确保端口完全释放
+                    thread::sleep(Duration::from_secs(2));
+                    
+                    // 最多尝试3次
+                    for attempt in 1..=3 {
+                        // 再次检查端口
+                        if self.is_port_in_use(*port) {
+                            if attempt < 3 {
+                                println!("Port {} is still in use after kill attempt {}. Waiting more time...", *port, attempt);
+                                thread::sleep(Duration::from_secs(2));
+                            } else {
+                                println!("Port {} is still in use after 3 attempts. Trying another port.", *port);
+                                *port += 1;
+                                println!("Now using port {}", *port);
+                            }
+                        } else {
+                            println!("Port {} is now available.", *port);
+                            break;
+                        }
+                    }
+                },
+                Ok(false) => {
+                    println!("No process found using port {}. It might be used by a system service.", *port);
+                    // 尝试使用另一个端口
+                    println!("Trying to use another port...");
+                    *port += 1;
+                    println!("Now using port {}", *port);
+                    
+                    // 确保新端口是可用的
+                    while self.is_port_in_use(*port) {
+                        println!("Port {} is also in use. Trying next port...", *port);
+                        *port += 1;
+                    }
+                },
+                Err(e) => {
+                    println!("Error killing process on port {}: {}", *port, e);
+                    // 尝试使用另一个端口
+                    println!("Trying to use another port...");
+                    *port += 1;
+                    println!("Now using port {}", *port);
+                    
+                    // 确保新端口是可用的
+                    while self.is_port_in_use(*port) {
+                        println!("Port {} is also in use. Trying next port...", *port);
+                        *port += 1;
+                    }
+                }
+            }
+        }
+        
+        println!("Using port: {}", *port);
         
         // 获取应用数据目录
         let app_dir = app_handle.path().app_data_dir().unwrap();
@@ -126,7 +379,7 @@ impl MastraService {
             cwd = source_dir;
         }
 
-        let port_str = self.port.to_string();
+        let port_str = port.to_string();
         let mut cmd = Command::new(&exec_path);
         
         if self.is_production {
@@ -162,7 +415,7 @@ impl MastraService {
         
         // 记录服务状态
         let service_type = if self.is_production { "production" } else { "development" };
-        println!("Started Mastra service ({}) on port {} - service will run in background", service_type, self.port);
+        println!("Started Mastra service ({}) on port {} - service will run in background", service_type, *port);
         
         // 设置自动重启监控
         self.setup_auto_restart(app_handle.clone());
@@ -334,7 +587,8 @@ impl MastraService {
     
     /// 获取服务URL
     pub fn get_url(&self) -> String {
-        format!("http://localhost:{}", self.port)
+        let port = self.port.lock().unwrap();
+        format!("http://localhost:{}", *port)
     }
     
     /// 检查服务是否在运行
@@ -370,5 +624,57 @@ impl Drop for MastraService {
         } else {
             println!("MastraService被销毁，但服务将继续运行...");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpListener;
+    
+    #[test]
+    fn test_is_port_in_use() {
+        let service = MastraService::new(8000, false);
+        
+        // 端口应该是空闲的
+        assert_eq!(service.is_port_in_use(8000), false);
+        
+        // 占用端口
+        let listener = TcpListener::bind("127.0.0.1:8001").unwrap();
+        
+        // 端口应该被占用
+        assert_eq!(service.is_port_in_use(8001), true);
+        
+        // 释放端口
+        drop(listener);
+        
+        // 端口应该再次空闲
+        assert_eq!(service.is_port_in_use(8001), false);
+    }
+    
+    #[test]
+    fn test_port_update() {
+        let service = MastraService::new(8000, false);
+        
+        // 初始端口应该是8000
+        {
+            let port = service.port.lock().unwrap();
+            assert_eq!(*port, 8000);
+        }
+        
+        // 修改端口
+        {
+            let mut port = service.port.lock().unwrap();
+            *port = 8001;
+        }
+        
+        // 更新后的端口应该是8001
+        {
+            let port = service.port.lock().unwrap();
+            assert_eq!(*port, 8001);
+        }
+        
+        // 获取URL应该使用新端口
+        assert_eq!(service.get_url(), "http://localhost:8001");
     }
 } 

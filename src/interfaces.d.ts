@@ -1,12 +1,12 @@
 import { TauriAPI } from './shared/tauri-types';
-import { DesktopPlatform } from './packages/platform';
 
+// 重新声明Window接口添加我们的全局属性
 declare global {
   interface Window {
     /**
      * Tauri API 的桥接对象
      */
-    tauriAPI?: any;
+    tauriAPI?: TauriAPI;
     
     /**
      * 平台对象

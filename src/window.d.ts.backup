@@ -16,12 +16,12 @@ declare global {
     /**
      * 清理所有缓存数据
      */
-    __clearAllCache: () => Promise<void>;
+    __clearAllCache: () => Promise<boolean>;
     
     /**
      * 只清理会话数据
      */
-    __clearSessionData: () => Promise<void>;
+    __clearSessionData: () => Promise<boolean>;
   }
 }
 

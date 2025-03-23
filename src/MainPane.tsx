@@ -13,9 +13,10 @@ import { Session, SessionType } from '@/shared/types';
 
 interface MainPaneProps {
     sidebarVisible?: boolean;
+    onSwitchToNewUI?: () => void;
 }
 
-const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true }) => {
+const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true, onSwitchToNewUI }) => {
     const [isMastraMode, setIsMastraMode] = useState(false);
     const [currentSessionId] = useAtom(atoms.currentSessionIdAtom);
     const currentSession = useAtomValue(atoms.currentSessionAtom);
@@ -109,6 +110,30 @@ const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true }) => {
                             <div>
                                 <p className="text-xl mb-2">选择或创建一个会话</p>
                                 <p>从左侧边栏中选择一个已有会话，或创建一个新的会话开始交流。</p>
+                                {onSwitchToNewUI && (
+                                    <Button 
+                                        onClick={() => {
+                                            // 使用更直接的方式切换到新界面
+                                            try {
+                                                // 先设置localStorage
+                                                localStorage.setItem('force_new_ui', 'true');
+                                                console.log("切换到新界面 - localStorage已设置");
+                                                
+                                                // 强制添加一个查询参数，保证会刷新且使用新UI
+                                                const newUrl = window.location.pathname + "?newui=true&t=" + Date.now();
+                                                console.log("切换到新界面 - 即将跳转到:", newUrl);
+                                                window.location.href = newUrl;
+                                            } catch (e) {
+                                                console.error("切换界面出错:", e);
+                                                alert("切换界面失败，请刷新页面重试");
+                                            }
+                                        }}
+                                        className="mt-4"
+                                        variant="default"
+                                    >
+                                        切换到新界面
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -149,7 +174,7 @@ const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true }) => {
             }`}
         >
             <div className="flex flex-col h-full">
-                <Header />
+                <Header onSwitchToNewUI={onSwitchToNewUI} />
                 {renderChatInterface()}
             </div>
         </div>

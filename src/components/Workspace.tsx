@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   MessageSquare, 
   PlusCircle, 
@@ -38,17 +38,106 @@ interface ChatSession {
   pinned?: boolean;
 }
 
+// 视图类型
+type ViewType = 'chat' | 'market' | 'editor' | 'settings' | 'workflow' | 'agent-manager';
+
 // 工作区组件
 const Workspace: React.FC = () => {
   // 状态管理
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeView, setActiveView] = useState<'chat' | 'market' | 'editor' | 'settings' | 'workflow'>('chat');
+  const [activeView, setActiveView] = useState<ViewType>('chat');
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
+  const initializedRef = useRef(false);
+  
+  // 从URL获取初始视图
+  useEffect(() => {
+    const handleRouteChange = () => {
+      const hash = window.location.hash.substring(1);
+      if (hash) {
+        const [view, params] = hash.split('/');
+        console.log(`Route change: view=${view}, params=${params}, sessions=${sessions.length}`);
+        switch (view) {
+          case 'chat':
+            setActiveView('chat');
+            if (params && sessions.some(s => s.id === params)) {
+              setSelectedSessionId(params);
+            } else if (params) {
+              console.log(`Warning: Attempted to navigate to session ${params} which doesn't exist`);
+              // If the session doesn't exist but we have other sessions, select the first one
+              if (sessions.length > 0) {
+                setSelectedSessionId(sessions[0].id);
+                navigateTo('chat', sessions[0].id);
+              }
+            }
+            break;
+          case 'market':
+            setActiveView('market');
+            break;
+          case 'editor':
+            setActiveView('editor');
+            if (params) {
+              setEditingAgentId(params);
+            }
+            break;
+          case 'settings':
+            setActiveView('settings');
+            break;
+          case 'workflow':
+            setActiveView('workflow');
+            break;
+          case 'agent-manager':
+            setActiveView('agent-manager');
+            break;
+          default:
+            setActiveView('chat');
+        }
+      }
+    };
+
+    // 初始路由处理
+    handleRouteChange();
+
+    // 监听hash变化
+    window.addEventListener('hashchange', handleRouteChange);
+    return () => {
+      window.removeEventListener('hashchange', handleRouteChange);
+    };
+  }, [sessions, selectedSessionId, editingAgentId]);
+
+  // 更新URL hash
+  const navigateTo = (view: ViewType, param?: string) => {
+    try {
+      // Validate the view type
+      if (!['chat', 'market', 'editor', 'settings', 'workflow', 'agent-manager'].includes(view)) {
+        console.error(`Invalid view type: ${view}`);
+        return;
+      }
+      
+      // For chat view, ensure the session exists
+      if (view === 'chat' && param && !sessions.some(s => s.id === param)) {
+        console.warn(`Trying to navigate to non-existent session: ${param}`);
+        if (sessions.length > 0) {
+          param = sessions[0].id;
+        } else {
+          // If no sessions exist, redirect to market view
+          view = 'market';
+          param = undefined;
+        }
+      }
+      
+      const newHash = param ? `#${view}/${param}` : `#${view}`;
+      console.log(`Navigating to: ${newHash}`);
+      window.location.hash = newHash;
+      setActiveView(view);
+    } catch (error) {
+      console.error(`Navigation error: ${error}`);
+    }
+  };
   
   // 监听窗口大小变化
   useEffect(() => {
@@ -66,6 +155,10 @@ const Workspace: React.FC = () => {
 
   // 初始化示例会话数据
   useEffect(() => {
+    // 避免重复初始化
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+    
     const demoSessions: ChatSession[] = [
       {
         id: '1',
@@ -93,6 +186,12 @@ const Workspace: React.FC = () => {
     
     setSessions(demoSessions);
     setSelectedSessionId('1');
+    // 使用setTimeout避免在状态更新过程中修改URL
+    setTimeout(() => {
+      if (!window.location.hash) {
+        navigateTo('chat', '1');
+      }
+    }, 0);
   }, []);
 
   // 创建新会话
@@ -107,7 +206,7 @@ const Workspace: React.FC = () => {
     setSessions(prev => [newSession, ...prev]);
     setSelectedSessionId(newSession.id);
     setShowNewSessionDialog(false);
-    setActiveView('chat');
+    navigateTo('chat', newSession.id);
   };
 
   // 获取当前会话
@@ -159,9 +258,20 @@ const Workspace: React.FC = () => {
     } else if (activeView === 'market') {
       return <AgentMarket onSelectAgent={(agentId: string, agentName: string) => {
         createNewSession(agentId, agentName);
-      }} />;
+      }} mode="explore" />;
+    } else if (activeView === 'agent-manager') {
+      return <AgentMarket onSelectAgent={(agentId: string, agentName: string) => {
+        setEditingAgentId(agentId);
+        navigateTo('editor', agentId);
+      }} mode="manage" />;
     } else if (activeView === 'editor') {
-      return <AgentEditor agentId={editingAgentId || undefined} />;
+      return <AgentEditor agentId={editingAgentId || undefined} onSave={() => {
+        if (editingAgentId) {
+          navigateTo('agent-manager');
+        } else {
+          navigateTo('market');
+        }
+      }} />;
     } else if (activeView === 'settings') {
       return <SettingsPage />;
     } else if (activeView === 'workflow') {
@@ -232,7 +342,7 @@ const Workspace: React.FC = () => {
           className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
           onClick={() => {
             if (selectedSessionId) {
-              setActiveView('chat');
+              navigateTo('chat', selectedSessionId);
             } else {
               setShowNewSessionDialog(true);
             }
@@ -247,7 +357,7 @@ const Workspace: React.FC = () => {
           variant={activeView === 'market' ? 'secondary' : 'ghost'}
           className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
           onClick={() => {
-            setActiveView('market');
+            navigateTo('market');
             if (isMobile) setMobileSidebarOpen(false);
           }}
         >
@@ -259,7 +369,7 @@ const Workspace: React.FC = () => {
           variant={activeView === 'editor' ? 'secondary' : 'ghost'}
           className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
           onClick={() => {
-            setActiveView('editor');
+            navigateTo('editor');
             setEditingAgentId(null);
             if (isMobile) setMobileSidebarOpen(false);
           }}
@@ -272,12 +382,24 @@ const Workspace: React.FC = () => {
           variant={activeView === 'workflow' ? 'secondary' : 'ghost'}
           className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
           onClick={() => {
-            setActiveView('workflow');
+            navigateTo('workflow');
             if (isMobile) setMobileSidebarOpen(false);
           }}
         >
           <GitBranch className="h-5 w-5" />
           {!sidebarCollapsed && <span className="ml-2">工作流构建器</span>}
+        </Button>
+
+        <Button 
+          variant={activeView === 'agent-manager' ? 'secondary' : 'ghost'}
+          className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
+          onClick={() => {
+            navigateTo('agent-manager');
+            if (isMobile) setMobileSidebarOpen(false);
+          }}
+        >
+          <Users className="h-5 w-5" />
+          {!sidebarCollapsed && <span className="ml-2">智能体管理</span>}
         </Button>
       </div>
       
@@ -319,7 +441,7 @@ const Workspace: React.FC = () => {
                   }`}
                   onClick={() => {
                     setSelectedSessionId(session.id);
-                    setActiveView('chat');
+                    navigateTo('chat', session.id);
                     if (isMobile) setMobileSidebarOpen(false);
                   }}
                 >
@@ -419,7 +541,7 @@ const Workspace: React.FC = () => {
                 }`}
                 onClick={() => {
                   setSelectedSessionId(session.id);
-                  setActiveView('chat');
+                  navigateTo('chat', session.id);
                   if (isMobile) setMobileSidebarOpen(false);
                 }}
               >
@@ -508,7 +630,7 @@ const Workspace: React.FC = () => {
         <Button 
           variant={activeView === 'settings' ? 'secondary' : 'ghost'}
           className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
-          onClick={() => setActiveView('settings')}
+          onClick={() => navigateTo('settings')}
         >
           <SettingsIcon className="h-5 w-5" />
           {!sidebarCollapsed && <span className="ml-2">设置</span>}
@@ -566,6 +688,55 @@ const Workspace: React.FC = () => {
             </h1>
             
             <div className="w-8" /> {/* 占位元素，保持标题居中 */}
+          </header>
+        )}
+        
+        {/* 非移动设备顶部栏 - 添加返回旧界面按钮 */}
+        {!isMobile && (
+          <header className="flex items-center justify-between p-3 border-b border-border">
+            <h1 className="text-lg font-semibold">
+              {activeView === 'chat' && currentSession 
+                ? currentSession.name 
+                : activeView === 'market'
+                ? '智能体市场'
+                : activeView === 'editor'
+                ? '智能体编辑器'
+                : activeView === 'workflow'
+                ? '工作流构建器'
+                : activeView === 'agent-manager'
+                ? '智能体管理'
+                : '设置'}
+            </h1>
+            
+            <Button 
+              variant="secondary" 
+              className="text-sm flex items-center" 
+              onClick={() => {
+                // 切换回旧界面 - 使用更强硬的方式
+                try {
+                  // 先设置localStorage
+                  localStorage.setItem('force_new_ui', 'false');
+                  console.log("切换到旧界面 - localStorage已设置");
+                  
+                  // 清除hash
+                  if (window.location.hash) {
+                    history.pushState("", document.title, window.location.pathname + window.location.search);
+                    console.log("切换到旧界面 - hash已清除");
+                  }
+                  
+                  // 强制添加一个查询参数，保证会刷新且使用旧UI
+                  const newUrl = window.location.pathname + "?legacy=true&t=" + Date.now();
+                  console.log("切换到旧界面 - 即将跳转到:", newUrl);
+                  window.location.href = newUrl;
+                } catch (e) {
+                  console.error("切换界面出错:", e);
+                  alert("切换界面失败，请刷新页面重试");
+                }
+              }}
+            >
+              <ChevronLeft className="mr-1 h-4 w-4" />
+              返回旧界面
+            </Button>
           </header>
         )}
         

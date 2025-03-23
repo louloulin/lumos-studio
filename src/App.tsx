@@ -20,6 +20,7 @@ import { ThemeProvider } from './components/ui/theme-provider'
 import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
+import { TauriAPI } from './shared/tauri-types'
 
 // The Window interface is now defined in window.d.ts
 
@@ -34,23 +35,49 @@ function Main() {
 
     // 开发模式下，可以通过URL参数强制显示新UI
     const [forceNewUI] = useState(() => {
-        return window.location.search.includes('newui=1') || localStorage.getItem('force_new_ui') === 'true';
+        // 检查URL参数或localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasNewUIParam = urlParams.has('newui');
+        const newUIValue = urlParams.get('newui');
+        
+        // 如果URL中有newui参数
+        if (hasNewUIParam) {
+            const shouldForce = newUIValue === '1' || newUIValue === 'true';
+            // 存储到localStorage以便持久化
+            localStorage.setItem('force_new_ui', shouldForce ? 'true' : 'false');
+            return shouldForce;
+        }
+        
+        // 否则从localStorage读取
+        return localStorage.getItem('force_new_ui') === 'true';
     });
 
     // 显示新界面条件
     const shouldShowNewUI = forceNewUI && !showLegacyUI;
+
+    // 切换回传统UI并清除hash
+    const switchToLegacyUI = () => {
+        // 更新状态
+        setShowLegacyUI(true);
+        
+        // 确保localStorage中的标志也被重置
+        localStorage.setItem('force_new_ui', 'false');
+        
+        // 清除hash
+        if (window.location.hash) {
+            // 清除hash但不刷新页面
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+        }
+        
+        // 可选：刷新页面以确保状态完全重置
+        // window.location.reload();
+    };
 
     return (
         <div className="box-border App" spellCheck={spellCheck}>
             {shouldShowNewUI ? (
                 <div className="h-full">
                     <Workspace />
-                    <button 
-                        className="fixed bottom-4 right-4 px-4 py-2 bg-muted text-muted-foreground rounded-md text-xs opacity-30 hover:opacity-100 transition-opacity"
-                        onClick={() => setShowLegacyUI(true)}
-                    >
-                        切换到旧界面
-                    </button>
                 </div>
             ) : (
                 <>
@@ -65,7 +92,10 @@ function Main() {
                             />
                         </ErrorBoundary>
                         <ErrorBoundary>
-                            <MainPane sidebarVisible={sidebarVisible} />
+                            <MainPane 
+                                sidebarVisible={sidebarVisible} 
+                                onSwitchToNewUI={() => setShowLegacyUI(false)}
+                            />
                         </ErrorBoundary>
                     </div>
                     <SettingDialog
@@ -111,20 +141,24 @@ export default function App() {
                     platform.tauriAPI = tauriBridge;
                 }
                 
-                initializeTauriEvents();
+                try {
+                    // 运行函数但不使用返回值
+                    initializeTauriEvents();
+                } catch (error) {
+                    console.error('Failed to initialize Tauri events:', error);
+                }
                 
                 if (typeof window.__clearAllCache !== 'function') {
                     try {
-                        const cacheModule = await import('./utils/clearCache');
-                        window.__clearAllCache = cacheModule.clearAllCache;
-                        window.__clearSessionData = cacheModule.clearSessionData;
-                        console.log('Cache clearing functions initialized');
+                        // 导入注册模块，自动注册清理函数到window
+                        await import('./utils/registerCacheClearFunctions');
                     } catch (e) {
-                        console.warn('Failed to initialize cache clearing functions:', e);
+                        console.warn('Failed to register cache clearing functions:', e);
                     }
                 }
                 
                 try {
+                    // 运行函数但不使用返回值
                     await tauriBridge.getStoreValue("test-init");
                 } catch (e) {
                     console.warn("Store initialization test failed:", e);
@@ -132,12 +166,15 @@ export default function App() {
                 
                 setInitialized(true);
             } catch (error) {
-                console.error('Failed to initialize Tauri events:', error);
+                console.error('Failed to initialize app:', error);
                 setInitialized(true);
             }
         };
         
-        initialize();
+        initialize().catch(error => {
+            console.error('Initialization failed:', error);
+            setInitialized(true);
+        });
     }, [setSessions]);
 
     if (!initialized) {

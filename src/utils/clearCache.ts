@@ -67,8 +67,4 @@ export async function clearSessionData(): Promise<boolean> {
         console.error('Failed to clear session data:', e)
         return false
     }
-}
-
-// 将清理函数挂载到全局对象，使其可以从控制台调用
-window.__clearAllCache = clearAllCache
-window.__clearSessionData = clearSessionData 
+} 

@@ -1,31 +1,21 @@
 import { useRef } from 'react'
-import {
-    Box,
-    Badge,
-    ListItemText,
-    MenuList,
-    IconButton,
-    Stack,
-    MenuItem,
-    ListItemIcon,
-    Typography,
-    Divider,
-    useTheme,
-} from '@mui/material'
-import SettingsIcon from '@mui/icons-material/Settings'
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
 import { useTranslation } from 'react-i18next'
 import icon from './static/icon.png'
-import SmartToyIcon from '@mui/icons-material/SmartToy'
-import AddIcon from '@mui/icons-material/AddCircleOutline'
 import useVersion from './hooks/useVersion'
 import SessionList from './components/SessionList'
 import * as sessionActions from './stores/sessionActions'
-import MenuOpenIcon from '@mui/icons-material/MenuOpen'
 import { useSetAtom } from 'jotai'
 import * as atoms from './stores/atoms'
-import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import { trackingEvent } from './packages/event'
+import { cn } from './lib/utils'
+import { Button } from './components/ui/button'
+import { 
+    Plus, 
+    Settings, 
+    Info, 
+    Bot, 
+    ImageIcon
+} from 'lucide-react'
 
 export const drawerWidth = 240
 
@@ -49,118 +39,82 @@ export default function Sidebar(props: Props) {
         trackingEvent('create_new_conversation', { event_category: 'user' })
     }
 
-    const theme = useTheme()
-
     return (
         <div
-            className="fixed top-0 left-0 h-full z-50"
-            style={{
-                boxSizing: 'border-box',
-                width: drawerWidth,
-                borderRightWidth: '1px',
-                borderRightStyle: 'solid',
-                borderRightColor: theme.palette.divider,
-            }}
+            className="fixed top-0 left-0 h-full z-50 w-60 border-r border-border"
         >
-            <div className="ToolBar h-full">
-                <Stack
-                    className="pt-3 pl-2 pr-1"
-                    sx={{
-                        height: '100%',
-                    }}
-                >
-                    <Box className="flex justify-between items-center px-2">
-                        <Box>
-                            <a
-                                href="https://github.com/Bin-Huang/chatbox"
-                                target="_blank"
-                                className="flex items-center no-underline"
-                            >
-                                <img src={icon} className="w-8 h-8 mr-3" />
-                                <div className="flex flex-col items-start">
-                                    <span className="text-2xl font-medium">Chatbox</span>
-                                    <span className="text-[10px] opacity-50">Community Edition</span>
-                                </div>
-                            </a>
-                        </Box>
-                    </Box>
+            <div className="h-full">
+                <div className="flex flex-col h-full pt-3 pl-2 pr-1">
+                    <div className="flex justify-between items-center px-2">
+                        <a
+                            href="https://github.com/Bin-Huang/chatbox"
+                            target="_blank"
+                            className="flex items-center no-underline"
+                        >
+                            <img src={icon} className="w-8 h-8 mr-3" />
+                            <div className="flex flex-col items-start">
+                                <span className="text-2xl font-medium">Chatbox</span>
+                                <span className="text-[10px] opacity-50">Community Edition</span>
+                            </div>
+                        </a>
+                    </div>
 
                     <SessionList sessionListRef={sessionListRef} />
 
-                    <Divider variant="fullWidth" />
+                    <div className="w-full h-px bg-border my-2"></div>
 
-                    <MenuList sx={{ marginBottom: '20px' }}>
-                        <MenuItem onClick={handleCreateNewSession} sx={{ padding: '0.2rem 0.1rem', margin: '0.1rem' }}>
-                            <ListItemIcon>
-                                <IconButton>
-                                    <AddIcon fontSize="small" />
-                                </IconButton>
-                            </ListItemIcon>
-                            <ListItemText>{t('new chat')}</ListItemText>
-                            <Typography variant="body2" color="text.secondary">
-                                {/* ⌘N */}
-                            </Typography>
-                        </MenuItem>
-
-                        <MenuItem onClick={props.openCopilotWindow}>
-                            <ListItemIcon>
-                                <SmartToyIcon fontSize="small" />
-                            </ListItemIcon>
-                            <ListItemText>
-                                <Typography className='fw500' variant='inherit'>{t('AI Copilot')}</Typography>
-                            </ListItemText>
-                        </MenuItem>
-
-                        <MenuItem
-                            onClick={() => {
-                                props.setOpenSettingWindow('ai')
-                            }}
-                            sx={{ padding: '0.2rem 0.1rem', margin: '0.1rem' }}
+                    <nav className="mb-5 space-y-1">
+                        <button 
+                            onClick={handleCreateNewSession}
+                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
                         >
-                            <ListItemIcon>
-                                <IconButton>
-                                    <SettingsIcon fontSize="small" />
-                                </IconButton>
-                            </ListItemIcon>
-                            <ListItemText>{t('settings')}</ListItemText>
-                            <Typography variant="body2" color="text.secondary">
-                                {/* ⌘N */}
-                            </Typography>
-                        </MenuItem>
+                            <Plus className="h-4 w-4 mr-2" />
+                            <span className="flex-1">{t('new chat')}</span>
+                        </button>
 
-                        <MenuItem onClick={props.openAboutWindow} sx={{ padding: '0.2rem 0.1rem', margin: '0.1rem' }}>
-                            <ListItemIcon>
-                                <IconButton>
-                                    <InfoOutlinedIcon fontSize="small" />
-                                </IconButton>
-                            </ListItemIcon>
-                            <ListItemText>
-                                <Badge
-                                    color="primary"
-                                    variant="dot"
-                                    invisible={!versionHook.needCheckUpdate}
-                                    sx={{ paddingRight: '8px' }}
-                                >
-                                    <Typography sx={{ opacity: 0.5 }}>
-                                        {t('About')}
-                                        {/\d/.test(versionHook.version) ? `(${versionHook.version})` : ''}
-                                    </Typography>
-                                </Badge>
-                            </ListItemText>
-                        </MenuItem>
+                        <button
+                            onClick={props.openCopilotWindow}
+                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
+                        >
+                            <Bot className="h-4 w-4 mr-2" />
+                            <span className="flex-1 font-medium">{t('AI Copilot')}</span>
+                        </button>
+
+                        <button
+                            onClick={() => props.setOpenSettingWindow('ai')}
+                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
+                        >
+                            <Settings className="h-4 w-4 mr-2" />
+                            <span className="flex-1">{t('settings')}</span>
+                        </button>
+
+                        <button
+                            onClick={props.openAboutWindow}
+                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
+                        >
+                            <Info className="h-4 w-4 mr-2" />
+                            <div className="flex-1 flex items-center">
+                                <span className="opacity-50">
+                                    {t('About')}
+                                    {/\d/.test(versionHook.version) ? `(${versionHook.version})` : ''}
+                                </span>
+                                {versionHook.needCheckUpdate && (
+                                    <span className="ml-2 h-2 w-2 rounded-full bg-primary"></span>
+                                )}
+                            </div>
+                        </button>
 
                         {props.openShadcnTest && (
-                            <MenuItem onClick={props.openShadcnTest}>
-                                <ListItemIcon>
-                                    <AddPhotoAlternateIcon fontSize="small" />
-                                </ListItemIcon>
-                                <ListItemText>
-                                    <Typography className='fw500' variant='inherit'>Shadcn UI 测试</Typography>
-                                </ListItemText>
-                            </MenuItem>
+                            <button
+                                onClick={props.openShadcnTest}
+                                className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
+                            >
+                                <ImageIcon className="h-4 w-4 mr-2" />
+                                <span className="flex-1 font-medium">Shadcn UI 测试</span>
+                            </button>
                         )}
-                    </MenuList>
-                </Stack>
+                    </nav>
+                </div>
             </div>
         </div>
     )

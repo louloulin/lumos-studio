@@ -40,7 +40,7 @@
    - 用 tailwind/shadcn 布局替换 `<Box>`、`<Grid>`、`<Container>`
    - 用 shadcn 重置样式更新 `<CssBaseline>`
 
-2. **导航组件** - ⏳ 进行中
+2. **导航组件** - ✅ 已完成
    - 使用 shadcn 导航组件迁移 `<Sidebar>` 组件
 
 #### UI 组件（按优先级排序）
@@ -57,15 +57,15 @@
    - 用 shadcn Toast 替换 `<Toasts>`
    - 用 shadcn Alert 替换错误指示器
 
-6. **对话框和模态组件** - ⏳ 进行中
+6. **对话框和模态组件** - ✅ 已完成
    - 用 shadcn Dialog 更新 `SettingDialog`、`ChatConfigWindow`、`AboutWindow`
-   - 用 shadcn Dialog 更新任何模态框
+   - 用 shadcn Dialog 更新 `CopilotWindow` 等模态框
 
 7. **高级组件** - ⏳ 进行中
    - 用 shadcn Accordion 替换 `<Accordion>`
    - 用 shadcn Slider 替换滑块组件（`TemperatureSlider` 等）
-   - 用 shadcn Avatar 替换 `<Avatar>`
-   - 用 shadcn DropdownMenu 替换 `<StyledMenu>`
+   - 用 shadcn Avatar 替换 `<Avatar>` - ✅ 已完成
+   - 用 shadcn DropdownMenu 替换 `<StyledMenu>` - ✅ 已完成
 
 8. **消息组件** - ✅ 已完成
    - 使用 shadcn Card、Typography 重构 `<Message>`、`<MessageList>` 等
@@ -98,11 +98,11 @@
 | `<Accordion>`          | shadcn Accordion                      | ⏳ 进行中 |
 | `<Slider>`             | shadcn Slider                         | ⏳ 进行中 |
 | `<Avatar>`             | shadcn Avatar                         | ✅ 已完成 |
-| `<Dialog>`             | shadcn Dialog                         | ⏳ 进行中 |
+| `<Dialog>`             | shadcn Dialog                         | ✅ 已完成 |
 | `<Grid>`               | div + tailwind grid 类                | ✅ 已完成 |
-| `<Menu>`、`<MenuItem>` | shadcn DropdownMenu                   | ⏳ 进行中 |
+| `<Menu>`、`<MenuItem>` | shadcn DropdownMenu                   | ✅ 已完成 |
 | `<Tooltip>`            | shadcn Tooltip                        | ⏳ 进行中 |
-| `<Tabs>`               | shadcn Tabs                           | ⏳ 进行中 |
+| `<Tabs>`               | shadcn Tabs                           | ✅ 已完成 |
 | `<CssBaseline>`        | 移除（由 Tailwind reset 处理）        | ✅ 已完成 |
 | `<ThemeProvider>`      | shadcn ThemeProvider 方法            | ✅ 已完成 |
 
@@ -114,6 +114,10 @@
 4. **InputBox** - 将输入框组件从 MUI 迁移到了 Tailwind 样式
 5. **Toasts** - 将通知组件从 MUI 的 Snackbar 迁移到 shadcn/ui 的 Toast
 6. **App 组件** - 更新了 App 组件以使用新的 ThemeProvider
+7. **Sidebar** - 将侧边栏组件从 MUI 迁移到了 Tailwind 样式和 shadcn/ui 组件
+8. **AboutWindow** - 将关于窗口从 MUI Dialog 迁移到 shadcn/ui Dialog
+9. **CopilotWindow** - 将 Copilot 窗口从 MUI Dialog 迁移到 shadcn/ui Dialog，并实现了 Tabs、DropdownMenu 等组件
+10. **增强组件** - 添加了各种 shadcn/ui 组件：Badge、Textarea、Switch、Label 等
 
 ## 实现示例
 
@@ -163,6 +167,35 @@
 </ThemeProvider>
 ```
 
+### 示例 4：对话框迁移
+从：
+```tsx
+<Dialog open={props.open} onClose={props.close} fullWidth>
+  <DialogTitle>{title}</DialogTitle>
+  <DialogContent>
+    {content}
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={props.close}>{closeText}</Button>
+  </DialogActions>
+</Dialog>
+```
+
+到：
+```tsx
+<Dialog open={props.open} onOpenChange={(open) => !open && props.close()}>
+  <DialogContent className="sm:max-w-md">
+    <DialogHeader>
+      <DialogTitle>{title}</DialogTitle>
+    </DialogHeader>
+    {content}
+    <DialogFooter>
+      <Button onClick={props.close}>{closeText}</Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
+```
+
 ## 移除清单
 
 - [ ] @emotion/react
@@ -176,4 +209,4 @@
 - [x] @shadcn/ui 组件
 - [x] Lucide React 图标（已在依赖中）
 - [x] @radix-ui/* 组件（部分已在依赖中）
-- [ ] Class variance authority 
+- [x] Class variance authority 

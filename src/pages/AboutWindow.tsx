@@ -1,20 +1,19 @@
-import {
-    Button,
-    Paper,
-    Badge,
-    Box,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    DialogTitle,
-    useTheme,
-} from '@mui/material'
-import iconPNG from '@/static/icon.png'
 import { useTranslation } from 'react-i18next'
+import iconPNG from '@/static/icon.png'
 import platform from '@/packages/platform'
 import useVersion from '@/hooks/useVersion'
 import * as atoms from '@/stores/atoms'
 import { useAtomValue } from 'jotai'
+import { cn } from '@/lib/utils'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Badge } from '@/components/ui/badge'
 
 interface Props {
     open: boolean
@@ -23,112 +22,91 @@ interface Props {
 
 export default function AboutWindow(props: Props) {
     const { t } = useTranslation()
-    const theme = useTheme()
     const language = useAtomValue(atoms.languageAtom)
     const versionHook = useVersion()
+    
     return (
-        <Dialog open={props.open} onClose={props.close} fullWidth>
-            <DialogTitle>{t('About Chatbox')}</DialogTitle>
-            <DialogContent>
-                <Box sx={{ textAlign: 'center', padding: '0 20px' }}>
-                    <img src={iconPNG} style={{ width: '100px', margin: 0, display: 'inline-block' }} />
-                    <h3 style={{ margin: '4px 0 5px 0' }}>Chatbox
-                        {
-                            /\d/.test(versionHook.version)
-                                ? `(v${versionHook.version})`
-                                : ''
-                        }
+        <Dialog open={props.open} onOpenChange={(open) => !open && props.close()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t('About Chatbox')}</DialogTitle>
+                </DialogHeader>
+                
+                <div className="text-center px-5">
+                    <img src={iconPNG} className="w-24 inline-block" />
+                    <h3 className="m-1">
+                        Chatbox
+                        {/\d/.test(versionHook.version) ? `(v${versionHook.version})` : ''}
                     </h3>
                     <p className="p-0 m-0">{t('about-slogan')}</p>
                     <p className="p-0 m-0 opacity-60 text-xs">{t('about-introduction')}</p>
-                </Box>
-                <Box
-                    sx={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        flexWrap: 'wrap',
-                    }}
-                    className='mt-1'
-                >
-                    <Badge color="primary" variant="dot" invisible={!versionHook.needCheckUpdate}
-                        sx={{ margin: '4px' }}
-                    >
+                </div>
+                
+                <div className="flex justify-center items-center flex-wrap mt-1">
+                    <div className="relative m-1">
+                        {versionHook.needCheckUpdate && (
+                            <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full"></span>
+                        )}
                         <Button
-                            variant="outlined"
+                            variant="outline"
                             onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/check_update/${language}`)}
                         >
                             {t('Check Update')}
                         </Button>
-                    </Badge>
+                    </div>
+                    
                     <Button
-                        variant="outlined"
-                        sx={{ margin: '4px' }}
+                        variant="outline"
+                        className="m-1"
                         onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/homepage/${language}`)}
                     >
                         {t('Homepage')}
                     </Button>
+                    
                     <Button
-                        variant="outlined"
-                        sx={{ margin: '4px' }}
+                        variant="outline"
+                        className="m-1"
                         onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/feedback/${language}`)}
                     >
                         {t('Feedback')}
                     </Button>
+                    
                     <Button
-                        variant="outlined"
-                        sx={{ margin: '4px' }}
+                        variant="outline"
+                        className="m-1"
                         onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/faqs/${language}`)}
                     >
                         {t('FAQs')}
                     </Button>
-                </Box>
-                <Paper
-                    elevation={2}
-                    className="font-light text-xs m-2 py-1 px-4"
-                    sx={{
-                        backgroundColor: 'paper',
-                    }}
-                >
-                    <div className='my-1'>
+                </div>
+                
+                <div className="border rounded-md text-xs p-4 my-2 bg-card">
+                    <div className="my-1">
                         <b>Benn:</b>
                     </div>
-                    <div className='my-1'>
+                    <div className="my-1">
                         <span>{t('Auther Message')}</span>
                     </div>
-                    <div className='my-1'>
+                    <div className="my-1">
                         <a
-                            className='underline font-normal cursor-pointer mr-4' style={{ color: theme.palette.primary.main }}
+                            className="underline font-normal cursor-pointer mr-4 text-primary"
                             onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/donate/${language}`)}
                         >
                             {t('Donate')}
                         </a>
                         <a
-                            className='underline font-normal cursor-pointer mr-4' style={{ color: theme.palette.primary.main }}
+                            className="underline font-normal cursor-pointer mr-4 text-primary"
                             onClick={() => platform.openLink(`https://chatboxai.app/redirect_app/author/${language}`)}
                         >
                             {t('Follow me on Twitter(X)')}
                         </a>
-                        {/* <Button
-                            variant="text"
-                            onClick={() =>
-                                api.openLink(`https://chatboxai.app/redirect_app/become_sponsor/${language}`)
-                            }
-                        >
-                            {t('Or become a sponsor')}
-                        </Button> */}
                     </div>
-                </Paper>
-                {/* <Box>
-                    <h4 className="text-center mb-1 mt-2">{t('Changelog')}</h4>
-                    <Box className="px-6">
-                        <Markdown>{i18n.changelog()}</Markdown>
-                    </Box>
-                </Box> */}
+                </div>
+                
+                <DialogFooter>
+                    <Button onClick={props.close}>{t('close')}</Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.close}>{t('close')}</Button>
-            </DialogActions>
         </Dialog>
     )
 }

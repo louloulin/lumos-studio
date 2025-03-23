@@ -1,42 +1,40 @@
 import React, { useState, useEffect } from 'react'
-import {
-    Button,
-    Avatar,
-    useTheme,
-    IconButton,
-    Tabs,
-    Tab,
-    Divider,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    DialogTitle,
-    TextField,
-    FormGroup,
-    FormControlLabel,
-    Switch,
-    MenuItem,
-    Typography,
-    Box,
-    ButtonGroup,
-} from '@mui/material'
 import { CopilotDetail, Message } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
-import EditIcon from '@mui/icons-material/Edit'
-import StyledMenu from '@/components/StyledMenu'
-import StarIcon from '@mui/icons-material/Star'
-import StarOutlineIcon from '@mui/icons-material/StarOutline'
-import DeleteForeverIcon from '@mui/icons-material/DeleteForever'
-import MoreHorizOutlinedIcon from '@mui/icons-material/MoreHorizOutlined'
 import { useMyCopilots, useRemoteCopilots } from '@/hooks/useCopilots'
 import * as remote from '@/packages/remote'
 import { v4 as uuidv4 } from 'uuid'
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline'
 import * as atoms from '@/stores/atoms'
 import * as sessionActions from '@/stores/sessionActions'
 import { useAtomValue } from 'jotai'
 import platform from '@/packages/platform'
 import { trackingEvent } from '@/packages/event'
+
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
+
+// Lucide Icons
+import { PlusCircle, Star, StarOff, Edit, Trash2, MoreHorizontal } from 'lucide-react'
 
 interface Props {
     open: boolean
@@ -104,9 +102,12 @@ export default function CopilotWindow(props: Props) {
     ]
 
     return (
-        <Dialog open={props.open} onClose={props.close} fullWidth maxWidth="md" classes={{ paper: 'h-4/5' }}>
-            <DialogTitle>{t('My Copilots')}</DialogTitle>
-            <DialogContent style={{ width: '100%' }}>
+        <Dialog open={props.open} onOpenChange={(open) => !open && props.close()}>
+            <DialogContent className="sm:max-w-4xl h-4/5">
+                <DialogHeader>
+                    <DialogTitle>{t('My Copilots')}</DialogTitle>
+                </DialogHeader>
+                
                 {copilotEdit ? (
                     <CopilotForm
                         copilotDetail={copilotEdit}
@@ -120,80 +121,60 @@ export default function CopilotWindow(props: Props) {
                     />
                 ) : (
                     <Button
-                        variant="outlined"
-                        startIcon={<AddCircleOutlineIcon />}
+                        variant="outline"
                         onClick={() => {
                             getEmptyCopilot().then(setCopilotEdit)
                         }}
                     >
+                        <PlusCircle className="h-4 w-4 mr-2" />
                         {t('Create New Copilot')}
                     </Button>
                 )}
-                <ScrollableTabsButtonAuto
-                    values={[{ value: 'my', label: t('My Copilots') }]}
-                    currentValue="my"
-                    onChange={() => { }}
-                />
-                <div
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        flexWrap: 'wrap',
-                        width: '100%',
-                        overflowY: 'auto',
-                        overflowX: 'hidden',
-                    }}
-                >
-                    {list.map((item, ix) => (
-                        <MiniItem
-                            key={`${item.id}_${ix}`}
-                            mode="local"
-                            detail={item}
-                            useMe={() => useCopilot(item)}
-                            switchStarred={() => {
-                                store.addOrUpdate({
-                                    ...item,
-                                    starred: !item.starred,
-                                })
-                            }}
-                            editMe={() => {
-                                setCopilotEdit(item)
-                            }}
-                            deleteMe={() => {
-                                store.remove(item.id)
-                            }}
-                        />
-                    ))}
-                </div>
-
-                <ScrollableTabsButtonAuto
-                    values={[
-                        {
-                            value: 'chatbox-featured',
-                            label: t('Chatbox Featured'),
-                        },
-                    ]}
-                    currentValue="chatbox-featured"
-                    onChange={() => { }}
-                />
-                <div
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        flexWrap: 'wrap',
-                        width: '100%',
-                        overflowY: 'auto',
-                        overflowX: 'hidden',
-                    }}
-                >
-                    {remoteStore.copilots.map((item, ix) => (
-                        <MiniItem key={`${item.id}_${ix}`} mode="remote" detail={item} useMe={() => useCopilot(item)} />
-                    ))}
-                </div>
+                
+                <Tabs defaultValue="my" className="w-full">
+                    <TabsList>
+                        <TabsTrigger value="my">{t('My Copilots')}</TabsTrigger>
+                        <TabsTrigger value="featured">{t('Chatbox Featured')}</TabsTrigger>
+                    </TabsList>
+                    
+                    <TabsContent value="my">
+                        <div className="flex flex-wrap w-full gap-2 overflow-y-auto overflow-x-hidden">
+                            {list.map((item, ix) => (
+                                <MiniItem
+                                    key={`${item.id}_${ix}`}
+                                    mode="local"
+                                    detail={item}
+                                    useMe={() => useCopilot(item)}
+                                    switchStarred={() => {
+                                        store.addOrUpdate({
+                                            ...item,
+                                            starred: !item.starred,
+                                        })
+                                    }}
+                                    editMe={() => {
+                                        setCopilotEdit(item)
+                                    }}
+                                    deleteMe={() => {
+                                        store.remove(item.id)
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    </TabsContent>
+                    
+                    <TabsContent value="featured">
+                        <div className="flex flex-wrap w-full gap-2 overflow-y-auto overflow-x-hidden">
+                            {remoteStore.copilots.map((item, ix) => (
+                                <MiniItem key={`${item.id}_${ix}`} mode="remote" detail={item} useMe={() => useCopilot(item)} />
+                            ))}
+                        </div>
+                    </TabsContent>
+                </Tabs>
+                
+                <DialogFooter>
+                    <Button onClick={props.close}>{t('close')}</Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={props.close}>{t('close')}</Button>
-            </DialogActions>
         </Dialog>
     )
 }
@@ -215,166 +196,74 @@ type MiniItemProps =
 
 function MiniItem(props: MiniItemProps) {
     const { t } = useTranslation()
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
-    const open = Boolean(anchorEl)
+    
     const useCopilot = (event: React.MouseEvent<HTMLElement>) => {
         event.preventDefault()
-        if (open) {
-            return
-        }
         props.useMe()
     }
-    const openMenu = (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation()
-        event.preventDefault()
-        setAnchorEl(event.currentTarget)
-    }
-    const closeMenu = () => {
-        setAnchorEl(null)
-    }
+
     return (
-        <Box
-            sx={{
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                padding: '5px',
-                margin: '5px',
-                cursor: 'pointer',
-                '.edit-icon': {
-                    opacity: 0,
-                },
-                '&:hover .edit-icon': {
-                    opacity: 1,
-                },
-            }}
-            className='w-48 hover:bg-slate-400/25 border-solid border-slate-400/20 rounded-md'
+        <div
+            className={cn(
+                "flex flex-row items-center p-2 m-1 cursor-pointer w-48",
+                "hover:bg-secondary/25 border border-secondary/20 rounded-md"
+            )}
             onClick={useCopilot}
         >
-            <Avatar
-                sizes="30px"
-                sx={{ width: '30px', height: '30px' }}
-                src={props.detail.picUrl}
-            ></Avatar>
-            <div
-                style={{
-                    marginLeft: '5px',
-                }}
-                className='w-28'
-            >
-                <Typography variant="body1" noWrap>
-                    {props.detail.name}
-                </Typography>
+            <Avatar className="h-8 w-8">
+                <AvatarImage src={props.detail.picUrl} />
+                <AvatarFallback>{props.detail.name.charAt(0)}</AvatarFallback>
+            </Avatar>
+            
+            <div className="ml-2 w-28">
+                <p className="text-sm font-medium truncate">{props.detail.name}</p>
             </div>
 
             {props.mode === 'local' && (
-                <>
-                    <div
-                        style={{
-                            width: '30px',
-                            height: '10px',
-                            marginLeft: '2px',
-                            display: 'flex',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <IconButton onClick={openMenu}>
-                            {props.detail.starred ? (
-                                <StarIcon color="primary" fontSize="small" />
-                            ) : (
-                                <MoreHorizOutlinedIcon className="edit-icon" color="primary" fontSize="small" />
-                            )}
-                        </IconButton>
-                    </div>
-                    <StyledMenu
-                        MenuListProps={{
-                            'aria-labelledby': 'long-button',
-                        }}
-                        anchorEl={anchorEl}
-                        open={open}
-                        onClose={closeMenu}
-                    >
-                        <MenuItem
-                            key={'star'}
-                            onClick={() => {
-                                props.switchStarred()
-                                closeMenu()
-                            }}
-                            disableRipple
-                        >
-                            {props.detail.starred ? (
-                                <>
-                                    <StarOutlineIcon fontSize="small" />
-                                    {t('unstar')}
-                                </>
-                            ) : (
-                                <>
-                                    <StarIcon fontSize="small" />
-                                    {t('star')}
-                                </>
-                            )}
-                        </MenuItem>
-
-                        <MenuItem
-                            key={'edit'}
-                            onClick={() => {
-                                props.editMe()
-                                closeMenu()
-                            }}
-                            disableRipple
-                        >
-                            <EditIcon />
-                            {t('edit')}
-                        </MenuItem>
-
-                        <Divider sx={{ my: 0.5 }} />
-
-                        <MenuItem
-                            key={'del'}
-                            onClick={() => {
-                                setAnchorEl(null)
-                                closeMenu()
-                                props.deleteMe()
-                            }}
-                            disableRipple
-                            sx={{
-                                '&:hover': {
-                                    backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                                },
-                            }}
-                        >
-                            <DeleteForeverIcon />
-                            {t('delete')}
-                        </MenuItem>
-                    </StyledMenu>
-                </>
+                <div className="ml-auto">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 p-0">
+                                {props.detail.starred ? 
+                                    <Star className="h-4 w-4 text-primary" /> : 
+                                    <MoreHorizontal className="h-4 w-4" />
+                                }
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={props.switchStarred}>
+                                {props.detail.starred ? (
+                                    <>
+                                        <StarOff className="h-4 w-4 mr-2" />
+                                        {t('unstar')}
+                                    </>
+                                ) : (
+                                    <>
+                                        <Star className="h-4 w-4 mr-2" />
+                                        {t('star')}
+                                    </>
+                                )}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuItem onClick={props.editMe}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                {t('edit')}
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            <DropdownMenuItem 
+                                onClick={props.deleteMe}
+                                className="text-destructive focus:text-destructive"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                {t('delete')}
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             )}
-        </Box>
-    )
-}
-
-interface TabsProps {
-    currentValue: string
-    values: { value: string; label: string }[]
-    onChange(value: string): void
-}
-function ScrollableTabsButtonAuto(props: TabsProps) {
-    return (
-        <Box sx={{ marginTop: '14px' }}>
-            <Tabs
-                component="a"
-                value={props.currentValue}
-                onChange={(event, newValue) => {
-                    props.onChange(newValue)
-                }}
-                variant="scrollable"
-                scrollButtons={false}
-            >
-                {props.values.map((item) => (
-                    <Tab key={item.value} label={item.label} value={item.value} />
-                ))}
-            </Tabs>
-        </Box>
+        </div>
     )
 }
 
@@ -382,109 +271,89 @@ interface CopilotFormProps {
     copilotDetail: CopilotDetail
     close(): void
     save(copilotDetail: CopilotDetail): void
-    // premiumActivated: boolean
-    // openPremiumPage(): void
 }
 
 function CopilotForm(props: CopilotFormProps) {
     const { t } = useTranslation()
-    const theme = useTheme()
-    const [copilotEdit, setCopilotEdit] = useState<CopilotDetail>(props.copilotDetail)
-    useEffect(() => {
-        setCopilotEdit(props.copilotDetail)
-    }, [props.copilotDetail])
-    const [helperTexts, setHelperTexts] = useState({
-        name: <></>,
-        prompt: <></>,
-    })
-    const inputHandler = (field: keyof CopilotDetail) => {
-        return (event: React.ChangeEvent<HTMLInputElement>) => {
-            setHelperTexts({ name: <></>, prompt: <></> })
-            setCopilotEdit({ ...copilotEdit, [field]: event.target.value })
-        }
+    const [copilotEdit, setCopilotEdit] = useState<CopilotDetail>({ ...props.copilotDetail })
+    const [errors, setErrors] = useState<Record<string, string>>({})
+
+    const inputHandler = (field: keyof CopilotDetail) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setCopilotEdit({ ...copilotEdit, [field]: e.target.value })
     }
+
     const save = () => {
-        copilotEdit.name = copilotEdit.name.trim()
-        copilotEdit.prompt = copilotEdit.prompt.trim()
-        if (copilotEdit.picUrl) {
-            copilotEdit.picUrl = copilotEdit.picUrl.trim()
+        const newErrors: Record<string, string> = {}
+        if (!copilotEdit.name) {
+            newErrors.name = t('Please input copilot name')
         }
-        if (copilotEdit.name.length === 0) {
-            setHelperTexts({
-                ...helperTexts,
-                name: <p style={{ color: 'red' }}>{t('cannot be empty')}</p>,
-            })
-            return
+        if (!copilotEdit.prompt) {
+            newErrors.prompt = t('Please input copilot prompt')
         }
-        if (copilotEdit.prompt.length === 0) {
-            setHelperTexts({
-                ...helperTexts,
-                prompt: <p style={{ color: 'red' }}>{t('cannot be empty')}</p>,
-            })
+        setErrors(newErrors)
+        if (Object.keys(newErrors).length > 0) {
             return
         }
         props.save(copilotEdit)
-        trackingEvent('create_copilot', { event_category: 'user' })
     }
+
     return (
-        <Box
-            sx={{
-                marginBottom: '20px',
-                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[700] : theme.palette.grey[50],
-                padding: '8px',
-            }}
-        >
-            <TextField
-                margin="dense"
-                label={t('Copilot Name')}
-                fullWidth
-                variant="outlined"
-                placeholder={t('My Assistant') as any}
-                value={copilotEdit.name}
-                onChange={inputHandler('name')}
-                helperText={helperTexts['name']}
-            />
-            <TextField
-                margin="dense"
-                label={t('Copilot Prompt')}
-                placeholder={t('Copilot Prompt Demo') as any}
-                fullWidth
-                variant="outlined"
-                multiline
-                minRows={4}
-                maxRows={10}
-                value={copilotEdit.prompt}
-                onChange={inputHandler('prompt')}
-                helperText={helperTexts['prompt']}
-            />
-            <TextField
-                margin="dense"
-                label={t('Copilot Avatar URL')}
-                placeholder="http://xxxxx/xxx.png"
-                fullWidth
-                variant="outlined"
-                value={copilotEdit.picUrl}
-                onChange={inputHandler('picUrl')}
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                <FormGroup row>
-                    <FormControlLabel
-                        control={<Switch />}
-                        label={t('Share with Chatbox')}
-                        checked={copilotEdit.shared}
-                        onChange={(e, checked) => setCopilotEdit({ ...copilotEdit, shared: checked })}
+        <div className="mb-5 bg-muted p-4 rounded-md">
+            <div className="grid gap-4">
+                <div className="grid gap-2">
+                    <Label htmlFor="name">{t('Copilot Name')}</Label>
+                    <Input 
+                        id="name"
+                        placeholder={t('My Assistant') as string}
+                        value={copilotEdit.name}
+                        onChange={inputHandler('name')}
                     />
-                </FormGroup>
-                <ButtonGroup>
-                    <Button variant="outlined" onClick={() => props.close()}>
-                        {t('cancel')}
-                    </Button>
-                    <Button variant="contained" onClick={save}>
-                        {t('save')}
-                    </Button>
-                </ButtonGroup>
-            </Box>
-        </Box>
+                    {errors.name && <p className="text-destructive text-xs">{errors.name}</p>}
+                </div>
+                
+                <div className="grid gap-2">
+                    <Label htmlFor="prompt">{t('Copilot Prompt')}</Label>
+                    <Textarea 
+                        id="prompt"
+                        placeholder={t('Copilot Prompt Demo') as string}
+                        rows={4}
+                        value={copilotEdit.prompt}
+                        onChange={inputHandler('prompt')}
+                    />
+                    {errors.prompt && <p className="text-destructive text-xs">{errors.prompt}</p>}
+                </div>
+                
+                <div className="grid gap-2">
+                    <Label htmlFor="picUrl">{t('Copilot Avatar URL')}</Label>
+                    <Input 
+                        id="picUrl"
+                        placeholder="http://xxxxx/xxx.png"
+                        value={copilotEdit.picUrl}
+                        onChange={inputHandler('picUrl')}
+                    />
+                </div>
+                
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center space-x-2">
+                        <Switch 
+                            id="share" 
+                            checked={copilotEdit.shared}
+                            onCheckedChange={(checked: boolean) => setCopilotEdit({ ...copilotEdit, shared: checked })}
+                        />
+                        <Label htmlFor="share">{t('Share with Chatbox')}</Label>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                        <Button variant="outline" onClick={props.close}>
+                            {t('cancel')}
+                        </Button>
+                        <Button onClick={save}>
+                            {t('save')}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
     )
 }
 

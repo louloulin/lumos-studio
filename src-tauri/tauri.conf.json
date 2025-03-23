@@ -17,12 +17,14 @@
         "height": 950,
         "resizable": true,
         "fullscreen": false,
-        "label": "main"
+        "label": "main",
+        "visible": true
       }
     ],
     "security": {
       "csp": null
-    }
+    },
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
@@ -33,6 +35,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/mastrax_dist/**/*"
     ]
   },
   "plugins": {
@@ -52,6 +57,14 @@
     "opener": {
       "path": true,
       "allowed-origins": ["*"]
+    },
+    "http": {
+      "all": true,
+      "request": true,
+      "scope": ["http://localhost:4111/*"]
+    },
+    "process": {
+      "all": true
     }
   }
 }

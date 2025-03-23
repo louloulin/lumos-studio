@@ -1,7 +1,10 @@
-import { Button, TextField, Box, FormControlLabel, Switch, FormGroup, Badge, IconButton, useTheme } from '@mui/material'
 import { Settings } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
 import * as defaults from '@/shared/defaults'
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 export default function ChatSettingTab(props: {
     settingsEdit: Settings
@@ -11,16 +14,13 @@ export default function ChatSettingTab(props: {
     const { t } = useTranslation()
 
     return (
-        <Box>
-            <Box className='mb-2'>
-                <TextField
-                    margin="dense"
-                    label={t('Default Prompt for New Conversation')}
-                    fullWidth
-                    variant="outlined"
+        <div className="space-y-6">
+            <div className="space-y-2">
+                <Textarea
+                    placeholder={String(t('Default Prompt for New Conversation'))}
+                    className="resize-none"
                     value={settingsEdit.defaultPrompt || ''}
-                    multiline
-                    maxRows={8}
+                    rows={4}
                     onChange={(e) =>
                         setSettingsEdit({
                             ...settingsEdit,
@@ -29,10 +29,9 @@ export default function ChatSettingTab(props: {
                     }
                 />
                 <Button
-                    size="small"
-                    variant="text"
-                    color="inherit"
-                    sx={{ opacity: 0.5, textTransform: 'none' }}
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs opacity-50"
                     onClick={() => {
                         setSettingsEdit({
                             ...settingsEdit,
@@ -42,45 +41,55 @@ export default function ChatSettingTab(props: {
                 >
                     {t('Reset to Default')}
                 </Button>
-            </Box>
+            </div>
 
-            <FormGroup>
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('Auto-Generate Chat Titles')}
-                    checked={settingsEdit.autoGenerateTitle}
-                    onChange={(e, checked) => {
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            autoGenerateTitle: checked,
-                        })
-                    }}
-                />
-            </FormGroup>
-            <FormGroup>
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('Spell Check')}
-                    checked={settingsEdit.spellCheck}
-                    onChange={(e, checked) => {
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            spellCheck: checked,
-                        })
-                    }}
-                />
-            </FormGroup>
-            <FormGroup>
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('Markdown Rendering')}
-                    checked={settingsEdit.enableMarkdownRendering}
-                    onChange={(e, checked) => {
-                        settingsEdit.enableMarkdownRendering = checked
-                        setSettingsEdit({ ...settingsEdit })
-                    }}
-                />
-            </FormGroup>
-        </Box>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="auto-generate-title" className="cursor-pointer">
+                        {t('Auto-Generate Chat Titles')}
+                    </Label>
+                    <Switch
+                        id="auto-generate-title"
+                        checked={settingsEdit.autoGenerateTitle}
+                        onCheckedChange={(checked) => {
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                autoGenerateTitle: checked,
+                            })
+                        }}
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="spell-check" className="cursor-pointer">
+                        {t('Spell Check')}
+                    </Label>
+                    <Switch
+                        id="spell-check"
+                        checked={settingsEdit.spellCheck}
+                        onCheckedChange={(checked) => {
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                spellCheck: checked,
+                            })
+                        }}
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="markdown-rendering" className="cursor-pointer">
+                        {t('Markdown Rendering')}
+                    </Label>
+                    <Switch
+                        id="markdown-rendering"
+                        checked={settingsEdit.enableMarkdownRendering}
+                        onCheckedChange={(checked) => {
+                            settingsEdit.enableMarkdownRendering = checked
+                            setSettingsEdit({ ...settingsEdit })
+                        }}
+                    />
+                </div>
+            </div>
+        </div>
     )
 }

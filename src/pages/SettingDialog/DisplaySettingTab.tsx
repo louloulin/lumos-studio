@@ -1,9 +1,10 @@
-import { FormGroup, FormControlLabel, Switch, Box } from '@mui/material'
 import { Settings, Theme } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
 import { languageNameMap, languages } from '@/i18n/locales'
-import TranslateIcon from '@mui/icons-material/Translate'
 import SimpleSelect from '@/components/SimpleSelect'
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Languages } from "lucide-react"
 
 export default function DisplaySettingTab(props: {
     settingsEdit: Settings
@@ -13,11 +14,11 @@ export default function DisplaySettingTab(props: {
     const { settingsEdit, setSettingsEdit, changeModeWithPreview } = props
     const { t } = useTranslation()
     return (
-        <Box>
+        <div className="space-y-6">
             <SimpleSelect
                 label={(
-                    <span className="inline-flex items-center justify-center">
-                        <TranslateIcon fontSize="small" />
+                    <span className="inline-flex items-center gap-2">
+                        <Languages className="h-4 w-4" />
                         {t('language')}
                     </span>
                 )}
@@ -41,63 +42,87 @@ export default function DisplaySettingTab(props: {
                     { value: Theme.DarkMode, label: t('Dark Mode') },
                 ]}
             />
-            <FormGroup>
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('show message word count')}
-                    checked={settingsEdit.showWordCount}
-                    onChange={(e, checked) =>
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            showWordCount: checked,
-                        })
-                    }
-                />
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('show message token count')}
-                    checked={settingsEdit.showTokenCount}
-                    onChange={(e, checked) =>
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            showTokenCount: checked,
-                        })
-                    }
-                />
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('show message token usage')}
-                    checked={settingsEdit.showTokenUsed}
-                    onChange={(e, checked) =>
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            showTokenUsed: checked,
-                        })
-                    }
-                />
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('show model name')}
-                    checked={settingsEdit.showModelName}
-                    onChange={(e, checked) =>
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            showModelName: checked,
-                        })
-                    }
-                />
-                <FormControlLabel
-                    control={<Switch />}
-                    label={t('show message timestamp')}
-                    checked={settingsEdit.showMessageTimestamp}
-                    onChange={(e, checked) =>
-                        setSettingsEdit({
-                            ...settingsEdit,
-                            showMessageTimestamp: checked,
-                        })
-                    }
-                />
-            </FormGroup>
-        </Box>
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="show-word-count" className="cursor-pointer">
+                        {t('show message word count')}
+                    </Label>
+                    <Switch
+                        id="show-word-count"
+                        checked={settingsEdit.showWordCount}
+                        onCheckedChange={(checked) =>
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                showWordCount: checked,
+                            })
+                        }
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="show-token-count" className="cursor-pointer">
+                        {t('show message token count')}
+                    </Label>
+                    <Switch
+                        id="show-token-count"
+                        checked={settingsEdit.showTokenCount}
+                        onCheckedChange={(checked) =>
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                showTokenCount: checked,
+                            })
+                        }
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="show-token-used" className="cursor-pointer">
+                        {t('show message token usage')}
+                    </Label>
+                    <Switch
+                        id="show-token-used"
+                        checked={settingsEdit.showTokenUsed}
+                        onCheckedChange={(checked) =>
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                showTokenUsed: checked,
+                            })
+                        }
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="show-model-name" className="cursor-pointer">
+                        {t('show model name')}
+                    </Label>
+                    <Switch
+                        id="show-model-name"
+                        checked={settingsEdit.showModelName}
+                        onCheckedChange={(checked) =>
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                showModelName: checked,
+                            })
+                        }
+                    />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    <Label htmlFor="show-message-timestamp" className="cursor-pointer">
+                        {t('show message timestamp')}
+                    </Label>
+                    <Switch
+                        id="show-message-timestamp"
+                        checked={settingsEdit.showMessageTimestamp}
+                        onCheckedChange={(checked) =>
+                            setSettingsEdit({
+                                ...settingsEdit,
+                                showMessageTimestamp: checked,
+                            })
+                        }
+                    />
+                </div>
+            </div>
+        </div>
     )
 }

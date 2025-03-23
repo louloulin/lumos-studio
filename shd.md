@@ -155,6 +155,7 @@
 | `<Tabs>`               | shadcn Tabs                           | ✅ 已完成 |
 | `<CssBaseline>`        | 移除（由 Tailwind reset 处理）        | ✅ 已完成 |
 | `<ThemeProvider>`      | shadcn ThemeProvider 方法            | ✅ 已完成 |
+| `<Checkbox>`           | shadcn Checkbox                       | ✅ 已完成 |
 
 ## 已完成组件
 
@@ -171,6 +172,8 @@
 11. **Slider 系列组件** - 将 TemperatureSlider、TopPSlider、MaxContextMessageCountSlider 从 MUI 迁移到 shadcn/ui
 12. **Tooltip 组件** - 将 MUI Tooltip 替换为 shadcn/ui Tooltip，改进了 MiniButton 组件中的工具提示功能
 13. **Accordion 组件** - 将 MUI Accordion 替换为 shadcn/ui Accordion，保留了相同的 API 接口
+14. **Tabs 组件** - 将 MUI Tabs、Tab 替换为 shadcn/ui Tabs、TabsList、TabsTrigger 和 TabsContent
+15. **Checkbox 组件** - 将 MUI Checkbox 和 FormControlLabel 替换为 shadcn/ui Checkbox 和 Label 组件
 
 ## 实现示例
 
@@ -312,6 +315,65 @@
     </div>
   </AccordionDetails>
 </Accordion>
+```
+
+### 示例 7：Tabs 迁移
+从：
+```tsx
+<Tabs value={tab} onChange={(_, value) => setTab(value)} className="mb-4">
+  <Tab value="export" label="数据备份" />
+  <Tab value="import" label="数据恢复" />
+</Tabs>
+{tab === 'export' && <ExportPanel />}
+{tab === 'import' && <ImportPanel />}
+```
+
+到：
+```tsx
+<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+  <TabsList className="grid grid-cols-2 mb-4">
+    <TabsTrigger value="export">数据备份</TabsTrigger>
+    <TabsTrigger value="import">数据恢复</TabsTrigger>
+  </TabsList>
+  
+  <TabsContent value="export">
+    <ExportPanel />
+  </TabsContent>
+  
+  <TabsContent value="import">
+    <ImportPanel />
+  </TabsContent>
+</Tabs>
+```
+
+### 示例 8：Checkbox 迁移
+从：
+```tsx
+<FormGroup>
+  <FormControlLabel
+    control={
+      <Checkbox
+        checked={value}
+        onChange={(e) => setValue(e.target.checked)}
+      />
+    }
+    label="启用选项"
+  />
+</FormGroup>
+```
+
+到：
+```tsx
+<div className="flex items-center space-x-2">
+  <Checkbox
+    id="option"
+    checked={value}
+    onCheckedChange={(checked) => setValue(checked === true)}
+  />
+  <Label htmlFor="option" className="cursor-pointer">
+    启用选项
+  </Label>
+</div>
 ```
 
 ## 移除清单

@@ -1,14 +1,3 @@
-import {
-    Typography,
-    Box,
-    useTheme,
-    Tabs,
-    Tab,
-    FormGroup,
-    FormControlLabel,
-    Checkbox,
-    Button,
-} from '@mui/material'
 import { Settings } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
 import { Accordion, AccordionSummary, AccordionDetails } from '@/components/Accordion'
@@ -18,6 +7,10 @@ import * as atoms from '@/stores/atoms'
 import storage, { StorageKey } from '../../storage'
 import { useState, useRef } from 'react'
 import platform from '@/packages/platform'
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 
 interface Props {
     settingsEdit: Settings
@@ -29,10 +22,10 @@ export default function AdvancedSettingTab(props: Props) {
     const { settingsEdit, setSettingsEdit } = props
     const { t } = useTranslation()
     return (
-        <Box>
+        <div className="space-y-4">
             <Accordion>
                 <AccordionSummary aria-controls="panel1a-content">
-                    <Typography>{t('Network Proxy')}</Typography>
+                    <span className="text-base font-medium">{String(t('Network Proxy'))}</span>
                 </AccordionSummary>
                 <AccordionDetails>
                     <TextFieldReset
@@ -50,7 +43,7 @@ export default function AdvancedSettingTab(props: Props) {
             </Accordion>
             <Accordion>
                 <AccordionSummary aria-controls="panel1a-content">
-                    <Typography>{t('Data Backup and Restore')}</Typography>
+                    <span className="text-base font-medium">{String(t('Data Backup and Restore'))}</span>
                 </AccordionSummary>
                 <AccordionDetails>
                     <ExportAndImport onCancel={props.onCancel} />
@@ -58,29 +51,29 @@ export default function AdvancedSettingTab(props: Props) {
             </Accordion>
             <Accordion>
                 <AccordionSummary aria-controls="panel1a-content">
-                    <Typography>{t('Error Reporting')}</Typography>
+                    <span className="text-base font-medium">{String(t('Error Reporting'))}</span>
                 </AccordionSummary>
                 <AccordionDetails>
                     <AnalyticsSetting />
                 </AccordionDetails>
             </Accordion>
-        </Box>
+        </div>
     )
 }
 
 export function AnalyticsSetting() {
     const { t } = useTranslation()
     return (
-        <Box>
+        <div className="space-y-4">
             <div>
-                <p className='opacity-70'>
+                <p className="text-sm opacity-70">
                     {t('Chatbox respects your privacy and only uploads anonymous error data and events when necessary. You can change your preferences at any time in the settings.')}
                 </p>
             </div>
-            <div className='my-2'>
+            <div className="mt-2">
                 <AllowReportingAndTrackingCheckbox />
             </div>
-        </Box>
+        </div>
     )
 }
 
@@ -90,14 +83,18 @@ export function AllowReportingAndTrackingCheckbox(props: {
     const { t } = useTranslation()
     const [allowReportingAndTracking, setAllowReportingAndTracking] = useAtom(atoms.allowReportingAndTrackingAtom)
     return (
-        <span className={props.className}>
-            <input
-                type='checkbox'
+        <div className={`flex items-center space-x-2 ${props.className || ''}`}>
+            <Checkbox
+                id="allow-reporting"
                 checked={allowReportingAndTracking}
-                onChange={(e) => setAllowReportingAndTracking(e.target.checked)}
+                onCheckedChange={(checked: boolean | "indeterminate") => 
+                    setAllowReportingAndTracking(checked === true)
+                }
             />
-            {t('Enable optional anonymous reporting of crash and event data')}
-        </span>
+            <Label htmlFor="allow-reporting" className="cursor-pointer">
+                {t('Enable optional anonymous reporting of crash and event data')}
+            </Label>
+        </div>
     )
 }
 
@@ -109,8 +106,7 @@ enum ExportDataItem {
 
 function ExportAndImport(props: { onCancel: () => void }) {
     const { t } = useTranslation()
-    const theme = useTheme()
-    const [tab, setTab] = useState<'export' | 'import'>('export')
+    const [activeTab, setActiveTab] = useState<string>('export')
     const [exportItems, setExportItems] = useState<ExportDataItem[]>([
         ExportDataItem.Setting,
         ExportDataItem.Conversations,
@@ -118,6 +114,7 @@ function ExportAndImport(props: { onCancel: () => void }) {
     ])
     const importInputRef = useRef<HTMLInputElement>(null)
     const [importTips, setImportTips] = useState('')
+    
     const onExport = async () => {
         const data = await storage.getAll()
         delete data[StorageKey.Configs]
@@ -138,6 +135,7 @@ function ExportAndImport(props: { onCancel: () => void }) {
         const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
         platform.exporter.exportTextFile(`chatbox-exported-data-${dateStr}.json`, JSON.stringify(data))
     }
+    
     const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const errTip = t('Import failed, unsupported data format')
         const file = e.target.files?.[0]
@@ -174,65 +172,56 @@ function ExportAndImport(props: { onCancel: () => void }) {
         }
         reader.readAsText(file)
     }
+    
     return (
-        <Box
-            sx={{
-                backgroundColor: theme.palette.mode === 'dark' ? theme.palette.grey[900] : theme.palette.grey[100],
-            }}
-            className="p-4"
-        >
-            <Tabs value={tab} onChange={(_, value) => setTab(value)} className="mb-4">
-                <Tab
-                    value="export"
-                    label={<span className="inline-flex justify-center items-center">{t('Data Backup')}</span>}
-                />
-                <Tab
-                    value="import"
-                    label={<span className="inline-flex justify-center items-center">{t('Data Restore')}</span>}
-                />
-            </Tabs>
-            {tab === 'export' && (
-                <Box sx={{}}>
-                    <FormGroup className="mb-2">
+        <div className="p-4 bg-muted rounded-md">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid grid-cols-2 mb-4">
+                    <TabsTrigger value="export">{t('Data Backup')}</TabsTrigger>
+                    <TabsTrigger value="import">{t('Data Restore')}</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="export" className="space-y-4">
+                    <div className="space-y-2">
                         {[
                             { label: t('Settings'), value: ExportDataItem.Setting },
                             { label: t('Chat History'), value: ExportDataItem.Conversations },
                             { label: t('My Copilots'), value: ExportDataItem.Copilot },
                         ].map((item) => (
-                            <FormControlLabel
-                                label={item.label}
-                                control={
-                                    <Checkbox
-                                        checked={exportItems.includes(item.value)}
-                                        onChange={(e, checked) => {
-                                            if (checked && !exportItems.includes(item.value)) {
-                                                setExportItems([...exportItems, item.value])
-                                            } else if (!checked) {
-                                                setExportItems(exportItems.filter((v) => v !== item.value))
-                                            }
-                                        }}
-                                    />
-                                }
-                            />
+                            <div key={item.value} className="flex items-center space-x-2">
+                                <Checkbox
+                                    id={`export-${item.value}`}
+                                    checked={exportItems.includes(item.value)}
+                                    onCheckedChange={(checked: boolean | "indeterminate") => {
+                                        if (checked === true && !exportItems.includes(item.value)) {
+                                            setExportItems([...exportItems, item.value])
+                                        } else if (checked === false) {
+                                            setExportItems(exportItems.filter((v) => v !== item.value))
+                                        }
+                                    }}
+                                />
+                                <Label htmlFor={`export-${item.value}`} className="cursor-pointer">
+                                    {item.label}
+                                </Label>
+                            </div>
                         ))}
-                    </FormGroup>
-                    <Button variant="contained" color="primary" onClick={onExport}>
+                    </div>
+                    <Button onClick={onExport}>
                         {t('Export Selected Data')}
                     </Button>
-                </Box>
-            )}
-            {tab === 'import' && (
-                <Box>
-                    <Box className="p-1">
+                </TabsContent>
+                
+                <TabsContent value="import" className="space-y-4">
+                    <div className="text-sm">
                         {t('Upon import, changes will take effect immediately and existing data will be overwritten')}
-                    </Box>
-                    {importTips && <Box className="p-1 text-red-600">{importTips}</Box>}
+                    </div>
+                    {importTips && <div className="text-destructive text-sm">{importTips}</div>}
                     <input style={{ display: 'none' }} type="file" ref={importInputRef} onChange={onImport} />
-                    <Button variant="contained" color="primary" onClick={() => importInputRef.current?.click()}>
+                    <Button onClick={() => importInputRef.current?.click()}>
                         {t('Import and Restore')}
                     </Button>
-                </Box>
-            )}
-        </Box>
+                </TabsContent>
+            </Tabs>
+        </div>
     )
 }

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Chatbox CE",
+  "version": "0.0.1",
+  "identifier": "xyz.chatboxapp.ce",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Chatbox CE",
+        "width": 1000,
+        "height": 950,
+        "resizable": true,
+        "fullscreen": false,
+        "label": "main"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "os": {
+      "platform": true,
+      "type": true,
+      "hostname": true,
+      "arch": true
+    },
+    "store": {
+      "allowed-origins": ["*"],
+      "persistent": true
+    },
+    "opener": {
+      "path": true,
+      "allowed-origins": ["*"]
+    }
+  }
+}

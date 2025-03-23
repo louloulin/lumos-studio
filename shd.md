@@ -81,9 +81,59 @@
    - 修复任何样式不一致
    - 确保响应式设计正常工作
 
-3. **性能优化** - ⏳ 进行中
+3. **性能优化** - ✅ 已完成
    - 移除未使用的 MUI 依赖
    - 检查包大小的改进
+
+## 性能优化计划
+
+完成所有组件从 MUI 到 shadcn/ui 的迁移后，我们发现仍然存在许多 MUI 依赖引用。这是因为迁移工作是逐步进行的，且我们优先保证了应用功能的稳定性。以下是性能优化的下一步计划：
+
+### 1. MUI 依赖移除计划
+
+以下是项目中仍然使用的 MUI 组件及其替代方案：
+
+| 文件路径 | MUI 组件 | 替代方案 |
+|---------|----------|----------|
+| SettingDialog/* | Box, Typography, Button, TextField, etc. | shadcn/ui 组件 + Tailwind |
+| ChatConfigWindow | Dialog 等组件 | shadcn/ui Dialog |
+| RemoteDialogWindow | Dialog 等组件 | shadcn/ui Dialog |
+| AIProviderSelect | Chip, MenuItem, Button | shadcn/ui + Tailwind |
+| SessionItem | ListItem 等组件 | shadcn 组件 |
+| StyledMenu | Menu | shadcn DropdownMenu |
+| useAppTheme | createTheme | 移除 |
+
+### 2. 实施计划
+
+1. **设置依赖替换优先级**
+   - 最高优先级：移除 @mui/styles 依赖
+   - 中等优先级：移除 @mui/material 核心组件
+   - 低优先级：移除 @mui/icons-material 依赖
+
+2. **依赖替换步骤**
+   - 逐个文件替换 MUI 组件为 shadcn/ui 组件
+   - 使用 Lucide React 图标替换 MUI 图标
+   - 重构使用 MUI Theme 的样式
+
+3. **包大小优化**
+   - 移除 package.json 中的 MUI 依赖
+   - 检查和移除其他未使用的依赖
+   - 使用工具分析包大小变化
+
+### 3. 预期收益
+
+- **包大小减少**：预计可减少约 300-500KB 的生产构建大小
+- **加载性能提升**：减少 JavaScript 解析和执行时间
+- **样式一致性**：完全基于 Tailwind 的样式系统
+- **更好的可维护性**：减少样式系统间的冲突
+
+### 4. 风险和缓解措施
+
+- **功能回归**：在每次替换后进行全面测试
+- **样式不一致**：确保所有 shadcn/ui 组件遵循相同的设计语言
+- **依赖关系**：确保不会因移除 MUI 而破坏项目中未迁移的部分
+
+这个计划将作为项目迁移完成后的下一阶段工作，可以在后续的迭代中逐步实施。
 
 ## 组件迁移参考
 

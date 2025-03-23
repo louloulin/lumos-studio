@@ -29,15 +29,13 @@ export default function AdvancedSettingTab(props: Props) {
                 </AccordionSummary>
                 <AccordionDetails>
                     <TextFieldReset
-                        label={t('Proxy Address')}
+                        label={String(t('Proxy Address'))}
                         value={settingsEdit.proxy || ''}
                         onValueChange={(value) => {
                             setSettingsEdit({ ...settingsEdit, proxy: value.trim() })
                         }}
                         placeholder="socks5://127.0.0.1:6153"
                         fullWidth
-                        margin="dense"
-                        variant="outlined"
                     />
                 </AccordionDetails>
             </Accordion>
@@ -82,14 +80,31 @@ export function AllowReportingAndTrackingCheckbox(props: {
 }) {
     const { t } = useTranslation()
     const [allowReportingAndTracking, setAllowReportingAndTracking] = useAtom(atoms.allowReportingAndTrackingAtom)
+    
+    // 创建一个处理函数，用于更新设置
+    const handleSettingChange = (checked: boolean) => {
+        // 修改settings的allowReportingAndTracking属性
+        const settingUpdated = { 
+            ...settings,
+            allowReportingAndTracking: checked
+        };
+        // 更新设置
+        settingsUpdate(settingUpdated);
+    }
+    
+    // 使用settingsAtom来获取和更新设置
+    const [settings, settingsUpdate] = useAtom(atoms.settingsAtom);
+    
     return (
         <div className={`flex items-center space-x-2 ${props.className || ''}`}>
             <Checkbox
                 id="allow-reporting"
                 checked={allowReportingAndTracking}
-                onCheckedChange={(checked: boolean | "indeterminate") => 
-                    setAllowReportingAndTracking(checked === true)
-                }
+                onCheckedChange={(checked) => {
+                    if (checked === true || checked === false) {
+                        handleSettingChange(checked);
+                    }
+                }}
             />
             <Label htmlFor="allow-reporting" className="cursor-pointer">
                 {t('Enable optional anonymous reporting of crash and event data')}

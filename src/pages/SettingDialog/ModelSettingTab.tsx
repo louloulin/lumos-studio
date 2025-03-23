@@ -9,6 +9,7 @@ import MaxContextMessageCountSlider from '@/components/MaxContextMessageCountSli
 import TemperatureSlider from '@/components/TemperatureSlider'
 import ClaudeSetting from './ClaudeSetting'
 import PPIOSetting from './PPIOSetting'
+import MastraSetting from './MastraSetting'
 import { Separator } from "@/components/ui/separator"
 
 interface ModelConfigProps {
@@ -84,6 +85,9 @@ export default function ModelSettingTab(props: ModelConfigProps) {
             )}
             {settingsEdit.aiProvider === ModelProvider.PPIO && (
                 <PPIOSetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
+            )}
+            {settingsEdit.aiProvider === ModelProvider.Mastra && (
+                <MastraSetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
         </div>
     )

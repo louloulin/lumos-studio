@@ -78,6 +78,7 @@ export enum ModelProvider {
     SiliconFlow = 'silicon-flow',
     LMStudio = 'lm-studio',
     PPIO = 'ppio',
+    Mastra = 'mastra',
 }
 
 export interface ModelSettings {
@@ -128,6 +129,9 @@ export interface ModelSettings {
     ppioHost: string
     ppioKey: string
     ppioModel: string
+    
+    // mastra
+    mastraAgentName: string
 
     temperature: number
     topP: number

@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import icon from './static/icon.png'
 import useVersion from './hooks/useVersion'
@@ -17,14 +17,14 @@ import {
     Info, 
     Bot, 
     ImageIcon,
-    Github as GithubIcon
+    Github as GithubIcon,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react'
-import platform from '@/packages/platform'
+import platform from './packages/platform'
 import { useAtom } from "jotai"
-import { sessionsAtom } from "@/stores/atoms"
-import { useSettingStore } from "@/stores/settings"
-import { useHistoryStore } from "@/stores/history"
-import { create } from "@/stores/sessionActions"
+import { sessionsAtom } from "./stores/atoms"
+import { create } from "./stores/sessionActions"
 
 export const drawerWidth = 240
 
@@ -33,6 +33,7 @@ interface Props {
     openAboutWindow(): void
     setOpenSettingWindow(name: 'ai' | 'display' | null): void
     openShadcnTest?(): void
+    onToggleVisibility?(visible: boolean): void
 }
 
 export default function Sidebar(props: Props) {
@@ -40,19 +41,37 @@ export default function Sidebar(props: Props) {
     const { t } = useTranslation()
     const [sessions, setSessions] = useAtom(sessionsAtom)
     const versionHook = useVersion()
+    const [isVisible, setIsVisible] = useState(true)
+
+    // 切换侧边栏可见性
+    const toggleSidebarVisibility = () => {
+        const newVisibility = !isVisible;
+        setIsVisible(newVisibility);
+        if (props.onToggleVisibility) {
+            props.onToggleVisibility(newVisibility);
+        }
+    }
+
+    // 初始化时通知父组件侧边栏状态
+    useEffect(() => {
+        if (props.onToggleVisibility) {
+            props.onToggleVisibility(isVisible);
+        }
+    }, []);
 
     const handleCreateNewSession = () => {
-        const session = create('chat')
-        setSessions([session, ...sessions])
+        sessionActions.createEmpty('chat');
         if (sessionListRef.current) {
-            sessionListRef.current.scrollTo(0, 0)
+            sessionListRef.current.scrollTo(0, 0);
         }
-        trackingEvent('create_new_conversation', { event_category: 'user' })
+        trackingEvent('create_new_conversation', { event_category: 'user' });
     }
 
     return (
         <div
-            className="fixed top-0 left-0 h-full z-50 w-60 border-r border-border"
+            className={`fixed top-0 left-0 h-full z-50 w-60 border-r border-border transition-all duration-300 ${
+                isVisible ? '' : '-translate-x-full'
+            }`}
         >
             <div className="h-full">
                 <div className="flex flex-col h-full pt-3 pl-2 pr-1">
@@ -68,57 +87,63 @@ export default function Sidebar(props: Props) {
                                 <span className="text-[10px] opacity-50">Studio</span>
                             </div>
                         </a>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={toggleSidebarVisibility}
+                            className="h-8 w-8"
+                        >
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
                     </div>
-
-                    <SessionList sessionListRef={sessionListRef} />
-
-                    <div className="w-full h-px bg-border my-2"></div>
-
-                    <nav className="mb-5 space-y-1">
-                        <button 
+                    <div className="flex-grow mt-4 overflow-hidden">
+                        <div className="flex flex-col flex-1 h-full overflow-auto hide-scrollbar" ref={sessionListRef}>
+                            <SessionList sessionListRef={sessionListRef} />
+                        </div>
+                    </div>
+                    <div className="flex flex-col gap-2 p-2 pt-2 border-t border-border">
+                        <Button
+                            variant="secondary"
+                            className="w-full justify-start"
                             onClick={handleCreateNewSession}
-                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
                         >
                             <Plus className="h-4 w-4 mr-2" />
-                            <span className="flex-1">{t('new chat')}</span>
-                        </button>
-
-                        <button
-                            onClick={props.openCopilotWindow}
-                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
-                        >
-                            <Bot className="h-4 w-4 mr-2" />
-                            <span className="flex-1 font-medium">{t('AI Copilot')}</span>
-                        </button>
-
-                        <button
-                            onClick={() => props.setOpenSettingWindow('ai')}
-                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
-                        >
-                            <Settings className="h-4 w-4 mr-2" />
-                            <span className="flex-1">{t('settings')}</span>
-                        </button>
-
-                        <button
-                            onClick={props.openAboutWindow}
-                            className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
-                        >
-                            <Info className="h-4 w-4 mr-2" />
-                            <span className="flex-1">{t('about')}</span>
-                        </button>
-
-                        {props.openShadcnTest && (
-                            <button
-                                onClick={props.openShadcnTest}
-                                className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
-                            >
-                                <ImageIcon className="h-4 w-4 mr-2" />
-                                <span className="flex-1">UI Test</span>
-                            </button>
-                        )}
-                    </nav>
+                            {t('create_new_chat')}
+                        </Button>
+                        <div className="grid grid-cols-4 gap-2">
+                            <Button variant="outline" size="icon" onClick={() => props.openAboutWindow()}>
+                                <Info className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => props.setOpenSettingWindow('ai')}>
+                                <Settings className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" onClick={() => props.openCopilotWindow()}>
+                                <Bot className="h-4 w-4" />
+                            </Button>
+                            {props.openShadcnTest && (
+                                <Button variant="outline" size="icon" onClick={props.openShadcnTest}>
+                                    <ImageIcon className="h-4 w-4" />
+                                </Button>
+                            )}
+                        </div>
+                        <div className="text-xs text-center mt-1 text-muted-foreground">
+                            Version: {versionHook.version}
+                        </div>
+                    </div>
                 </div>
             </div>
+            
+            {/* 侧边栏切换按钮（当侧边栏隐藏时显示） */}
+            {!isVisible && (
+                <Button
+                    variant="secondary"
+                    size="icon"
+                    onClick={toggleSidebarVisibility}
+                    className="absolute top-4 right-0 translate-x-full rounded-l-none"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+            )}
         </div>
     )
 }

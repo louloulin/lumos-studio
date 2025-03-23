@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import SettingDialog from './pages/SettingDialog'
 import ChatConfigWindow from './pages/ChatConfigWindow'
 import CleanWidnow from './pages/CleanWindow'
@@ -29,6 +29,7 @@ function Main() {
     const [openAboutWindow, setOpenAboutWindow] = React.useState(false)
     const [openCopilotWindow, setOpenCopilotWindow] = React.useState(false)
     const [showShadcnTest, setShowShadcnTest] = React.useState(false)
+    const [sidebarVisible, setSidebarVisible] = useState(true)
 
     return (
         <div className="box-border App" spellCheck={spellCheck}>
@@ -56,10 +57,11 @@ function Main() {
                                 openAboutWindow={() => setOpenAboutWindow(true)}
                                 setOpenSettingWindow={setOpenSettingWindow}
                                 openShadcnTest={() => setShowShadcnTest(true)}
+                                onToggleVisibility={(visible) => setSidebarVisible(visible)}
                             />
                         </ErrorBoundary>
                         <ErrorBoundary>
-                            <MainPane />
+                            <MainPane sidebarVisible={sidebarVisible} />
                         </ErrorBoundary>
                     </div>
                     <SettingDialog

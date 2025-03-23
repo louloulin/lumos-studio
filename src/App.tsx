@@ -1,7 +1,4 @@
 import React, { useEffect } from 'react'
-import CssBaseline from '@mui/material/CssBaseline'
-import { ThemeProvider } from '@mui/material/styles'
-import { Box, Grid } from '@mui/material'
 import SettingDialog from './pages/SettingDialog'
 import ChatConfigWindow from './pages/ChatConfigWindow'
 import CleanWidnow from './pages/CleanWindow'
@@ -19,40 +16,60 @@ import Sidebar from './Sidebar'
 import * as premiumActions from './stores/premiumActions'
 import { tauriBridge, initializeTauriEvents } from './tauri-bridge'
 import platform from './packages/platform'
+import { ThemeProvider } from './components/ui/theme-provider'
+import ShadcnTest from './components/ShadcnTest'
 
 // The Window interface is now defined in window.d.ts
 
 function Main() {
     const spellCheck = useAtomValue(atoms.spellCheckAtom)
-
     const [openSettingWindow, setOpenSettingWindow] = useAtom(atoms.openSettingDialogAtom)
-
     const [openAboutWindow, setOpenAboutWindow] = React.useState(false)
-
     const [openCopilotWindow, setOpenCopilotWindow] = React.useState(false)
+    const [showShadcnTest, setShowShadcnTest] = React.useState(false)
 
     return (
-        <Box className="box-border App" spellCheck={spellCheck}>
-            <Grid container className="h-full">
-                <Sidebar
-                    openCopilotWindow={() => setOpenCopilotWindow(true)}
-                    openAboutWindow={() => setOpenAboutWindow(true)}
-                    setOpenSettingWindow={setOpenSettingWindow}
-                />
-                <MainPane />
-            </Grid>
-            <SettingDialog
-                open={!!openSettingWindow}
-                targetTab={openSettingWindow || undefined}
-                close={() => setOpenSettingWindow(null)}
-            />
-            <AboutWindow open={openAboutWindow} close={() => setOpenAboutWindow(false)} />
-            <ChatConfigWindow />
-            <CleanWidnow />
-            <CopilotWindow open={openCopilotWindow} close={() => setOpenCopilotWindow(false)} />
-            <RemoteDialogWindow />
+        <div className="box-border App" spellCheck={spellCheck}>
+            {showShadcnTest ? (
+                <div className="h-full flex flex-col">
+                    <div className="p-4 bg-primary text-primary-foreground flex justify-between items-center">
+                        <h1 className="text-xl font-bold">Shadcn UI 测试</h1>
+                        <button 
+                            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md"
+                            onClick={() => setShowShadcnTest(false)}
+                        >
+                            返回应用
+                        </button>
+                    </div>
+                    <div className="flex-1 overflow-auto">
+                        <ShadcnTest />
+                    </div>
+                </div>
+            ) : (
+                <>
+                    <div className="h-full flex">
+                        <Sidebar
+                            openCopilotWindow={() => setOpenCopilotWindow(true)}
+                            openAboutWindow={() => setOpenAboutWindow(true)}
+                            setOpenSettingWindow={setOpenSettingWindow}
+                            openShadcnTest={() => setShowShadcnTest(true)}
+                        />
+                        <MainPane />
+                    </div>
+                    <SettingDialog
+                        open={!!openSettingWindow}
+                        targetTab={openSettingWindow || undefined}
+                        close={() => setOpenSettingWindow(null)}
+                    />
+                    <AboutWindow open={openAboutWindow} close={() => setOpenAboutWindow(false)} />
+                    <ChatConfigWindow />
+                    <CleanWidnow />
+                    <CopilotWindow open={openCopilotWindow} close={() => setOpenCopilotWindow(false)} />
+                    <RemoteDialogWindow />
+                </>
+            )}
             <Toasts />
-        </Box>
+        </div>
     )
 }
 
@@ -100,23 +117,14 @@ export default function App() {
     // Show loading indicator if not initialized
     if (!initialized) {
         return (
-            <ThemeProvider theme={theme}>
-                <CssBaseline />
-                <Box 
-                    display="flex" 
-                    justifyContent="center" 
-                    alignItems="center" 
-                    height="100vh"
-                >
-                    <div>Initializing application...</div>
-                </Box>
-            </ThemeProvider>
+            <div className="flex justify-center items-center h-screen">
+                <div>Initializing application...</div>
+            </div>
         );
     }
 
     return (
-        <ThemeProvider theme={theme}>
-            <CssBaseline />
+        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
             <Main />
         </ThemeProvider>
     )

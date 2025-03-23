@@ -33,6 +33,7 @@ interface Props {
     openCopilotWindow(): void
     openAboutWindow(): void
     setOpenSettingWindow(name: 'ai' | 'display' | null): void
+    openShadcnTest?(): void
 }
 
 export default function Sidebar(props: Props) {
@@ -101,14 +102,12 @@ export default function Sidebar(props: Props) {
                             </Typography>
                         </MenuItem>
 
-                        <MenuItem onClick={props.openCopilotWindow} sx={{ padding: '0.2rem 0.1rem', margin: '0.1rem' }}>
+                        <MenuItem onClick={props.openCopilotWindow}>
                             <ListItemIcon>
-                                <IconButton>
-                                    <SmartToyIcon fontSize="small" />
-                                </IconButton>
+                                <SmartToyIcon fontSize="small" />
                             </ListItemIcon>
                             <ListItemText>
-                                <Typography>{t('My Copilots')}</Typography>
+                                <Typography className='fw500' variant='inherit'>{t('AI Copilot')}</Typography>
                             </ListItemText>
                         </MenuItem>
 
@@ -149,6 +148,17 @@ export default function Sidebar(props: Props) {
                                 </Badge>
                             </ListItemText>
                         </MenuItem>
+
+                        {props.openShadcnTest && (
+                            <MenuItem onClick={props.openShadcnTest}>
+                                <ListItemIcon>
+                                    <AddPhotoAlternateIcon fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>
+                                    <Typography className='fw500' variant='inherit'>Shadcn UI 测试</Typography>
+                                </ListItemText>
+                            </MenuItem>
+                        )}
                     </MenuList>
                 </Stack>
             </div>

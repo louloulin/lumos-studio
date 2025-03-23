@@ -1,14 +1,4 @@
 import { useEffect, useState, useRef } from 'react'
-import Box from '@mui/material/Box'
-import Avatar from '@mui/material/Avatar'
-import {
-    Typography,
-    Grid,
-    useTheme,
-} from '@mui/material'
-import PersonIcon from '@mui/icons-material/Person'
-import SmartToyIcon from '@mui/icons-material/SmartToy'
-import SettingsIcon from '@mui/icons-material/Settings'
 import { useTranslation } from 'react-i18next'
 import { Message, SessionType } from '@/shared/types'
 import { useAtomValue, useSetAtom } from 'jotai'
@@ -30,6 +20,10 @@ import { cn } from '@/lib/utils'
 import { estimateTokensFromMessages } from '@/packages/token'
 import { countWord } from '@/packages/word-count'
 
+// 引入 shadcn/ui 组件
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { User, Settings, Bot } from "lucide-react"
+
 export interface Props {
     id?: string
     sessionId: string
@@ -43,7 +37,6 @@ export interface Props {
 
 export default function MessageComponent(props: Props) {
     const { t } = useTranslation()
-    const theme = useTheme()
 
     const showMessageTimestamp = useAtomValue(showMessageTimestampAtom)
     const showModelName = useAtomValue(showModelNameAtom)
@@ -123,113 +116,91 @@ export default function MessageComponent(props: Props) {
     )
 
     return (
-        <Box
+        <div
             ref={ref}
             id={props.id}
             key={msg.id}
             className={cn(
                 'group/message',
                 'msg-block',
-                'px-2',
+                'px-4 sm:px-6',
+                'pb-0.1',
                 msg.generating ? 'rendering' : 'render-done',
                 {
-                    user: 'user-msg',
-                    system: 'system-msg',
-                    assistant: 'assistant-msg',
-                }[msg?.role || 'user'],
-                className,
-            )}
-            sx={{
-                margin: '0',
-                paddingBottom: '0.1rem',
-                paddingX: '1rem',
-                [theme.breakpoints.down('sm')]: {
-                    paddingX: '0.3rem',
+                    'user-msg': msg.role === 'user',
+                    'system-msg': msg.role === 'system',
+                    'assistant-msg': msg.role === 'assistant'
                 },
-            }}
+                className
+            )}
         >
-            <Grid container wrap="nowrap" spacing={1.5}>
-                <Grid item>
-                    <Box sx={{ marginTop: '8px' }}>
+            <div className="flex gap-4 flex-nowrap">
+                <div className="mt-2">
+                    {msg.role === 'assistant' && (
+                        currentSessionPicUrl ? (
+                            <Avatar className="h-7 w-7">
+                                <AvatarImage src={currentSessionPicUrl} />
+                                <AvatarFallback>
+                                    <Bot className="h-4 w-4" />
+                                </AvatarFallback>
+                            </Avatar>
+                        ) : (
+                            <Avatar className="h-7 w-7 bg-primary">
+                                <AvatarFallback>
+                                    <Bot className="h-4 w-4" />
+                                </AvatarFallback>
+                            </Avatar>
+                        )
+                    )}
+                    {msg.role === 'user' && (
+                        <Avatar
+                            className="h-7 w-7 cursor-pointer"
+                            onClick={() => setOpenSettingWindow('chat')}
+                        >
+                            <AvatarFallback>
+                                <User className="h-4 w-4" />
+                            </AvatarFallback>
+                        </Avatar>
+                    )}
+                    {msg.role === 'system' && (
+                        <Avatar className="h-7 w-7 bg-warning">
+                            <AvatarFallback>
+                                <Settings className="h-4 w-4" />
+                            </AvatarFallback>
+                        </Avatar>
+                    )}
+                </div>
+                <div className="flex-1 w-0 pr-4">
+                    <div 
+                        className={cn('msg-content', { 'msg-content-small': small })}
+                        style={small ? { fontSize: '0.875rem' } : {}}
+                    >
                         {
-                            {
-                                assistant: currentSessionPicUrl ? (
-                                    <Avatar
-                                        src={currentSessionPicUrl}
-                                        sx={{
-                                            width: '28px',
-                                            height: '28px',
-                                        }}
-                                    />
-                                ) : (
-                                    <Avatar
-                                        sx={{
-                                            backgroundColor: theme.palette.primary.main,
-                                            width: '28px',
-                                            height: '28px',
-                                        }}
-                                    >
-                                        <SmartToyIcon fontSize='small' />
-                                    </Avatar>
-                                ),
-                                user: (
-                                    <Avatar
-                                        sx={{
-                                            width: '28px',
-                                            height: '28px',
-                                        }}
-                                        className='cursor-pointer'
-                                        onClick={() => setOpenSettingWindow('chat')}
-                                    >
-                                        <PersonIcon fontSize='small' />
-                                    </Avatar>
-                                ),
-                                system:
-                                        <Avatar
-                                            sx={{
-                                                backgroundColor: theme.palette.warning.main,
-                                                width: '28px',
-                                                height: '28px',
-                                            }}
-                                        >
-                                            <SettingsIcon fontSize='small' />
-                                        </Avatar>
-                            }[msg.role]
+                            enableMarkdownRendering && !isCollapsed ? (
+                                <Markdown>
+                                    {content}
+                                </Markdown>
+                            ) : (
+                                <div>
+                                    {content}
+                                    {
+                                        needCollapse && isCollapsed && (
+                                            CollapseButton
+                                        )
+                                    }
+                                </div>
+                            )
                         }
-                    </Box>
-                </Grid>
-                <Grid item xs sm container sx={{ width: '0px', paddingRight: '15px' }}>
-                    <Grid item xs>
-                        <Box className={cn('msg-content', { 'msg-content-small': small })} sx={
-                            small ? { fontSize: theme.typography.body2.fontSize } : {}
-                        }>
-                            {
-                                enableMarkdownRendering && !isCollapsed ? (
-                                    <Markdown>
-                                        {content}
-                                    </Markdown>
-                                ) : (
-                                    <div>
-                                        {content}
-                                        {
-                                            needCollapse && isCollapsed && (
-                                                CollapseButton
-                                            )
-                                        }
-                                    </div>
-                                )
-                            }
-                        </Box>
-                        <MessageErrTips msg={msg} />
-                        {
-                            needCollapse && !isCollapsed && CollapseButton
-                        }
-                        <Typography variant="body2" sx={{ opacity: 0.5, paddingBottom: '2rem' }}>
-                            {tips.join(', ')}
-                        </Typography>
-                    </Grid>
-                </Grid>
-            </Grid>
-        </Box>
+                    </div>
+                    <MessageErrTips msg={msg} />
+                    {
+                        needCollapse && !isCollapsed && CollapseButton
+                    }
+                    <p className="text-sm opacity-50 pb-8">
+                        {tips.join(', ')}
+                    </p>
+                </div>
+            </div>
+        </div>
     )
 }

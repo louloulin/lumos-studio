@@ -191,6 +191,7 @@ export interface CopilotDetail {
 export interface Toast {
     id: string
     content: string
+    shown?: boolean
 }
 
 export enum Theme {

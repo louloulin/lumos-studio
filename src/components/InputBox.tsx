@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react'
-import { Typography, useTheme } from '@mui/material'
 import { SessionType, createMessage } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
 import * as atoms from '@/stores/atoms'
@@ -21,7 +20,6 @@ export interface Props {
 }
 
 export default function InputBox(props: Props) {
-    const theme = useTheme()
     const setChatConfigDialogSession = useSetAtom(atoms.chatConfigDialogAtom)
     const { t } = useTranslation()
     const [messageInput, setMessageInput] = useState('')
@@ -71,17 +69,11 @@ export default function InputBox(props: Props) {
     const [easterEgg, setEasterEgg] = useState(false)
 
     return (
-        <div className='pl-2 pr-4'
-            style={{
-                borderTopWidth: '1px',
-                borderTopStyle: 'solid',
-                borderTopColor: theme.palette.divider,
-            }}
-        >
+        <div className='pl-2 pr-4 border-t border-border'>
             <div className={cn('w-full mx-auto flex flex-col')}>
                 <div className='flex flex-row flex-nowrap justify-between py-1'>
                     <div className='flex flex-row items-center'>
-                        <MiniButton className='mr-2 hover:bg-transparent' style={{ color: theme.palette.text.primary }}
+                        <MiniButton className='mr-2 hover:bg-transparent text-foreground'
                             onClick={() => {
                                 setEasterEgg(true)
                                 setTimeout(() => setEasterEgg(false), 1000)
@@ -89,7 +81,7 @@ export default function InputBox(props: Props) {
                         >
                             <img className={cn('w-5 h-5', easterEgg ? 'animate-spin' : '')} src={icon} />
                         </MiniButton>
-                        <MiniButton className='mr-2' style={{ color: theme.palette.text.primary }}
+                        <MiniButton className='mr-2 text-foreground'
                             onClick={() => setChatConfigDialogSession(sessionActions.getCurrentSession())}
                             tooltipTitle={
                                 <div className='text-center inline-block'>
@@ -102,15 +94,11 @@ export default function InputBox(props: Props) {
                         </MiniButton>
                     </div>
                     <div className='flex flex-row items-center'>
-                        <MiniButton className='w-8 ml-2'
-                            style={{
-                                color: theme.palette.getContrastText(theme.palette.primary.main),
-                                backgroundColor: theme.palette.primary.main,
-                            }}
+                        <MiniButton className='w-8 ml-2 bg-primary text-primary-foreground'
                             tooltipTitle={
-                                <Typography variant="caption">
+                                <p className="text-xs">
                                     {t('[Enter] send, [Shift+Enter] line break, [Ctrl+Enter] send without generating')}
-                                </Typography>
+                                </p>
                             }
                             tooltipPlacement='top'
                             onClick={() => handleSubmit()}
@@ -124,7 +112,7 @@ export default function InputBox(props: Props) {
                         className={cn(
                             `w-full max-h-[${maxTextareaHeight}px]`,
                             'overflow-y resize-none border-none outline-none',
-                            'bg-transparent p-1'
+                            'bg-transparent p-1 text-foreground'
                         )}
                         value={messageInput} onChange={onMessageInput}
                         onKeyDown={onKeyDown}
@@ -132,9 +120,6 @@ export default function InputBox(props: Props) {
                         style={{
                             height: 'auto',
                             minHeight: minTextareaHeight + 'px',
-                            color: theme.palette.text.primary,
-                            fontFamily: theme.typography.fontFamily,
-                            fontSize: theme.typography.body1.fontSize,
                         }}
                         placeholder={t('Type your question here...') || ''}
                     />

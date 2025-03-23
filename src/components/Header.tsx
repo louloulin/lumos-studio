@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { Typography, useTheme } from '@mui/material'
 import * as atoms from '@/stores/atoms'
 import { useAtomValue, useSetAtom } from 'jotai'
 import * as sessionActions from '@/stores/sessionActions'
@@ -10,7 +9,6 @@ import { getAutoGenerateTitle } from '@/stores/settingActions'
 interface Props { }
 
 export default function Header(props: Props) {
-    const theme = useTheme()
     const currentSession = useAtomValue(atoms.currentSessionAtom)
     const setChatConfigDialogSession = useSetAtom(atoms.chatConfigDialogAtom)
 
@@ -32,35 +30,19 @@ export default function Header(props: Props) {
 
     return (
         <div
-            className="pt-3 pb-2 px-4"
-            style={{
-                borderBottomWidth: '1px',
-                borderBottomStyle: 'solid',
-                borderBottomColor: theme.palette.divider,
-            }}
+            className="pt-3 pb-2 px-4 border-b border-border"
         >
             <div className={cn('w-full mx-auto flex flex-row')}>
-                <Typography
-                    variant="h6"
-                    color="inherit"
-                    component="div"
-                    noWrap
-                    sx={{
-                        flex: 1,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                    }}
-                    className="flex items-center cursor-pointer"
+                <div
+                    className="flex-1 overflow-hidden text-ellipsis flex items-center cursor-pointer"
                     onClick={() => {
                         editCurrentSession()
                     }}
                 >
-                    {
-                        <Typography variant="h6" noWrap className={cn('max-w-56', 'ml-3')}>
-                            {currentSession.name}
-                        </Typography>
-                    }
-                </Typography>
+                    <h2 className="text-xl font-semibold truncate max-w-56 ml-3">
+                        {currentSession.name}
+                    </h2>
+                </div>
                 <Toolbar />
             </div>
         </div>

@@ -1,19 +1,25 @@
 import React, { useEffect } from 'react'
-import { Button, Tabs, Tab, Dialog, DialogContent, DialogActions, DialogTitle, Box } from '@mui/material'
 import { Settings, SettingWindowTab, Theme } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
 import { useAtom } from 'jotai'
 import { settingsAtom } from '@/stores/atoms'
 import { switchTheme } from '@/hooks/useAppTheme'
-import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined'
-import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness'
-import ChatOutlinedIcon from '@mui/icons-material/ChatOutlined'
 import ChatSettingTab from './ChatSettingTab'
 import DisplaySettingTab from './DisplaySettingTab'
 import ModelSettingTab from './ModelSettingTab'
 import AdvancedSettingTab from './AdvancedSettingTab'
-import SettingsIcon from '@mui/icons-material/Settings'
 import { trackingEvent } from '@/packages/event'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Bot, MonitorSpeaker, MessageSquare, Settings as SettingsIcon } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface Props {
     open: boolean
@@ -65,105 +71,80 @@ export default function SettingWindow(props: Props) {
     }
 
     return (
-        <Dialog open={props.open} onClose={onCancel} fullWidth>
-            <DialogTitle>{t('settings')}</DialogTitle>
-            <DialogContent>
-                <Box
-                    sx={{
-                        borderBottom: 1,
-                        borderColor: 'divider',
-                        marginBottom: '20px',
-                    }}
+        <Dialog open={props.open} onOpenChange={(open) => !open && onCancel()}>
+            <DialogContent className="max-w-3xl">
+                <DialogHeader>
+                    <DialogTitle>{t('settings')}</DialogTitle>
+                </DialogHeader>
+
+                <Tabs 
+                    value={currentTab} 
+                    onValueChange={(value) => setCurrentTab(value as SettingWindowTab)} 
+                    className="mt-4"
                 >
-                    <Tabs
-                        value={currentTab}
-                        onChange={(_, value) => setCurrentTab(value)}
-                        variant="scrollable"
-                        scrollButtons
-                        allowScrollButtonsMobile
-                    >
-                        <Tab
-                            value="ai"
-                            label={
-                                <span className="inline-flex justify-center items-center">
-                                    <SmartToyOutlinedIcon fontSize="small" style={{ marginRight: 5 }} />
-                                    <span>{t('model')}</span>
-                                </span>
-                            }
-                        />
-                        <Tab
-                            value="display"
-                            label={
-                                <span className="inline-flex justify-center items-center">
-                                    <SettingsBrightnessIcon fontSize="small" style={{ marginRight: 5 }} />
-                                    <span>{t('display')}</span>
-                                </span>
-                            }
-                        />
-                        <Tab
-                            value="chat"
-                            label={
-                                <span className="inline-flex justify-center items-center">
-                                    <ChatOutlinedIcon fontSize="small" style={{ marginRight: 5 }} />
-                                    <span>{t('chat')}</span>
-                                </span>
-                            }
-                        />
-                        <Tab
-                            value="advanced"
-                            label={
-                                <span className="inline-flex justify-center items-center">
-                                    <SettingsIcon fontSize="small" style={{ marginRight: 5 }} />
-                                    <span>{t('advanced')}</span>
-                                </span>
-                            }
-                        />
-                        {/* <Tab label={t('premium')} value='premium' /> */}
-                    </Tabs>
-                </Box>
+                    <TabsList className="w-full mb-4 border-b">
+                        <TabsTrigger value="ai" className="flex items-center gap-1.5">
+                            <Bot className="h-4 w-4" />
+                            <span>{t('model')}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="display" className="flex items-center gap-1.5">
+                            <MonitorSpeaker className="h-4 w-4" />
+                            <span>{t('display')}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="chat" className="flex items-center gap-1.5">
+                            <MessageSquare className="h-4 w-4" />
+                            <span>{t('chat')}</span>
+                        </TabsTrigger>
+                        <TabsTrigger value="advanced" className="flex items-center gap-1.5">
+                            <SettingsIcon className="h-4 w-4" />
+                            <span>{t('advanced')}</span>
+                        </TabsTrigger>
+                    </TabsList>
 
-                {currentTab === 'ai' && (
-                    <ModelSettingTab
-                        settingsEdit={settingsEdit}
-                        setSettingsEdit={(updated) => {
-                            setSettingsEdit({ ...settingsEdit, ...updated })
-                        }}
-                    />
-                )}
+                    <TabsContent value="ai">
+                        <ModelSettingTab
+                            settingsEdit={settingsEdit}
+                            setSettingsEdit={(updated) => {
+                                setSettingsEdit({ ...settingsEdit, ...updated })
+                            }}
+                        />
+                    </TabsContent>
 
-                {currentTab === 'display' && (
-                    <DisplaySettingTab
-                        settingsEdit={settingsEdit}
-                        setSettingsEdit={(updated) => {
-                            setSettingsEdit({ ...settingsEdit, ...updated })
-                        }}
-                        changeModeWithPreview={changeThemeWithPreview}
-                    />
-                )}
+                    <TabsContent value="display">
+                        <DisplaySettingTab
+                            settingsEdit={settingsEdit}
+                            setSettingsEdit={(updated) => {
+                                setSettingsEdit({ ...settingsEdit, ...updated })
+                            }}
+                            changeModeWithPreview={changeThemeWithPreview}
+                        />
+                    </TabsContent>
 
-                {currentTab === 'chat' && (
-                    <ChatSettingTab
-                        settingsEdit={settingsEdit}
-                        setSettingsEdit={(updated) => {
-                            setSettingsEdit({ ...settingsEdit, ...updated })
-                        }}
-                    />
-                )}
+                    <TabsContent value="chat">
+                        <ChatSettingTab
+                            settingsEdit={settingsEdit}
+                            setSettingsEdit={(updated) => {
+                                setSettingsEdit({ ...settingsEdit, ...updated })
+                            }}
+                        />
+                    </TabsContent>
 
-                {currentTab === 'advanced' && (
-                    <AdvancedSettingTab
-                        settingsEdit={settingsEdit}
-                        setSettingsEdit={(updated) => {
-                            setSettingsEdit({ ...settingsEdit, ...updated })
-                        }}
-                        onCancel={onCancel}
-                    />
-                )}
+                    <TabsContent value="advanced">
+                        <AdvancedSettingTab
+                            settingsEdit={settingsEdit}
+                            setSettingsEdit={(updated) => {
+                                setSettingsEdit({ ...settingsEdit, ...updated })
+                            }}
+                            onCancel={onCancel}
+                        />
+                    </TabsContent>
+                </Tabs>
+
+                <DialogFooter className="mt-6">
+                    <Button variant="outline" onClick={onCancel}>{t('cancel')}</Button>
+                    <Button onClick={onSave}>{t('save')}</Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onCancel}>{t('cancel')}</Button>
-                <Button onClick={onSave}>{t('save')}</Button>
-            </DialogActions>
         </Dialog>
     )
 }

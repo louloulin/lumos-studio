@@ -1,4 +1,3 @@
-import { Divider, Box } from '@mui/material'
 import { ModelProvider, ModelSettings } from '@/shared/types'
 import OpenAISetting from './OpenAISetting'
 import ChatboxAISetting from './ChatboxAISetting'
@@ -19,12 +18,12 @@ interface ModelConfigProps {
 export default function ModelSettingTab(props: ModelConfigProps) {
     const { settingsEdit, setSettingsEdit } = props
     return (
-        <Box>
+        <div className="space-y-6">
             <AIProviderSelect
                 settings={settingsEdit}
                 setSettings={setSettingsEdit}
             />
-            <Divider sx={{ marginTop: '10px', marginBottom: '24px' }} />
+            <hr className="my-4 border-t border-border" />
             {settingsEdit.aiProvider === ModelProvider.OpenAI && (
                 <OpenAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
@@ -32,7 +31,7 @@ export default function ModelSettingTab(props: ModelConfigProps) {
                 <ChatboxAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
             {settingsEdit.aiProvider === ModelProvider.Ollama && (
-                <>
+                <div className="space-y-4">
                     <OllamaHostInput
                         ollamaHost={settingsEdit.ollamaHost}
                         setOllamaHost={(v) => setSettingsEdit({ ...settingsEdit, ollamaHost: v })}
@@ -50,11 +49,11 @@ export default function ModelSettingTab(props: ModelConfigProps) {
                         value={settingsEdit.temperature}
                         onChange={(v) => setSettingsEdit({ ...settingsEdit, temperature: v })}
                     />
-                </>
+                </div>
             )}
 
             {settingsEdit.aiProvider === ModelProvider.LMStudio && (
-                <>
+                <div className="space-y-4">
                     <LMStudioHostInput
                         LMStudioHost={settingsEdit.lmStudioHost}
                         setLMStudioHost={(v) => setSettingsEdit({ ...settingsEdit, lmStudioHost: v })}
@@ -72,7 +71,7 @@ export default function ModelSettingTab(props: ModelConfigProps) {
                         value={settingsEdit.temperature}
                         onChange={(v) => setSettingsEdit({ ...settingsEdit, temperature: v })}
                     />
-                </>
+                </div>
             )}
 
 
@@ -85,6 +84,6 @@ export default function ModelSettingTab(props: ModelConfigProps) {
             {settingsEdit.aiProvider === ModelProvider.PPIO && (
                 <PPIOSetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
-        </Box>
+        </div>
     )
 }

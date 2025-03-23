@@ -1,9 +1,17 @@
-import { Button, Dialog, DialogContent, DialogActions, DialogTitle, DialogContentText } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import * as atoms from '@/stores/atoms'
 import { useAtom } from 'jotai'
 import * as sessionActions from '@/stores/sessionActions'
 import { trackingEvent } from '@/packages/event'
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 interface Props {
 }
@@ -26,21 +34,23 @@ export default function CleanWindow(props: Props) {
         close()
     }
     return (
-        <Dialog open={!!sessionClean} onClose={close}>
-            <DialogTitle>{t('clean')}</DialogTitle>
+        <Dialog open={!!sessionClean} onOpenChange={(open) => !open && close()}>
             <DialogContent>
-                <DialogContentText>
+                <DialogHeader>
+                    <DialogTitle>{t('clean')}</DialogTitle>
+                </DialogHeader>
+                <DialogDescription>
                     {t('delete confirmation', {
                         sessionName: '"' + sessionClean?.name + '"',
                     })}
-                </DialogContentText>
+                </DialogDescription>
+                <DialogFooter className="mt-4">
+                    <Button variant="outline" onClick={close}>{t('cancel')}</Button>
+                    <Button variant="destructive" onClick={clean}>
+                        {t('clean it up')}
+                    </Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={close}>{t('cancel')}</Button>
-                <Button onClick={clean} color="error">
-                    {t('clean it up')}
-                </Button>
-            </DialogActions>
         </Dialog>
     )
 }

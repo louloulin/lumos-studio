@@ -1,5 +1,14 @@
-import { Select, MenuItem, FormControl, InputLabel } from '@mui/material'
 import * as React from 'react'
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { cn } from "@/lib/utils"
+import { Label } from "@/components/ui/label"
 
 export interface Props<T extends string | number> {
     label: string | React.ReactNode
@@ -15,22 +24,28 @@ export interface Props<T extends string | number> {
 export default function SimpleSelect<T extends string | number>(props: Props<T>) {
     const { fullWidth = true, size, style } = props
     return (
-        <FormControl
-            fullWidth={fullWidth}
-            variant="outlined"
-            margin="dense"
-            className={props.className}
-            size={size}
-            style={style}
-        >
-            <InputLabel>{props.label}</InputLabel>
-            <Select label={props.label} value={props.value} onChange={(e) => props.onChange(e.target.value as T)}>
-                {props.options.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                    </MenuItem>
-                ))}
+        <div className={cn(
+            "flex flex-col gap-1.5",
+            fullWidth && "w-full",
+            props.className
+        )} style={style}>
+            {props.label && <Label>{props.label}</Label>}
+            <Select value={props.value.toString()} onValueChange={(value) => props.onChange(value as unknown as T)}>
+                <SelectTrigger className={cn(
+                    size === 'small' ? "h-8 text-sm" : "h-10"
+                )}>
+                    <SelectValue placeholder="选择选项" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectGroup>
+                        {props.options.map((option) => (
+                            <SelectItem key={option.value} value={option.value.toString()}>
+                                {option.label}
+                            </SelectItem>
+                        ))}
+                    </SelectGroup>
+                </SelectContent>
             </Select>
-        </FormControl>
+        </div>
     )
 }

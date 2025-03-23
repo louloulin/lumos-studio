@@ -1,15 +1,15 @@
 import React from 'react'
-import Alert from '@mui/material/Alert'
 import { Trans } from 'react-i18next'
 import { Message } from '@/shared/types'
 import { aiProviderNameHash } from '@/packages/models'
 import * as atoms from '@/stores/atoms'
 import * as settingActions from '@/stores/settingActions'
 import { useSetAtom } from 'jotai'
-import { Link } from '@mui/material'
 import { ChatboxAIAPIError } from '@/packages/models/errors'
 import platform from '@/packages/platform'
 import { trackingEvent } from '@/packages/event'
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { cn } from "@/lib/utils"
 
 export default function MessageErrTips(props: { msg: Message }) {
     const { msg } = props
@@ -28,6 +28,7 @@ export default function MessageErrTips(props: { msg: Message }) {
                 }}
                 components={[
                     <a
+                        className="underline hover:text-primary"
                         href={`https://chatboxai.app/redirect_app/faqs/${settingActions.getLanguage()}`}
                         target="_blank"
                     ></a>,
@@ -55,7 +56,10 @@ export default function MessageErrTips(props: { msg: Message }) {
                     aiProvider: msg.aiProvider ? aiProviderNameHash[msg.aiProvider] : 'AI Provider',
                 }}
                 components={[
-                    <Link className="cursor-pointer font-bold" onClick={() => setOpenSettingDialogAtom('ai')}></Link>,
+                    <button 
+                        className="cursor-pointer font-bold text-primary underline"
+                        onClick={() => setOpenSettingDialogAtom('ai')}
+                    ></button>,
                 ]}
             />
         )
@@ -71,13 +75,19 @@ export default function MessageErrTips(props: { msg: Message }) {
                     }}
                     components={{
                         OpenSettingButton: (
-                            <Link className="cursor-pointer italic" onClick={() => setOpenSettingDialogAtom('ai')}></Link>
+                            <button 
+                                className="cursor-pointer italic text-primary underline"
+                                onClick={() => setOpenSettingDialogAtom('ai')}
+                            ></button>
                         ),
                         OpenMorePlanButton: (
-                            <Link className="cursor-pointer italic" onClick={() => {
-                                platform.openLink('https://chatboxai.app/redirect_app/view_more_plans')
-                                trackingEvent('click_view_more_plans_button_from_upgrade_error_tips', { event_category: 'user' })
-                            }}></Link>
+                            <button 
+                                className="cursor-pointer italic text-primary underline" 
+                                onClick={() => {
+                                    platform.openLink('https://chatboxai.app/redirect_app/view_more_plans')
+                                    trackingEvent('click_view_more_plans_button_from_upgrade_error_tips', { event_category: 'user' })
+                                }}
+                            ></button>
                         )
                     }}
                 />
@@ -89,6 +99,7 @@ export default function MessageErrTips(props: { msg: Message }) {
                 i18nKey="unknown error tips"
                 components={[
                     <a
+                        className="underline hover:text-primary"
                         href={`https://chatboxai.app/redirect_app/faqs/${settingActions.getLanguage()}`}
                         target="_blank"
                     ></a>,
@@ -97,17 +108,19 @@ export default function MessageErrTips(props: { msg: Message }) {
         )
     }
     return (
-        <Alert icon={false} severity="error">
-            {tips.map((tip, i) => (<b key={i}>{tip}</b>))}
-            {
-                onlyShowTips
-                    ? <></>
-                    : <>
-                        <br />
-                        <br />
-                        {msg.error}
-                    </>
-            }
+        <Alert variant="destructive" className="mt-2 mb-4">
+            <AlertDescription>
+                <div className="font-semibold">
+                    {tips.map((tip, i) => (<span key={i}>{tip}</span>))}
+                </div>
+                {
+                    !onlyShowTips && (
+                        <div className="mt-2 text-sm opacity-80">
+                            {msg.error}
+                        </div>
+                    )
+                }
+            </AlertDescription>
         </Alert>
     )
 }

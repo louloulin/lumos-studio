@@ -75,35 +75,39 @@ export const MastraAPI = {
   ): Promise<AgentGenerateResponse> {
     try {
       const client = await getClient();
-      const agent = client.getAgent(agentName);
-      
-      let content = '';
+      const agent = client.getAgent(agentName || 'agent');
       
       if (Array.isArray(request.messages)) {
         if (request.messages.length === 0) {
           throw new Error("Messages array cannot be empty");
         }
         
+        let result;
+        
         if (typeof request.messages[0] === 'string') {
-          // If it's a string array, just use the first message
-          content = request.messages[0];
+          const formattedMessages = (request.messages as string[]).map(msg => ({
+            role: 'user',
+            content: msg
+          }));
+          
+          result = await (agent as any).generate({
+            messages: formattedMessages,
+            options: request.options
+          });
         } else {
-          // If it contains objects with role, get the content
-          content = (request.messages as Message[])[0].content;
+          result = await (agent as any).generate({
+            messages: request.messages as any,
+            options: request.options
+          });
         }
+        
+        return {
+          text: typeof result.text === 'string' ? result.text : '',
+          metadata: result.metadata || {}
+        };
       } else {
         throw new Error("Messages must be an array");
       }
-      
-      // Call generate with a simple string message
-      // This bypasses the type-checking since we're dealing with a real-world API
-      // that may have a different structure than what TypeScript expects
-      const result = await (agent as any).generate(content);
-      
-      return {
-        text: typeof result.text === 'string' ? result.text : '',
-        metadata: result.metadata || {}
-      };
     } catch (error) {
       console.error(`Failed to generate from agent ${agentName}:`, error);
       throw error;
@@ -116,33 +120,112 @@ export const MastraAPI = {
     request: AgentGenerateRequest
   ): AsyncGenerator<string, void, unknown> {
     try {
+      console.log('streamGenerate called for agent:', agentName);
       const client = await getClient();
-      const agent = client.getAgent(agentName);
-      
-      let content = '';
+      const agent = client.getAgent(agentName || 'agent');
       
       if (Array.isArray(request.messages)) {
         if (request.messages.length === 0) {
           throw new Error("Messages array cannot be empty");
         }
         
+        let formattedMessages;
         if (typeof request.messages[0] === 'string') {
-          // If it's a string array, just use the first message
-          content = request.messages[0];
+          formattedMessages = (request.messages as string[]).map(msg => ({
+            role: 'user',
+            content: msg
+          }));
         } else {
-          // If it contains objects with role, get the content
-          content = (request.messages as Message[])[0].content;
+          formattedMessages = request.messages;
+        }
+        
+        try {
+          // 使用stream方法获取Response对象
+          console.log('Calling stream with messages:', formattedMessages);
+          const response = await (agent as any).stream({
+            messages: formattedMessages as any,
+            options: request.options
+          });
+          
+          if (response && response.body) {
+            console.log('Stream response received, processing with reader');
+            // 获取reader
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullText = '';
+            
+            // 读取流数据
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              
+              // 解码二进制数据为文本
+              const chunk = decoder.decode(value, { stream: true });
+              buffer += chunk;
+              
+              // 处理buffer中的数据
+              let lines = buffer.split('\n');
+              buffer = lines.pop() || ''; // 保留最后一个可能不完整的行
+              
+              for (const line of lines) {
+                if (!line.trim()) continue; // 跳过空行
+                
+                try {
+                  // 检查是否是JSON格式的元数据
+                  if (line.startsWith('f:') || line.startsWith('d:') || line.startsWith('e:')) {
+                    // 这是完成或其他元数据，可以记录但不输出给用户
+                    console.log('Metadata:', line);
+                    continue;
+                  }
+                  
+                  // 检查是否是带前缀的文本块 (0:"text")
+                  const prefixMatch = line.match(/^0:"(.+)"$/);
+                  if (prefixMatch) {
+                    const textContent = prefixMatch[1];
+                    // 处理转义字符
+                    const unescapedText = textContent
+                      .replace(/\\n/g, '\n')
+                      .replace(/\\"/g, '"')
+                      .replace(/\\\\/g, '\\');
+                    
+                    fullText += unescapedText;
+                    yield unescapedText;
+                    continue;
+                  }
+                  
+                  // 如果没有特定格式，原样输出
+                  console.log('Unknown format line:', line);
+                  yield line;
+                } catch (parseError) {
+                  console.warn('Error parsing line:', parseError, line);
+                  yield line; // 出错时原样返回
+                }
+              }
+            }
+            
+            // 处理剩余的buffer
+            if (buffer.trim()) {
+              console.log('Processing remaining buffer:', buffer);
+              yield buffer;
+            }
+            
+          } else {
+            throw new Error('Stream response or body is null');
+          }
+        } catch (streamError) {
+          console.warn('Stream API failed, falling back to normal generate:', streamError);
+          // 如果流式API失败，回退到普通生成
+          const result = await (agent as any).generate({
+            messages: formattedMessages as any,
+            options: request.options
+          });
+          
+          yield typeof result.text === 'string' ? result.text : '';
         }
       } else {
         throw new Error("Messages must be an array");
       }
-
-      // Call generate with a simple string message
-      // This bypasses the type-checking since we're dealing with a real-world API
-      const result = await (agent as any).generate(content);
-      
-      // Return the full result as one chunk
-      yield typeof result.text === 'string' ? result.text : '';
     } catch (error) {
       console.error(`Failed to stream from agent ${agentName}:`, error);
       throw error;

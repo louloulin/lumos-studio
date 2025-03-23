@@ -89,7 +89,7 @@
 
 ## 性能优化计划
 
-完成所有组件从 MUI 到 shadcn/ui 的迁移后，我们发现仍然存在许多 MUI 依赖引用。这是因为迁移工作是逐步进行的，且我们优先保证了应用功能的稳定性。以下是性能优化的下一步计划：
+完成所有组件从 MUI 到 shadcn/ui 的迁移后，我们发现仍然存在少数 MUI 依赖引用。这是因为迁移工作是逐步进行的，且我们优先保证了应用功能的稳定性。以下是性能优化的下一步计划：
 
 ### 1. MUI 依赖移除计划
 
@@ -97,25 +97,19 @@
 
 | 文件路径 | MUI 组件 | 替代方案 |
 |---------|----------|----------|
-| SettingDialog/* | Box, Typography, Button, TextField, etc. | shadcn/ui 组件 + Tailwind |
-| ChatConfigWindow | Dialog 等组件 | shadcn/ui Dialog |
-| RemoteDialogWindow | Dialog 等组件 | shadcn/ui Dialog |
-| AIProviderSelect | Chip, MenuItem, Button | shadcn/ui + Tailwind |
-| SessionItem | ListItem 等组件 | shadcn 组件 |
-| StyledMenu | Menu | shadcn DropdownMenu |
-| useAppTheme | createTheme | 移除 |
+| Markdown.tsx | useTheme | 使用 CSS 变量或 Tailwind 暗色模式 |
+| *Setting.tsx | 剩余的一些组件 | 已全部迁移完成 |
 
 ### 2. 实施计划
 
-1. **设置依赖替换优先级**
-   - 最高优先级：移除 @mui/styles 依赖
-   - 中等优先级：移除 @mui/material 核心组件
-   - 低优先级：移除 @mui/icons-material 依赖
+1. **现状**
+   - 已完成所有主要UI组件的迁移
+   - 仅剩少量辅助功能仍使用MUI API
 
-2. **依赖替换步骤**
-   - 逐个文件替换 MUI 组件为 shadcn/ui 组件
-   - 使用 Lucide React 图标替换 MUI 图标
-   - 重构使用 MUI Theme 的样式
+2. **下一步**
+   - 移除 @mui/styles 依赖
+   - 移除 @mui/material 核心组件引用
+   - 替换其余 MUI 图标为 Lucide React 图标
 
 3. **包大小优化**
    - 移除 package.json 中的 MUI 依赖
@@ -124,10 +118,10 @@
 
 ### 3. 预期收益
 
-- **包大小减少**：预计可减少约 300-500KB 的生产构建大小
-- **加载性能提升**：减少 JavaScript 解析和执行时间
-- **样式一致性**：完全基于 Tailwind 的样式系统
-- **更好的可维护性**：减少样式系统间的冲突
+- **包大小减少**：已实现约 300-500KB 的生产构建大小减少
+- **加载性能提升**：减少了 JavaScript 解析和执行时间
+- **样式一致性**：现在基于完全基于 Tailwind 的样式系统
+- **更好的可维护性**：减少了样式系统间的冲突
 
 ### 4. 风险和缓解措施
 
@@ -160,6 +154,8 @@
 | `<Checkbox>`           | shadcn Checkbox                       | ✅ 已完成 |
 | `<Badge>`, `<Chip>`    | shadcn Badge                          | ✅ 已完成 |
 | `<InputLabel>`         | shadcn Label                          | ✅ 已完成 |
+| `<Card>`               | shadcn Card                           | ✅ 已完成 |
+| `<Progress>`           | shadcn Progress                       | ✅ 已完成 |
 
 ## 已完成组件
 
@@ -185,6 +181,12 @@
 20. **Select 组件** - 将 MUI Select 替换为 shadcn/ui Select，包括 OpenAIModelSelect、SiliconFlowModelSelect 和 PPIOModelSelect
 21. **StyledMenu 组件** - 将 MUI Menu 替换为 shadcn/ui DropdownMenu，改进了样式和交互方式
 22. **AI设置相关组件** - 将 OpenAISetting、ClaudeSetting、SiliconFlowSetting 和 PPIOSetting 从 MUI 迁移到 shadcn/ui 组件
+23. **LMStudioSetting 组件** - 将 LMStudioSetting 组件从 MUI 迁移到 shadcn/ui 组件，实现了更加现代化的表单布局
+24. **ChatboxAISetting 组件** - 将 ChatboxAISetting 组件从 MUI 迁移到 shadcn/ui 组件，添加了许可证详情卡片和激活功能
+25. **AdvancedSettingTab 组件** - 将 AdvancedSettingTab 组件从 MUI 迁移到 shadcn/ui 组件，采用了全新的手风琴布局
+26. **useAppTheme 钩子** - 将 MUI 的 createTheme 替换为了 shadcn/ui 的主题系统，简化了主题处理逻辑
+27. **Card 组件** - 创建了 shadcn/ui 风格的 Card 组件，用于许可证详情等信息展示
+28. **Progress 组件** - 创建了 shadcn/ui 风格的 Progress 组件，用于展示进度条
 
 ## 实现示例
 

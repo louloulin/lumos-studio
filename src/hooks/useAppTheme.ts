@@ -1,8 +1,6 @@
-import { useMemo, useLayoutEffect } from 'react'
+import { useLayoutEffect } from 'react'
 import { getDefaultStore, useAtomValue } from 'jotai'
 import { activeThemeAtom, themeAtom, fontSizeAtom } from '@/stores/atoms'
-import { createTheme } from '@mui/material/styles'
-import { ThemeOptions } from '@mui/material/styles'
 import { Theme } from '@/shared/types'
 import platform from '@/packages/platform'
 
@@ -44,25 +42,9 @@ export default function useAppTheme() {
         }
     }, [activeTheme])
 
-    const themeObj = useMemo(() => createTheme(getThemeDesign(activeTheme, fontSize)), [activeTheme, fontSize])
-    return themeObj
-}
-
-export function getThemeDesign(realTheme: 'light' | 'dark', fontSize: number): ThemeOptions {
-    return {
-        palette: {
-            mode: realTheme,
-            ...(realTheme === 'light'
-                ? {}
-                : {
-                    background: {
-                        default: 'rgb(40, 40, 40)',
-                        paper: 'rgb(40, 40, 40)',
-                    },
-                }),
-        },
-        typography: {
-            fontSize,
-        },
+    // 返回当前主题和字体大小，而不是MUI主题对象
+    return { 
+        mode: activeTheme, 
+        fontSize 
     }
 }

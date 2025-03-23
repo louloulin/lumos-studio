@@ -1,6 +1,5 @@
 import { Settings } from '@/shared/types'
 import { useTranslation } from 'react-i18next'
-import { Accordion, AccordionSummary, AccordionDetails } from '@/components/Accordion'
 import TextFieldReset from '@/components/TextFieldReset'
 import { useAtom } from 'jotai'
 import * as atoms from '@/stores/atoms'
@@ -11,6 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import { 
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger
+} from '@/components/ui/accordion'
 
 interface Props {
     settingsEdit: Settings
@@ -23,37 +28,45 @@ export default function AdvancedSettingTab(props: Props) {
     const { t } = useTranslation()
     return (
         <div className="space-y-4">
-            <Accordion>
-                <AccordionSummary aria-controls="panel1a-content">
-                    <span className="text-base font-medium">{String(t('Network Proxy'))}</span>
-                </AccordionSummary>
-                <AccordionDetails>
-                    <TextFieldReset
-                        label={String(t('Proxy Address'))}
-                        value={settingsEdit.proxy || ''}
-                        onValueChange={(value) => {
-                            setSettingsEdit({ ...settingsEdit, proxy: value.trim() })
-                        }}
-                        placeholder="socks5://127.0.0.1:6153"
-                        fullWidth
-                    />
-                </AccordionDetails>
+            <Accordion type="single" collapsible>
+                <AccordionItem value="network-proxy">
+                    <AccordionTrigger className="text-base font-medium">
+                        {String(t('Network Proxy'))}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <TextFieldReset
+                            label={String(t('Proxy Address'))}
+                            value={settingsEdit.proxy || ''}
+                            onValueChange={(value) => {
+                                setSettingsEdit({ ...settingsEdit, proxy: value.trim() })
+                            }}
+                            placeholder="socks5://127.0.0.1:6153"
+                            fullWidth
+                        />
+                    </AccordionContent>
+                </AccordionItem>
             </Accordion>
-            <Accordion>
-                <AccordionSummary aria-controls="panel1a-content">
-                    <span className="text-base font-medium">{String(t('Data Backup and Restore'))}</span>
-                </AccordionSummary>
-                <AccordionDetails>
-                    <ExportAndImport onCancel={props.onCancel} />
-                </AccordionDetails>
+            
+            <Accordion type="single" collapsible>
+                <AccordionItem value="backup-restore">
+                    <AccordionTrigger className="text-base font-medium">
+                        {String(t('Data Backup and Restore'))}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <ExportAndImport onCancel={props.onCancel} />
+                    </AccordionContent>
+                </AccordionItem>
             </Accordion>
-            <Accordion>
-                <AccordionSummary aria-controls="panel1a-content">
-                    <span className="text-base font-medium">{String(t('Error Reporting'))}</span>
-                </AccordionSummary>
-                <AccordionDetails>
-                    <AnalyticsSetting />
-                </AccordionDetails>
+            
+            <Accordion type="single" collapsible>
+                <AccordionItem value="error-reporting">
+                    <AccordionTrigger className="text-base font-medium">
+                        {String(t('Error Reporting'))}
+                    </AccordionTrigger>
+                    <AccordionContent>
+                        <AnalyticsSetting />
+                    </AccordionContent>
+                </AccordionItem>
             </Accordion>
         </div>
     )

@@ -1,15 +1,9 @@
-import { Button, ButtonGroup, Card, Typography, Box } from '@mui/material'
+import React, { useState } from 'react'
 import { ChatboxAILicenseDetail, ModelSettings } from '@/shared/types'
 import { Trans, useTranslation } from 'react-i18next'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
 import PasswordTextField from '@/components/PasswordTextField'
 import ChatboxAIModelSelect from '@/components/ChatboxAIModelSelect'
-import LinearProgress, { LinearProgressProps, linearProgressClasses } from '@mui/material/LinearProgress';
-import { styled } from '@mui/material/styles';
-import { Accordion, AccordionSummary, AccordionDetails } from '@/components/Accordion'
-import React, { useState } from 'react'
 import * as remote from '@/packages/remote'
-import CircularProgress from '@mui/material/CircularProgress';
 import platform from '@/packages/platform'
 import { trackingEvent } from '@/packages/event'
 import * as premiumActions from '@/stores/premiumActions'
@@ -21,10 +15,30 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { CheckCircle, Loader2 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
+import { 
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger
+} from '@/components/ui/accordion'
 
 interface ModelConfigProps {
     settingsEdit: ModelSettings
     setSettingsEdit: (settings: ModelSettings) => void
+}
+
+// 简化的许可证详情接口，与API返回匹配
+interface SimpleLicenseDetail {
+    name: string
+    plan: string
+    tokenLeft: number
+    tokenTotal: number
+    expireAt?: string
+    status: string
 }
 
 export default function ChatboxAISetting(props: ModelConfigProps) {
@@ -49,44 +63,49 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
                 switch (result.error) {
                     case 'reached_activation_limit':
                         setTip(
-                            <Box className='text-red-500'>
+                            <div className="text-red-500">
                                 <Trans i18nKey="This license key has reached the activation limit, <a>click here</a> to manage license and devices to deactivate old devices."
-                                    components={{ a: <a href={`https://chatboxai.app/redirect_app/manage_license/${language}`} target='_blank' rel='noreferrer' /> }}
+                                    components={{ 
+                                        a: <a href={`https://chatboxai.app/redirect_app/manage_license/${language}`}
+                                             target='_blank' 
+                                             rel='noreferrer'
+                                             className="font-medium underline" /> 
+                                    }}
                                 />
-                            </Box>
+                            </div>
                         )
                         break;
                     case 'not_found':
                         setTip(
-                            <Box className='text-red-500'>
+                            <div className="text-red-500">
                                 {t('License not found, please check your license key')}
-                            </Box>
+                            </div>
                         )
                         break;
                     case 'expired':
                         setTip(
-                            <Box className='text-red-500'>
+                            <div className="text-red-500">
                                 {t('License expired, please check your license key')}
-                            </Box>
+                            </div>
                         )
                         break;
                 }
             }
         } catch (e) {
             setTip(
-                <Box className='text-red-500'>
+                <div className="text-red-500">
                     {t('Failed to activate license, please check your license key and network connection')}
                     <br />
                     {(e as any).message}
-                </Box>
+                </div>
             )
         }
         setLoading(false)
     }
 
     return (
-        <Box>
-            <Box>
+        <div className="space-y-4">
+            <div className="space-y-2">
                 <PasswordTextField
                     label={t('Chatbox AI License')}
                     value={settingsEdit.licenseKey || ''}
@@ -94,33 +113,37 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
                     placeholder="xxxxxxxxxxxxxxxxxxxxxxxx"
                     disabled={activated}
                 />
-                <Box>
-                    <ButtonGroup
-                        disabled={loading}
-                        sx={{ display: 'block', marginBottom: '15px' }}
-                    >
-                        {
-                            activated && (
+                <div className="flex items-center space-x-2 mb-4">
+                    {activated && (
+                        <>
+                            <span className="text-green-700 text-xs">{t('License Activated')}</span>
+                            <Button variant="ghost" size="sm" onClick={() => {
+                                premiumActions.deactivate()
+                                trackingEvent('click_deactivate_license_button', { event_category: 'user' })
+                            }}>
+                                {t('clean')}({t('Deactivate')})
+                            </Button>
+                        </>
+                    )}
+                    {!activated && (
+                        <Button 
+                            variant={settingsEdit.licenseKey ? "default" : "ghost"} 
+                            size="sm"
+                            onClick={activate}
+                            disabled={loading}
+                        >
+                            {loading ? (
                                 <>
-                                    <span className='text-green-700 text-xs mr-2'>{t('License Activated')}</span>
-                                    <Button variant='text' onClick={() => {
-                                        premiumActions.deactivate()
-                                        trackingEvent('click_deactivate_license_button', { event_category: 'user' })
-                                    }}>
-                                        {t('clean')}({t('Deactivate')})
-                                    </Button>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    {t('Activating...')}
                                 </>
-                            )
-                        }
-                        {
-                            !activated && (
-                                <Button variant={settingsEdit.licenseKey ? 'outlined' : "text"} onClick={activate}>
-                                    {loading ? t('Activating...') : t('Activate License')}
-                                </Button>
-                            )
-                        }
-                    </ButtonGroup>
-                </Box>
+                            ) : (
+                                t('Activate License')
+                            )}
+                        </Button>
+                    )}
+                </div>
+                {tip && <div className="mt-2">{tip}</div>}
                 {activated && (
                     <ChatboxAIModelSelect
                         value={settingsEdit.chatboxAIModel}
@@ -128,272 +151,112 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
                     />
                 )}
                 <DetailCard licenseKey={settingsEdit.licenseKey} activated={activated} />
-            </Box>
-        </Box>
+            </div>
+        </div>
     )
 }
 
-// 详细信息卡片
-function DetailCard(props: { licenseKey?: string, activated: boolean }) {
+function DetailCard(props: { licenseKey?: string, activated?: boolean }) {
     const { licenseKey, activated } = props
     const { t } = useTranslation()
-    return (
-        <Card sx={{ marginTop: '20px', padding: '10px 14px' }} elevation={3}>
-            {
-                activated && (
-                    <Box>
-                        <Box className='mb-2'>
-                            <ActivedButtonGroup />
-                        </Box>
-                        <LicenseDetail licenseKey={licenseKey} />
-                    </Box>
-                )
-            }
-            {
-                !activated && (<InactivedButtonGroup />)
-            }
-            <Box className='mt-2' sx={{ opacity: activated ? '0.5' : undefined }}>
-                <Typography>
-                    {t('Chatbox AI offers a user-friendly AI solution to help you enhance productivity')}
-                </Typography>
-                <Box>
-                    {[
-                        t('Smartest AI-Powered Services for Rapid Access'),
-                        t('Vision, Drawing, File Understanding and more'),
-                        t('Hassle-free setup'),
-                        t('Ideal for work and study')
-                    ].map(
-                        (item) => (
-                            <Box key={item} sx={{ display: 'flex', margin: '4px 0' }}>
-                                <CheckCircleOutlineIcon color={activated ? 'success' : 'action'} />
-                                <b style={{ marginLeft: '5px' }}>{item}</b>
-                            </Box>
-                        )
-                    )}
-                </Box>
-            </Box>
-        </Card>
-    )
-}
+    const [loading, setLoading] = useState(false)
+    const [detail, setDetail] = useState<SimpleLicenseDetail | null>(null)
 
-function ActivedButtonGroup() {
-    const { t } = useTranslation()
-    const language = useAtomValue(languageAtom)
-    return (
-        <Box sx={{ marginTop: '10px' }}>
-            <Button
-                variant="outlined"
-                sx={{ marginRight: '10px' }}
-                onClick={() => {
-                    platform.openLink(`https://chatboxai.app/redirect_app/manage_license/${language}`)
-                    trackingEvent('click_manage_license_button', { event_category: 'user' })
-                }}
-            >
-                {t('Manage License and Devices')}
-            </Button>
-            <Button
-                variant='outlined'
-                // color='warning'
-                sx={{ marginRight: '10px' }}
-                onClick={() => {
-                    premiumActions.deactivate()
-                    trackingEvent('click_deactivate_license_button', { event_category: 'user' })
-                }}
-            >
-                {t('Deactivate')}
-            </Button>
-            <Button
-                variant="text"
-                sx={{ marginRight: '10px' }}
-                onClick={() => {
-                    platform.openLink('https://chatboxai.app/redirect_app/view_more_plans')
-                    trackingEvent('click_view_more_plans_button', { event_category: 'user' })
-                }}
-            >
-                {t('View More Plans')}
-            </Button>
-        </Box>
-    )
-}
-
-function InactivedButtonGroup() {
-    const { t } = useTranslation()
-    const language = useAtomValue(languageAtom)
-    return (
-        <Box sx={{ marginTop: '10px' }}>
-            <Button
-                variant="outlined"
-                sx={{ marginRight: '10px' }}
-                onClick={() => {
-                    platform.openLink('https://chatboxai.app/redirect_app/get_license')
-                    trackingEvent('click_get_license_button', { event_category: 'user' })
-                }}
-            >
-                {t('Get License')}
-            </Button>
-            <Button
-                variant="text"
-                sx={{ marginRight: '10px' }}
-                onClick={() => {
-                    platform.openLink(`https://chatboxai.app/redirect_app/manage_license/${language}`)
-                    trackingEvent('click_retrieve_license_button', { event_category: 'user' })
-                }}
-            >
-                {t('Retrieve License')}
-            </Button>
-        </Box>
-    )
-}
-
-function BorderLinearProgress(props: LinearProgressProps) {
-    return (<_BorderLinearProgress variant="determinate" {...props}
-        color={
-            props.value !== undefined && props.value <= 10
-                ? 'error'
-                : props.value !== undefined && props.value <= 20 ? 'warning' : 'inherit'
-        }
-    />)
-}
-
-const _BorderLinearProgress = styled(LinearProgress)(({ theme }) => ({
-    height: 5,
-    borderRadius: 5,
-    [`&.${linearProgressClasses.colorPrimary}`]: {
-    },
-    [`& .${linearProgressClasses.bar}`]: {
-        borderRadius: 5,
-    },
-}));
-
-function LicenseDetail(props: { licenseKey?: string }) {
-    const { licenseKey } = props
-    const { t } = useTranslation()
-    const [expanded, setExpanded] = useState<boolean>(false);
-    const [licenseDetail, setLicenseDetail] = useState<ChatboxAILicenseDetail | null>(null)
-    const onChange = (event: React.SyntheticEvent, newExpanded: boolean) => {
-        setExpanded(newExpanded);
-        if (!newExpanded) {
-            setLicenseDetail(null)
-            return
-        }
+    const fetchDetail = async () => {
         if (!licenseKey) {
             return
         }
-        remote.getLicenseDetailRealtime({ licenseKey }).then((res) => {
-            if (res) {
-                setTimeout(() => {
-                    setLicenseDetail(res)
-                }, 200)
+        setLoading(true)
+        try {
+            const licenseDetail = await remote.getLicenseDetail({ licenseKey })
+            if (licenseDetail) {
+                // 转换API返回的许可证详情为简化格式
+                setDetail({
+                    name: licenseDetail.name,
+                    plan: licenseDetail.name, // 使用name作为plan
+                    tokenLeft: Math.round(licenseDetail.remaining_quota_35 * 100),
+                    tokenTotal: 100,
+                    expireAt: licenseDetail.token_expire_time || undefined,
+                    status: 'active'
+                })
             }
-        })
+        } catch (e) {
+            console.error(e)
+        }
+        setLoading(false)
     }
-    return (
-        <Accordion expanded={expanded} onChange={onChange} className='mb-4'>
-            <AccordionSummary>
-                <div>
-                    <span className='font-bold text-green-700 block'>
-                        {t('License Activated')}!
-                    </span>
-                    <span className='opacity-50 text-xs font-light block'>
-                        {t('Click to view license details and quota usage')}
-                    </span>
-                </div>
-            </AccordionSummary>
-            <AccordionDetails>
-                {
-                    licenseDetail ? (
-                        <>
-                            <Box className='grid grid-cols-2'>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Box className='mr-4 mb-4' >
-                                                <Typography className=''>
-                                                    {t('Chatbox AI 3.5 Quota')}
-                                                </Typography>
-                                                <BorderLinearProgress className='mt-1' variant="determinate"
-                                                    value={Math.floor(licenseDetail.remaining_quota_35 * 100)} />
-                                            </Box>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>{(licenseDetail.remaining_quota_35 * 100).toFixed(2)} %</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Box className='mr-4 mb-4' >
-                                                <Typography className=''>
-                                                    {t('Chatbox AI 4 Quota')}
-                                                </Typography>
-                                                <BorderLinearProgress className='mt-1' variant="determinate"
-                                                    value={Math.floor(licenseDetail.remaining_quota_4 * 100)} />
-                                            </Box>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>{(licenseDetail.remaining_quota_4 * 100).toFixed(2)} %</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                                <TooltipProvider>
-                                    <Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Box className='mr-4 mb-4' >
-                                                <Typography >
-                                                    {t('Chatbox AI Image Quota')}
-                                                </Typography>
-                                                <BorderLinearProgress className='mt-1' variant="determinate"
-                                                    value={Math.floor(licenseDetail.remaining_quota_image * 100)} />
-                                            </Box>
-                                        </TooltipTrigger>
-                                        <TooltipContent>
-                                            <p>{licenseDetail.image_total_quota - licenseDetail.image_used_count} / {licenseDetail.image_total_quota}</p>
-                                        </TooltipContent>
-                                    </Tooltip>
-                                </TooltipProvider>
-                            </Box>
-                            <Box className='grid grid-cols-2'>
-                                <Box className='mr-4 mb-4' >
-                                    <Typography className=''>
-                                        {t('Quota Reset')}
-                                    </Typography>
-                                    <Typography className=''><span className='font-bold'>{
-                                        new Date(licenseDetail.token_refreshed_time).toLocaleDateString()
-                                    }</span></Typography>
-                                </Box>
-                                {
-                                    licenseDetail.token_expire_time && (
-                                        <Box className='mr-4 mb-4' >
-                                            <Typography className=''>
-                                                {t('License Expiry')}
-                                            </Typography>
-                                            <Typography className=''><span className='font-bold'>{
-                                                new Date(licenseDetail.token_expire_time).toLocaleDateString()
-                                            }</span></Typography>
-                                        </Box>
-                                    )
-                                }
-                                <Box className='mr-4 mb-4' >
-                                    <Typography className=''>
-                                        {t('License Plan Overview')}
-                                    </Typography>
-                                    <Typography>
-                                        <span className='font-bold'>
-                                            {licenseDetail.name}
-                                        </span>
-                                    </Typography>
-                                </Box>
-                            </Box>
-                        </>
-                    ) : (
-                        <Box className='flex items-center justify-center'>
-                            <CircularProgress />
-                        </Box>
 
-                    )
-                }
-            </AccordionDetails>
-        </Accordion>
+    React.useEffect(() => {
+        fetchDetail()
+    }, [licenseKey, activated])
+
+    if (!activated) {
+        return null
+    }
+
+    return (
+        <Card className="mt-4">
+            <CardContent className="p-4">
+                <div className="mb-3 flex justify-between items-center">
+                    <h3 className="text-lg font-medium leading-6">
+                        {t('License Detail')}
+                    </h3>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={fetchDetail} 
+                        disabled={loading}
+                    >
+                        {loading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            t('refresh')
+                        )}
+                    </Button>
+                </div>
+                
+                {loading && (
+                    <div className="flex justify-center py-4">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                    </div>
+                )}
+                
+                {!loading && detail && (
+                    <div className="space-y-3">
+                        <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">{t('Plan')}</span>
+                            <span className="text-sm font-medium">{detail.plan}</span>
+                        </div>
+                        
+                        <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">{t('Status')}</span>
+                            <span className="text-sm font-medium flex items-center">
+                                <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                                {t('Active')}
+                            </span>
+                        </div>
+                        
+                        <div className="flex justify-between">
+                            <span className="text-sm text-muted-foreground">{t('Expire At')}</span>
+                            <span className="text-sm font-medium">
+                                {detail.expireAt ? new Date(detail.expireAt).toLocaleDateString() : t('Never')}
+                            </span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            <div className="flex justify-between">
+                                <span className="text-sm text-muted-foreground">
+                                    {t('Token')} ({detail.tokenLeft}/{detail.tokenTotal})
+                                </span>
+                                <span className="text-sm font-medium">
+                                    {Math.round((detail.tokenLeft / detail.tokenTotal) * 100)}%
+                                </span>
+                            </div>
+                            <Progress value={(detail.tokenLeft / detail.tokenTotal) * 100} className="h-2" />
+                        </div>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     )
 }

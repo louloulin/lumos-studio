@@ -176,6 +176,8 @@
 15. **Checkbox 组件** - 将 MUI Checkbox 和 FormControlLabel 替换为 shadcn/ui Checkbox 和 Label 组件
 16. **ChatConfigWindow** - 将会话配置窗口从 MUI Dialog 迁移到 shadcn/ui Dialog，改进了表单布局
 17. **RemoteDialogWindow** - 将远程对话框从 MUI Dialog 迁移到 shadcn/ui Dialog，优化了按钮布局
+18. **SessionItem** - 将会话项从 MUI MenuItem 迁移到 Tailwind 布局，改进了样式和交互方式
+19. **SessionList** - 将会话列表从 MUI MenuList 迁移到纯 Tailwind 实现，保留了拖拽功能
 
 ## 实现示例
 
@@ -424,6 +426,62 @@
         </DialogFooter>
     </DialogContent>
 </Dialog>
+```
+
+### 示例 10：导航组件迁移
+从：
+```tsx
+<MenuItem
+    key={id}
+    selected={selected}
+    onClick={onClick}
+    sx={{ padding: '0.1rem', margin: '0.1rem' }}
+    className='group/session-item'
+>
+    <ListItemIcon>
+        <IconButton color={'inherit'} onClick={onClick}>
+            <ChatBubbleOutlineOutlinedIcon fontSize="small" />
+        </IconButton>
+    </ListItemIcon>
+    <ListItemText>
+        <Typography variant="inherit" noWrap>
+            {name}
+        </Typography>
+    </ListItemText>
+    <IconButton onClick={handleMenuClick} sx={{ color: 'primary.main' }}>
+        <MoreHorizOutlinedIcon fontSize="small" />
+    </IconButton>
+</MenuItem>
+```
+
+到：
+```tsx
+<div 
+    className={cn(
+        "flex items-center px-2 py-1 rounded-md cursor-pointer group/session-item",
+        selected ? "bg-secondary" : "hover:bg-secondary/50"
+    )}
+    onClick={onClick}
+>
+    <div className="flex-shrink-0 mr-2">
+        <MessageSquare className="h-5 w-5" />
+    </div>
+    
+    <div className="flex-grow min-w-0">
+        <div className="truncate text-sm font-medium">
+            {name}
+        </div>
+    </div>
+    
+    <Button 
+        variant="ghost" 
+        size="icon"
+        className="h-8 w-8 p-0 opacity-0 group-hover/session-item:opacity-100"
+        onClick={(e) => e.stopPropagation()}
+    >
+        <MoreHorizontal className="h-4 w-4" />
+    </Button>
+</div>
 ```
 
 ## 移除清单

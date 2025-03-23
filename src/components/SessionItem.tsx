@@ -1,17 +1,19 @@
 import React, { useMemo } from 'react'
 import { useSetAtom } from 'jotai'
-import { ListItemText, MenuItem, Avatar, IconButton, Typography, ListItemIcon, useTheme } from '@mui/material'
 import { Session } from '@/shared/types'
-import CopyIcon from '@mui/icons-material/CopyAll'
-import EditIcon from '@mui/icons-material/Edit'
-import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined'
-import MoreHorizOutlinedIcon from '@mui/icons-material/MoreHorizOutlined'
-import DeleteIcon from '@mui/icons-material/Delete'
-import StyledMenu from './StyledMenu'
 import { useTranslation } from 'react-i18next'
 import * as sessionActions from '@/stores/sessionActions'
 import * as atoms from '@/stores/atoms'
 import { cn } from '@/lib/utils'
+import { 
+    DropdownMenu, 
+    DropdownMenuContent, 
+    DropdownMenuItem, 
+    DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Copy, Edit, MoreHorizontal, MessageSquare, Trash } from "lucide-react"
 
 export interface Props {
     session: Session
@@ -22,102 +24,86 @@ function _SessionItem(props: Props) {
     const { session, selected } = props
     const { t } = useTranslation()
     const setChatConfigDialogSession = useSetAtom(atoms.chatConfigDialogAtom)
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null)
-    const open = Boolean(anchorEl)
-    const handleMenuClick = (event: React.MouseEvent<HTMLElement>) => {
-        event.stopPropagation()
-        event.preventDefault()
-        setAnchorEl(event.currentTarget)
-    }
-    const handleMenuClose = () => {
-        setAnchorEl(null)
-    }
+    const [menuOpen, setMenuOpen] = React.useState(false)
+    
     const onClick = () => {
         sessionActions.switchCurrentSession(session.id)
     }
-    const theme = useTheme()
-    const medianSize = theme.typography.pxToRem(24)
-    // const smallSize = theme.typography.pxToRem(20)
+    
     return (
-        <>
-            <MenuItem
-                key={session.id}
-                selected={selected}
-                onClick={onClick}
-                sx={{ padding: '0.1rem', margin: '0.1rem' }}
-                className='group/session-item'
-            >
-                <ListItemIcon>
-                    <IconButton color={'inherit'} onClick={onClick}>
-                        {session.picUrl ? (
-                            <Avatar sizes={medianSize} sx={{ width: medianSize, height: medianSize }} src={session.picUrl} />
-                        ) : (
-                            <ChatBubbleOutlineOutlinedIcon fontSize="small" />
+        <div 
+            className={cn(
+                "flex items-center px-2 py-1 rounded-md cursor-pointer group/session-item",
+                selected ? "bg-secondary" : "hover:bg-secondary/50"
+            )}
+            onClick={onClick}
+        >
+            <div className="flex-shrink-0 mr-2">
+                {session.picUrl ? (
+                    <Avatar className="h-6 w-6">
+                        <AvatarImage src={session.picUrl} alt={session.name} />
+                        <AvatarFallback><MessageSquare className="h-4 w-4" /></AvatarFallback>
+                    </Avatar>
+                ) : (
+                    <MessageSquare className="h-5 w-5" />
+                )}
+            </div>
+            
+            <div className="flex-grow min-w-0">
+                <div className="truncate text-sm font-medium">
+                    {session.name}
+                </div>
+            </div>
+            
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+                <DropdownMenuTrigger asChild>
+                    <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className={cn(
+                            "h-8 w-8 p-0", 
+                            menuOpen ? "opacity-100" : "opacity-0 group-hover/session-item:opacity-100"
                         )}
-                    </IconButton>
-                </ListItemIcon>
-                <ListItemText>
-                    <Typography variant="inherit" noWrap>
-                        {session.name}
-                    </Typography>
-                </ListItemText>
-                <span className={cn(anchorEl ? 'inline-flex' : 'hidden group-hover/session-item:inline-flex')}>
-                    <IconButton onClick={handleMenuClick} sx={{ color: 'primary.main' }}>
-                        <MoreHorizOutlinedIcon fontSize="small" />
-                    </IconButton>
-                </span>
-            </MenuItem>
-            <StyledMenu
-                MenuListProps={{
-                    'aria-labelledby': 'long-button',
-                }}
-                anchorEl={anchorEl}
-                open={open}
-                onClose={handleMenuClose}
-            >
-                <MenuItem
-                    key={session.id + 'edit'}
-                    onClick={() => {
-                        setChatConfigDialogSession(session)
-                        handleMenuClose()
-                    }}
-                    disableRipple
-                >
-                    <EditIcon fontSize="small" />
-                    {t('edit')}
-                </MenuItem>
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Menu</span>
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                        onClick={() => {
+                            setChatConfigDialogSession(session)
+                            setMenuOpen(false)
+                        }}
+                    >
+                        <Edit className="mr-2 h-4 w-4" />
+                        <span>{t('edit')}</span>
+                    </DropdownMenuItem>
 
-                <MenuItem
-                    key={session.id + 'copy'}
-                    onClick={() => {
-                        sessionActions.copy(session)
-                        handleMenuClose()
-                    }}
-                    disableRipple
-                >
-                    <CopyIcon fontSize="small" />
-                    {t('copy')}
-                </MenuItem>
+                    <DropdownMenuItem
+                        onClick={() => {
+                            sessionActions.copy(session)
+                            setMenuOpen(false)
+                        }}
+                    >
+                        <Copy className="mr-2 h-4 w-4" />
+                        <span>{t('copy')}</span>
+                    </DropdownMenuItem>
 
-                <MenuItem
-                    key={session.id + 'del'}
-                    onClick={() => {
-                        setAnchorEl(null)
-                        handleMenuClose()
-                        sessionActions.remove(session)
-                    }}
-                    disableRipple
-                    sx={{
-                        '&:hover': {
-                            backgroundColor: 'rgba(255, 0, 0, 0.1)',
-                        },
-                    }}
-                >
-                    <DeleteIcon fontSize="small" />
-                    {t('delete')}
-                </MenuItem>
-            </StyledMenu>
-        </>
+                    <DropdownMenuItem
+                        onClick={() => {
+                            setMenuOpen(false)
+                            sessionActions.remove(session)
+                        }}
+                        className="text-destructive focus:text-destructive"
+                    >
+                        <Trash className="mr-2 h-4 w-4" />
+                        <span>{t('delete')}</span>
+                    </DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </div>
     )
 }
 

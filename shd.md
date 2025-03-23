@@ -174,6 +174,8 @@
 13. **Accordion 组件** - 将 MUI Accordion 替换为 shadcn/ui Accordion，保留了相同的 API 接口
 14. **Tabs 组件** - 将 MUI Tabs、Tab 替换为 shadcn/ui Tabs、TabsList、TabsTrigger 和 TabsContent
 15. **Checkbox 组件** - 将 MUI Checkbox 和 FormControlLabel 替换为 shadcn/ui Checkbox 和 Label 组件
+16. **ChatConfigWindow** - 将会话配置窗口从 MUI Dialog 迁移到 shadcn/ui Dialog，改进了表单布局
+17. **RemoteDialogWindow** - 将远程对话框从 MUI Dialog 迁移到 shadcn/ui Dialog，优化了按钮布局
 
 ## 实现示例
 
@@ -374,6 +376,54 @@
     启用选项
   </Label>
 </div>
+```
+
+### 示例 9：会话配置对话框迁移
+从：
+```tsx
+<Dialog open={!!session} onClose={onCancel} fullWidth>
+    <DialogTitle>{title}</DialogTitle>
+    <DialogContent>
+        <TextField
+            margin="dense"
+            label={t('name')}
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={name}
+            onChange={handleChange}
+        />
+    </DialogContent>
+    <DialogActions>
+        <Button onClick={onCancel}>{t('cancel')}</Button>
+        <Button onClick={onSave}>{t('save')}</Button>
+    </DialogActions>
+</Dialog>
+```
+
+到：
+```tsx
+<Dialog open={!!session} onOpenChange={(open) => !open && onCancel()}>
+    <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+            <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+                <Label htmlFor="name">{t('name')}</Label>
+                <Input
+                    id="name"
+                    value={name}
+                    onChange={handleChange}
+                />
+            </div>
+        </div>
+        <DialogFooter>
+            <Button variant="outline" onClick={onCancel}>{t('cancel')}</Button>
+            <Button onClick={onSave}>{t('save')}</Button>
+        </DialogFooter>
+    </DialogContent>
+</Dialog>
 ```
 
 ## 移除清单

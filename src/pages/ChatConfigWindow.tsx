@@ -1,14 +1,5 @@
 import React, { useEffect } from 'react'
 import {
-    Button,
-    Dialog,
-    DialogContent,
-    DialogActions,
-    DialogTitle,
-    DialogContentText,
-    TextField,
-} from '@mui/material'
-import {
     Session,
     createMessage,
 } from '@/shared/types'
@@ -17,6 +8,17 @@ import * as sessionActions from '@/stores/sessionActions'
 import * as atoms from '@/stores/atoms'
 import { useAtom } from 'jotai'
 import { trackingEvent } from '@/packages/event'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 
 interface Props {
 }
@@ -82,38 +84,39 @@ export default function ChatConfigWindow(props: Props) {
         return null
     }
     return (
-        <Dialog open={!!chatConfigDialogSession} onClose={onCancel} fullWidth>
-            <DialogTitle>{t('Conversation Settings')}</DialogTitle>
-            <DialogContent>
-                <DialogContentText></DialogContentText>
-                <TextField
-                    margin="dense"
-                    label={t('name')}
-                    type="text"
-                    fullWidth
-                    variant="outlined"
-                    value={editingData.name}
-                    onChange={(e) => setEditingData({ ...editingData, name: e.target.value })}
-                />
-                <div className='mt-1'>
-                    <TextField
-                        margin="dense"
-                        label={t('Instruction (System Prompt)')}
-                        placeholder={t('Copilot Prompt Demo') || ''}
-                        fullWidth
-                        variant="outlined"
-                        multiline
-                        minRows={2}
-                        maxRows={8}
-                        value={systemPrompt}
-                        onChange={(event) => setSystemPrompt(event.target.value)}
-                    />
+        <Dialog open={!!chatConfigDialogSession} onOpenChange={(open) => !open && onCancel()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{t('Conversation Settings')}</DialogTitle>
+                </DialogHeader>
+                
+                <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">{t('name')}</Label>
+                        <Input
+                            id="name"
+                            value={editingData.name}
+                            onChange={(e) => setEditingData({ ...editingData, name: e.target.value })}
+                        />
+                    </div>
+                    
+                    <div className="grid gap-2">
+                        <Label htmlFor="prompt">{t('Instruction (System Prompt)')}</Label>
+                        <Textarea
+                            id="prompt"
+                            placeholder={t('Copilot Prompt Demo') || ''}
+                            className="min-h-[80px]"
+                            value={systemPrompt}
+                            onChange={(event) => setSystemPrompt(event.target.value)}
+                        />
+                    </div>
                 </div>
+                
+                <DialogFooter>
+                    <Button variant="outline" onClick={onCancel}>{t('cancel')}</Button>
+                    <Button onClick={onSave}>{t('save')}</Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onCancel}>{t('cancel')}</Button>
-                <Button onClick={onSave}>{t('save')}</Button>
-            </DialogActions>
         </Dialog>
     )
 }

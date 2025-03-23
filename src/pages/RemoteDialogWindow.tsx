@@ -1,5 +1,4 @@
 import React from 'react'
-import { Box, Button, Dialog, DialogContent, DialogActions, DialogContentText } from '@mui/material'
 import { useTranslation } from 'react-i18next'
 import * as remote from '@/packages/remote'
 import { getDefaultStore } from 'jotai'
@@ -7,6 +6,13 @@ import platform from '@/packages/platform'
 import { settingsAtom } from '@/stores/atoms'
 import Markdown from '@/components/Markdown'
 import { trackingEvent } from '@/packages/event'
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogDescription,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 const { useEffect, useState } = React
 
@@ -47,28 +53,35 @@ export default function RemoteDialogWindow() {
         }
     }, [open])
 
-    const onClose = (event?: any, reason?: 'backdropClick' | 'escapeKeyDown') => {
-        if (reason === 'backdropClick') {
-            return
-        }
+    const onClose = () => {
         setOpen(false)
     }
 
     return (
-        <Dialog open={open} onClose={onClose}>
-            <DialogContent>
-                <DialogContentText>
-                    <Markdown>{dialogConfig?.markdown || ''}</Markdown>
-                    <Box>
-                        {dialogConfig?.buttons.map((button, index) => (
-                            <Button onClick={() => platform.openLink(button.url)}>{button.label}</Button>
-                        ))}
-                    </Box>
-                </DialogContentText>
+        <Dialog open={open} onOpenChange={(open) => open || onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogDescription asChild>
+                    <div className="space-y-4">
+                        <Markdown>{dialogConfig?.markdown || ''}</Markdown>
+                        
+                        <div className="flex flex-wrap gap-2">
+                            {dialogConfig?.buttons.map((button, index) => (
+                                <Button 
+                                    key={index}
+                                    variant="outline" 
+                                    onClick={() => platform.openLink(button.url)}
+                                >
+                                    {button.label}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                </DialogDescription>
+                
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onClose()}>{t('cancel')}</Button>
+                </DialogFooter>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={() => onClose()}>{t('cancel')}</Button>
-            </DialogActions>
         </Dialog>
     )
 }

@@ -3,7 +3,6 @@ import SessionItem from './SessionItem'
 import * as atoms from '@/stores/atoms'
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { DragEndEvent } from '@dnd-kit/core'
-import { MenuList } from '@mui/material'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import {
@@ -17,6 +16,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
+import { cn } from '@/lib/utils'
 
 export interface Props {
     sessionListRef: MutableRefObject<HTMLDivElement | null>
@@ -56,14 +56,10 @@ export default function SessionList(props: Props) {
         }
     }
     return (
-        <MenuList
-            sx={{
-                width: '100%',
-                overflow: 'auto',
-                '& ul': { padding: 0 },
-                flexGrow: 1,
-            }}
-            component="div"
+        <div
+            className={cn(
+                "w-full overflow-auto flex-grow"
+            )}
             ref={props.sessionListRef}
         >
             <DndContext
@@ -73,17 +69,19 @@ export default function SessionList(props: Props) {
                 onDragEnd={onDragEnd}
             >
                 <SortableContext items={sortedSessions.map(session => session.id)} strategy={verticalListSortingStrategy}>
-                    {sortedSessions.map((session) => (
-                        <SortableItem key={session.id} id={session.id}>
-                            <SessionItem
-                                selected={currentSessionId === session.id}
-                                session={session}
-                            />
-                        </SortableItem>
-                    ))}
+                    <div className="space-y-1 p-1">
+                        {sortedSessions.map((session) => (
+                            <SortableItem key={session.id} id={session.id}>
+                                <SessionItem
+                                    selected={currentSessionId === session.id}
+                                    session={session}
+                                />
+                            </SortableItem>
+                        ))}
+                    </div>
                 </SortableContext>
             </DndContext>
-        </MenuList>
+        </div>
     )
 }
 

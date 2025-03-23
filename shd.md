@@ -50,8 +50,9 @@
    - 用 shadcn Button 变体替换 `<Button>`、`<IconButton>`
 
 4. **输入组件** - ✅ 已完成
-   - 用 shadcn Input 替换 `<TextField>`、`<TextFieldReset>`、`<PasswordTextField>`
-   - 用 shadcn Select/Combobox 替换 `<SimpleSelect>`、`<AIProviderSelect>` 等
+   - 用 shadcn Input 替换 `<TextField>`、`<TextFieldReset>`、`<PasswordTextField>` - ✅ 已完成
+   - 用 shadcn Select/Combobox 替换 `<SimpleSelect>`、`<AIProviderSelect>` 等 - ✅ 已完成
+   - 用 shadcn Label 组件替换 MUI 的 InputLabel - ✅ 已完成
 
 5. **反馈组件** - ✅ 已完成
    - 用 shadcn Toast 替换 `<Toasts>`

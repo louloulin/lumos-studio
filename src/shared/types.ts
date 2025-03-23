@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
-import { Model } from '../renderer/packages/models/openai'
-import * as siliconflow from '../renderer/packages/models/siliconflow'
-import { ClaudeModel } from '../renderer/packages/models/claude'
+import { Model } from '@/packages/models/openai'
+import * as siliconflow from '@/packages/models/siliconflow'
+import { ClaudeModel } from '@/packages/models/claude'
 
 export const MessageRoleEnum = {
     System: 'system',
@@ -10,6 +10,14 @@ export const MessageRoleEnum = {
 } as const
 
 export type MessageRole = (typeof MessageRoleEnum)[keyof typeof MessageRoleEnum]
+
+export enum OpenAIModelType {
+    GPT3_5 = 'gpt-3.5-turbo',
+    GPT4 = 'gpt-4',
+    GPT4_TURBO = 'gpt-4-turbo-preview',
+    GPT4_VISION = 'gpt-4-vision-preview',
+    CUSTOM = 'custom',
+}
 
 export interface Message {
     id: string

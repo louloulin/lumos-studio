@@ -1,12 +1,18 @@
-import { Chip, MenuItem, Typography } from '@mui/material'
-import { ModelProvider, ModelSettings } from '@/shared/types'
+import React from 'react'
 import { useTranslation } from 'react-i18next'
+import { cn } from '@/lib/utils'
+import { ModelSettings } from '@/shared/types'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { AIModelProviderMenuOptionList } from '@/packages/models'
-import * as React from 'react';
-import Button from '@mui/material/Button';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import StyledMenu from './StyledMenu';
-import StarIcon from '@mui/icons-material/Star';
 
 interface ModelConfigProps {
     settings: ModelSettings
@@ -18,73 +24,62 @@ interface ModelConfigProps {
 export default function AIProviderSelect(props: ModelConfigProps) {
     const { settings, setSettings, className, hideCustomProviderManage } = props
     const { t } = useTranslation()
+    const [open, setOpen] = React.useState(false)
 
-    const [menuAnchorEl, setMenuAnchorEl] = React.useState<null | HTMLElement>(null);
-    const menuState = Boolean(menuAnchorEl);
-    const openMenu = (event: React.MouseEvent<HTMLElement>) => {
-        setMenuAnchorEl(event.currentTarget);
-    };
-    const closeMenu = () => {
-        setMenuAnchorEl(null);
-    };
+    const selectedProvider = AIModelProviderMenuOptionList.find(
+        (provider) => provider.value === settings.aiProvider
+    )
 
     return (
-        <>
-            <Typography variant='caption' className='opacity-50'>
+        <div className={cn("space-y-1", className)}>
+            <div className="text-xs text-muted-foreground">
                 {t('Model Provider')}:
-            </Typography>
-            <div className='flex items-end justify-between'>
-                <Button
-                    variant="contained"
-                    disableElevation
-                    onClick={openMenu}
-                    endIcon={<KeyboardArrowDownIcon />}
-                >
-                    <Typography className='text-left' maxWidth={200} noWrap>
-                        { AIModelProviderMenuOptionList.find((provider) => provider.value === settings.aiProvider)?.label || 'Unknown' }
-                    </Typography>
-                </Button>
-                <StyledMenu
-                    anchorEl={menuAnchorEl}
-                    open={menuState}
-                    onClose={closeMenu}
-                    anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'left',
-                    }}
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'left',
-                    }}
-                >
-                    {
-                        AIModelProviderMenuOptionList.map((provider) => (
-                            <MenuItem key={provider.value} disableRipple
+            </div>
+            <div className="flex items-center justify-between">
+                <DropdownMenu open={open} onOpenChange={setOpen}>
+                    <DropdownMenuTrigger asChild>
+                        <Button 
+                            variant="default" 
+                            className="w-full justify-between text-left font-normal"
+                        >
+                            <span className="truncate max-w-[200px]">
+                                {selectedProvider?.label || 'Unknown'}
+                            </span>
+                            {selectedProvider?.featured && (
+                                <Badge variant="secondary" className="ml-2">
+                                    {t('Featured')}
+                                </Badge>
+                            )}
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="w-[200px]">
+                        <DropdownMenuLabel>{t('Model Provider')}</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {AIModelProviderMenuOptionList.map((item) => (
+                            <DropdownMenuItem
+                                key={item.value}
+                                disabled={item.disabled}
                                 onClick={() => {
                                     setSettings({
                                         ...settings,
-                                        aiProvider: provider.value as ModelProvider,
+                                        aiProvider: item.value,
                                     })
-                                    closeMenu()
+                                    setOpen(false)
                                 }}
+                                className="flex items-center justify-between"
                             >
-                                <StarIcon />
-                                {provider.label}
-                                {provider.featured && (
-                                    <Chip
-                                        label={t('Easy Access')}
-                                        size="small"
-                                        color="success"
-                                        variant="outlined"
-                                        sx={{ marginLeft: '10px' }}
-                                    />
+                                <span>{item.label}</span>
+                                {item.featured && (
+                                    <Badge variant="secondary" className="ml-2">
+                                        {t('Featured')}
+                                    </Badge>
                                 )}
-                            </MenuItem>
-                        ))
-                    }
-                </StyledMenu>
+                            </DropdownMenuItem>
+                        ))}
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
-        </>
+        </div>
     )
 }
 

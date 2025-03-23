@@ -62,7 +62,7 @@
    - 用 shadcn Dialog 更新 `CopilotWindow` 等模态框
 
 7. **高级组件** - ✅ 已完成
-   - 用 shadcn Accordion 替换 `<Accordion>` ⏳ 进行中
+   - 用 shadcn Accordion 替换 `<Accordion>` - ✅ 已完成
    - 用 shadcn Slider 替换滑块组件（`TemperatureSlider` 等）- ✅ 已完成
    - 用 shadcn Avatar 替换 `<Avatar>` - ✅ 已完成
    - 用 shadcn DropdownMenu 替换 `<StyledMenu>` - ✅ 已完成
@@ -95,7 +95,7 @@
 | `<IconButton>`         | 带图标变体的 shadcn Button            | ✅ 已完成 |
 | `<TextField>`          | shadcn Input                          | ✅ 已完成 |
 | `<Select>`             | shadcn Select                         | ✅ 已完成 |
-| `<Accordion>`          | shadcn Accordion                      | ⏳ 进行中 |
+| `<Accordion>`          | shadcn Accordion                      | ✅ 已完成 |
 | `<Slider>`             | shadcn Slider                         | ✅ 已完成 |
 | `<Avatar>`             | shadcn Avatar                         | ✅ 已完成 |
 | `<Dialog>`             | shadcn Dialog                         | ✅ 已完成 |
@@ -120,6 +120,7 @@
 10. **增强组件** - 添加了各种 shadcn/ui 组件：Badge、Textarea、Switch、Label 等
 11. **Slider 系列组件** - 将 TemperatureSlider、TopPSlider、MaxContextMessageCountSlider 从 MUI 迁移到 shadcn/ui
 12. **Tooltip 组件** - 将 MUI Tooltip 替换为 shadcn/ui Tooltip，改进了 MiniButton 组件中的工具提示功能
+13. **Accordion 组件** - 将 MUI Accordion 替换为 shadcn/ui Accordion，保留了相同的 API 接口
 
 ## 实现示例
 
@@ -226,6 +227,41 @@
     className="py-4"
   />
 </div>
+```
+
+### 示例 6：Accordion 迁移
+从：
+```tsx
+<Accordion expanded={expanded} onChange={onChange}>
+  <AccordionSummary>
+    <Typography className="font-bold">
+      标题内容
+    </Typography>
+  </AccordionSummary>
+  <AccordionDetails>
+    <Box>
+      内容区域
+    </Box>
+  </AccordionDetails>
+</Accordion>
+```
+
+到：
+```tsx
+<Accordion expanded={expanded} onChange={onChange} className="mb-4">
+  <AccordionSummary>
+    <div>
+      <span className="font-bold">
+        标题内容
+      </span>
+    </div>
+  </AccordionSummary>
+  <AccordionDetails>
+    <div>
+      内容区域
+    </div>
+  </AccordionDetails>
+</Accordion>
 ```
 
 ## 移除清单

@@ -1,34 +1,87 @@
-import { styled } from '@mui/material/styles'
-import MuiAccordionDetails from '@mui/material/AccordionDetails'
-import MuiAccordion, { AccordionProps } from '@mui/material/Accordion'
-import MuiAccordionSummary, { AccordionSummaryProps } from '@mui/material/AccordionSummary'
-import ArrowForwardIosSharpIcon from '@mui/icons-material/ArrowForwardIosSharp'
+import React from 'react'
+import { cn } from '@/lib/utils'
+import {
+  Accordion as ShadcnAccordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent
+} from '@/components/ui/accordion'
 
-export const Accordion = styled((props: AccordionProps) => (
-    <MuiAccordion disableGutters elevation={0} square {...props} />
-))(({ theme }) => ({
-    border: `1px solid ${theme.palette.divider}`,
-    '&:not(:last-child)': {
-    },
-    '&:before': {
-        display: 'none',
-    },
-}))
+// 保持原有的API接口兼容性
+export interface AccordionProps {
+  expanded?: boolean
+  onChange?: (event: React.SyntheticEvent, expanded: boolean) => void
+  children: React.ReactNode
+  className?: string
+  [key: string]: any
+}
 
-export const AccordionSummary = styled((props: AccordionSummaryProps) => (
-    <MuiAccordionSummary expandIcon={<ArrowForwardIosSharpIcon sx={{ fontSize: '0.9rem' }} />} {...props} />
-))(({ theme }) => ({
-    backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .01)',
-    flexDirection: 'row-reverse',
-    '& .MuiAccordionSummary-expandIconWrapper.Mui-expanded': {
-        transform: 'rotate(90deg)',
-    },
-    '& .MuiAccordionSummary-content': {
-        marginLeft: theme.spacing(1),
-    },
-}))
+export const Accordion = React.forwardRef<
+  HTMLDivElement,
+  AccordionProps
+>(({ expanded, onChange, children, className, ...props }, ref) => {
+  // 处理单个Accordion的情况
+  const handleValueChange = (value: string) => {
+    if (onChange) {
+      onChange({} as React.SyntheticEvent, value === 'item-1')
+    }
+  }
 
-export const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
-    padding: theme.spacing(2),
-    border: '1px solid rgba(0, 0, 0, .125)',
-}))
+  return (
+    <ShadcnAccordion
+      ref={ref}
+      type="single"
+      collapsible
+      className={cn('border rounded-md', className)}
+      value={expanded ? 'item-1' : ''}
+      onValueChange={handleValueChange}
+      {...props}
+    >
+      <AccordionItem value="item-1" className="border-0">
+        {children}
+      </AccordionItem>
+    </ShadcnAccordion>
+  )
+})
+
+Accordion.displayName = 'Accordion'
+
+export interface AccordionSummaryProps extends React.HTMLAttributes<HTMLButtonElement> {
+  expandIcon?: React.ReactNode
+}
+
+export const AccordionSummary = React.forwardRef<
+  HTMLButtonElement,
+  AccordionSummaryProps
+>(({ children, className, expandIcon, ...props }, ref) => {
+  return (
+    <AccordionTrigger
+      ref={ref}
+      className={cn('px-4 py-2 hover:no-underline', className)}
+      {...props}
+    >
+      <div className="flex-grow">{children}</div>
+    </AccordionTrigger>
+  )
+})
+
+AccordionSummary.displayName = 'AccordionSummary'
+
+export interface AccordionDetailsProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+export const AccordionDetails = React.forwardRef<
+  HTMLDivElement,
+  AccordionDetailsProps
+>(({ children, className, ...props }, ref) => {
+  return (
+    <AccordionContent
+      ref={ref}
+      className={cn('px-4', className)}
+      {...props}
+    >
+      {children}
+    </AccordionContent>
+  )
+})
+
+AccordionDetails.displayName = 'AccordionDetails'

@@ -4,13 +4,16 @@ import rehypeKatex from 'rehype-katex'
 import remarkMath from 'remark-math'
 import remarkBreaks from 'remark-breaks'
 import { useTranslation } from 'react-i18next'
-import { useTheme } from '@mui/material'
 import { useMemo } from 'react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { a11yDark, atomDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import ContentCopyIcon from '@mui/icons-material/ContentCopy'
 import * as toastActions from '@/stores/toastActions'
 import { sanitizeUrl } from '@braintree/sanitize-url'
+import { useAtomValue } from 'jotai'
+import { themeAtom } from '@/stores/atoms'
+import { Theme } from '@/shared/types'
+import { Copy } from 'lucide-react'
+import { Button } from './ui/button'
 
 import 'katex/dist/katex.min.css' // `rehype-katex` does not import the CSS for you
 import { copyToClipboard } from '@/packages/navigator'
@@ -50,7 +53,10 @@ export default function Markdown(props: {
 
 export function CodeBlock(props: any) {
     const { t } = useTranslation()
-    const theme = useTheme()
+    // 使用jotai获取主题，替代MUI的useTheme
+    const theme = useAtomValue(themeAtom)
+    const isDarkMode = theme === Theme.DarkMode
+    
     return useMemo(() => {
         const { children, className, node, hiddenCodeCopyButton, ...rest } = props
         const match = /language-(\w+)/.exec(className || '')
@@ -61,12 +67,12 @@ export function CodeBlock(props: any) {
                     {...rest}
                     className={className}
                     style={{
-                        backgroundColor: theme.palette.mode === 'dark' ? '#333' : '#f1f1f1',
+                        backgroundColor: isDarkMode ? '#333' : '#f1f1f1',
                         padding: '2px 4px',
                         marigin: '0 4px',
                         borderRadius: '4px',
                         border: '1px solid',
-                        borderColor: theme.palette.mode === 'dark' ? '#444' : '#ddd',
+                        borderColor: isDarkMode ? '#444' : '#ddd',
                     }}
                 >
                     {children}
@@ -101,34 +107,24 @@ export function CodeBlock(props: any) {
                     </span>
                     {
                         !hiddenCodeCopyButton && (
-                            <ContentCopyIcon
-                                sx={{
-                                    textDecoration: 'none',
-                                    color: 'white',
-                                    padding: '1px',
-                                    margin: '2px 10px 0 10px',
-                                    cursor: 'pointer',
-                                    opacity: 0.5,
-                                    ':hover': {
-                                        backgroundColor: 'rgb(80, 80, 80)',
-                                        opacity: 1,
-                                    },
-                                }}
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 mx-2 my-1 hover:bg-[rgb(80,80,80)] opacity-50 hover:opacity-100"
                                 onClick={() => {
                                     copyToClipboard(String(children))
                                     toastActions.add(t('copied to clipboard'))
                                 }}
-                            />
+                            >
+                                <Copy className="h-4 w-4 text-white" />
+                                <span className="sr-only">Copy code</span>
+                            </Button>
                         )
                     }
                 </div>
                 <SyntaxHighlighter
                     children={String(children).replace(/\n$/, '')}
-                    style={
-                        theme.palette.mode === 'dark'
-                            ? atomDark
-                            : a11yDark
-                    }
+                    style={isDarkMode ? atomDark : a11yDark}
                     language={language}
                     PreTag="div"
                     customStyle={{
@@ -143,5 +139,5 @@ export function CodeBlock(props: any) {
                 />
             </div>
         )
-    }, [props.children, theme.palette.mode])
+    }, [props.children, isDarkMode])
 }

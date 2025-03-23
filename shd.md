@@ -97,8 +97,8 @@
 
 | 文件路径 | MUI 组件 | 替代方案 |
 |---------|----------|----------|
-| Markdown.tsx | useTheme | 使用 CSS 变量或 Tailwind 暗色模式 |
-| *Setting.tsx | 剩余的一些组件 | 已全部迁移完成 |
+| ~~Markdown.tsx~~ | ~~useTheme~~ | ~~使用 CSS 变量或 Tailwind 暗色模式~~ |
+| - | - | 已全部迁移完成 |
 
 ### 2. 实施计划
 
@@ -187,6 +187,7 @@
 26. **useAppTheme 钩子** - 将 MUI 的 createTheme 替换为了 shadcn/ui 的主题系统，简化了主题处理逻辑
 27. **Card 组件** - 创建了 shadcn/ui 风格的 Card 组件，用于许可证详情等信息展示
 28. **Progress 组件** - 创建了 shadcn/ui 风格的 Progress 组件，用于展示进度条
+29. **Markdown 组件** - 将 Markdown 组件从 MUI 迁移到了 Tailwind 和 shadcn 组件，移除了对 useTheme 和 ContentCopyIcon 的依赖
 
 ## 实现示例
 

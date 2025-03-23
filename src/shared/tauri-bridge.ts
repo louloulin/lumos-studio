@@ -42,7 +42,7 @@ async function getStore(): Promise<Store | null> {
     storePromise = new Promise(async (resolve, reject) => {
       try {
         // In Tauri 2.0, Store doesn't have a load method, it's automatically loaded
-        const store = new Store("settings.dat");
+        const store = new Store("settings1.dat");
         resolve(store);
       } catch (e) {
         console.error('Failed to create Store:', e);

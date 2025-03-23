@@ -10,7 +10,7 @@ import Toasts from './components/Toasts'
 import RemoteDialogWindow from './pages/RemoteDialogWindow'
 import { useSystemLanguageWhenInit } from './hooks/useDefaultSystemLanguage'
 import MainPane from './MainPane'
-import { useAtom, useAtomValue } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import * as atoms from './stores/atoms'
 import Sidebar from './Sidebar'
 import * as premiumActions from './stores/premiumActions'
@@ -18,6 +18,8 @@ import { tauriBridge, initializeTauriEvents } from './tauri-bridge'
 import platform from './packages/platform'
 import { ThemeProvider } from './components/ui/theme-provider'
 import ShadcnTest from './components/ShadcnTest'
+import * as defaults from './shared/defaults'
+import ErrorBoundary from './components/ErrorBoundary'
 
 // The Window interface is now defined in window.d.ts
 
@@ -48,13 +50,17 @@ function Main() {
             ) : (
                 <>
                     <div className="h-full flex">
-                        <Sidebar
-                            openCopilotWindow={() => setOpenCopilotWindow(true)}
-                            openAboutWindow={() => setOpenAboutWindow(true)}
-                            setOpenSettingWindow={setOpenSettingWindow}
-                            openShadcnTest={() => setShowShadcnTest(true)}
-                        />
-                        <MainPane />
+                        <ErrorBoundary>
+                            <Sidebar
+                                openCopilotWindow={() => setOpenCopilotWindow(true)}
+                                openAboutWindow={() => setOpenAboutWindow(true)}
+                                setOpenSettingWindow={setOpenSettingWindow}
+                                openShadcnTest={() => setShowShadcnTest(true)}
+                            />
+                        </ErrorBoundary>
+                        <ErrorBoundary>
+                            <MainPane />
+                        </ErrorBoundary>
                     </div>
                     <SettingDialog
                         open={!!openSettingWindow}
@@ -79,24 +85,39 @@ export default function App() {
     useSystemLanguageWhenInit()
     const theme = useAppTheme()
     const [initialized, setInitialized] = React.useState(false);
+    const setSessions = useSetAtom(atoms.sessionsAtom);
 
     useEffect(() => {
         const initialize = async () => {
             try {
-                // Expose the Tauri bridge to the window object
+                const shouldUseDefaults = localStorage.getItem('_force_use_defaults') === 'true';
+                if (shouldUseDefaults) {
+                    console.log('Force using default sessions after cache cleaning');
+                    setSessions(defaults.sessions());
+                    localStorage.removeItem('_force_use_defaults');
+                }
+                
                 if (!window.tauriAPI) {
                     window.tauriAPI = tauriBridge;
                 }
                 
-                // Initialize the platform with tauriAPI
                 if (platform.tauriAPI !== tauriBridge) {
                     platform.tauriAPI = tauriBridge;
                 }
                 
-                // Initialize tauri events using our improved function
                 initializeTauriEvents();
                 
-                // Initialize store and test store operations
+                if (typeof window.__clearAllCache !== 'function') {
+                    try {
+                        const cacheModule = await import('./utils/clearCache');
+                        window.__clearAllCache = cacheModule.clearAllCache;
+                        window.__clearSessionData = cacheModule.clearSessionData;
+                        console.log('Cache clearing functions initialized');
+                    } catch (e) {
+                        console.warn('Failed to initialize cache clearing functions:', e);
+                    }
+                }
+                
                 try {
                     await tauriBridge.getStoreValue("test-init");
                 } catch (e) {
@@ -106,15 +127,13 @@ export default function App() {
                 setInitialized(true);
             } catch (error) {
                 console.error('Failed to initialize Tauri events:', error);
-                // Set initialized even if there was an error to avoid frozen UI
                 setInitialized(true);
             }
         };
         
         initialize();
-    }, []);
+    }, [setSessions]);
 
-    // Show loading indicator if not initialized
     if (!initialized) {
         return (
             <div className="flex justify-center items-center h-screen">
@@ -124,8 +143,10 @@ export default function App() {
     }
 
     return (
-        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-            <Main />
-        </ThemeProvider>
+        <ErrorBoundary>
+            <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                <Main />
+            </ThemeProvider>
+        </ErrorBoundary>
     )
 }

@@ -188,6 +188,7 @@
 27. **Card 组件** - 创建了 shadcn/ui 风格的 Card 组件，用于许可证详情等信息展示
 28. **Progress 组件** - 创建了 shadcn/ui 风格的 Progress 组件，用于展示进度条
 29. **Markdown 组件** - 将 Markdown 组件从 MUI 迁移到了 Tailwind 和 shadcn 组件，移除了对 useTheme 和 ContentCopyIcon 的依赖
+30. **OllamaSetting 组件** - 将 OllamaSetting 组件从 MUI 迁移到 shadcn/ui 组件，替换 MUI Alert、Select 和 FormControl 组件
 
 ## 实现示例
 

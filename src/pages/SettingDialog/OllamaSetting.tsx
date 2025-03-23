@@ -1,4 +1,4 @@
-import { Alert, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ModelSettings } from '@/shared/types'
 import { Trans, useTranslation } from 'react-i18next'
 import TextFieldReset from '@/components/TextFieldReset'
@@ -7,6 +7,8 @@ import Ollama from '@/packages/models/ollama'
 import platform from '@/packages/platform'
 import { useAtomValue } from 'jotai'
 import { languageAtom } from '@/stores/atoms'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 
 export function OllamaHostInput(props: {
     ollamaHost: string
@@ -18,7 +20,7 @@ export function OllamaHostInput(props: {
     return (
         <>
             <TextFieldReset
-                label={t('api host')}
+                label={t('api host') as string}
                 value={props.ollamaHost}
                 defaultValue='http://localhost:11434'
                 onValueChange={props.setOllamaHost}
@@ -30,14 +32,16 @@ export function OllamaHostInput(props: {
                 && props.ollamaHost.length > 16
                 && !props.ollamaHost.includes('localhost')
                 && !props.ollamaHost.includes('127.0.0.1') && (
-                    <Alert icon={false} severity='info' className='my-4'>
-                        <Trans i18nKey='Please ensure that the Remote Ollama Service is able to connect remotely. For more details, refer to <a>this tutorial</a>.'
-                            components={{
-                                a: <a className='cursor-pointer font-bold' onClick={() => {
-                                    platform.openLink(`https://chatboxai.app/redirect_app/ollama_guide/${language}`)
-                                }}></a>,
-                            }}
-                        />
+                    <Alert className='my-4'>
+                        <AlertDescription>
+                            <Trans i18nKey='Please ensure that the Remote Ollama Service is able to connect remotely. For more details, refer to <a>this tutorial</a>.'
+                                components={{
+                                    a: <a className='cursor-pointer font-bold' onClick={() => {
+                                        platform.openLink(`https://chatboxai.app/redirect_app/ollama_guide/${language}`)
+                                    }}></a>,
+                                }}
+                            />
+                        </AlertDescription>
                     </Alert>
                 )
             }
@@ -67,22 +71,23 @@ export function OllamaModelSelect(props: {
         }
     }, [props.ollamaHost])
     return (
-        <FormControl fullWidth variant="outlined" margin="dense" className={props.className}>
-            <InputLabel htmlFor="ollama-model-select">{t('model')}</InputLabel>
+        <div className={props.className}>
+            <Label htmlFor="ollama-model-select">{t('model')}</Label>
             <Select
-                label={t('model')}
-                id="ollama-model-select"
                 value={props.ollamaModel}
-                onChange={(e) =>
-                    props.setOlamaModel(e.target.value)
-                }
+                onValueChange={props.setOlamaModel}
             >
-                {models.map((model) => (
-                    <MenuItem key={model} value={model}>
-                        {model}
-                    </MenuItem>
-                ))}
+                <SelectTrigger id="ollama-model-select" className="w-full mt-1">
+                    <SelectValue placeholder={t('Select a model')} />
+                </SelectTrigger>
+                <SelectContent>
+                    {models.map((model) => (
+                        <SelectItem key={model} value={model}>
+                            {model}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
             </Select>
-        </FormControl>
+        </div>
     )
 }

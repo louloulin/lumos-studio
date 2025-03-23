@@ -11,6 +11,7 @@ try {
 }
 
 import { MastraClient } from '@mastra/client-js';
+import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse } from './types';
 
 // Get the Mastra service URL from the Tauri backend
 async function getMastraUrl(): Promise<string> {
@@ -33,25 +34,6 @@ async function getClient() {
     });
   }
   return mastraClient;
-}
-
-// Interface for message objects
-interface Message {
-  role?: string;
-  content: string;
-}
-
-// Interface for agent generate request
-interface AgentGenerateRequest {
-  messages: string[] | Message[];
-  stream?: boolean;
-  options?: Record<string, any>;
-}
-
-// Interface for agent generate response
-interface AgentGenerateResponse {
-  text: string;
-  metadata?: Record<string, any>;
 }
 
 // Mastra API client
@@ -82,24 +64,10 @@ export const MastraAPI = {
           throw new Error("Messages array cannot be empty");
         }
         
-        let result;
-        
-        if (typeof request.messages[0] === 'string') {
-          const formattedMessages = (request.messages as string[]).map(msg => ({
-            role: 'user',
-            content: msg
-          }));
-          
-          result = await (agent as any).generate({
-            messages: formattedMessages,
-            options: request.options
-          });
-        } else {
-          result = await (agent as any).generate({
-            messages: request.messages as any,
-            options: request.options
-          });
-        }
+        const result = await (agent as any).generate({
+          messages: request.messages,
+          options: request.options
+        });
         
         return {
           text: typeof result.text === 'string' ? result.text : '',
@@ -129,21 +97,11 @@ export const MastraAPI = {
           throw new Error("Messages array cannot be empty");
         }
         
-        let formattedMessages;
-        if (typeof request.messages[0] === 'string') {
-          formattedMessages = (request.messages as string[]).map(msg => ({
-            role: 'user',
-            content: msg
-          }));
-        } else {
-          formattedMessages = request.messages;
-        }
-        
         try {
           // 使用stream方法获取Response对象
-          console.log('Calling stream with messages:', formattedMessages);
+          console.log('Calling stream with messages:', request.messages);
           const response = await (agent as any).stream({
-            messages: formattedMessages as any,
+            messages: request.messages,
             options: request.options
           });
           
@@ -217,7 +175,7 @@ export const MastraAPI = {
           console.warn('Stream API failed, falling back to normal generate:', streamError);
           // 如果流式API失败，回退到普通生成
           const result = await (agent as any).generate({
-            messages: formattedMessages as any,
+            messages: request.messages,
             options: request.options
           });
           

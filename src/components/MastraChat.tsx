@@ -2,17 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MastraAPI } from '../api/mastra';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
-import { Send, User, Bot, Plus, RefreshCw, Settings } from 'lucide-react';
+import { Send, User, Bot, Plus, RefreshCw, Settings, Image as ImageIcon, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import Markdown from './Markdown';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
+import { toast } from '@/hooks/use-toast';
+import ImageUploadInput from './ImageUploadInput';
+import { MessageContent, MastraMessage } from '../api/types';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: number;
+  images?: string[]; // Base64 encoded images
 }
 
 interface AgentProfile {
@@ -35,7 +39,9 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const [loading, setLoading] = useState(false);
   const [isServiceRunning, setIsServiceRunning] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 映射智能体名称到配置文件
   const agentProfiles: Record<string, Omit<AgentProfile, 'id'>> = {
@@ -127,69 +133,219 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!selectedAgent || !input.trim() || loading) return;
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     
+    const newImages: string[] = [];
+    
+    Array.from(files).forEach(file => {
+      // Check if file is an image
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: '不支持的文件类型',
+          description: '请上传图片文件 (JPG, PNG, GIF等)',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      // Check file size (limit to 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: '文件过大',
+          description: '图片大小不能超过5MB',
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        if (e.target?.result) {
+          const base64String = e.target.result.toString();
+          setUploadedImages(prev => [...prev, base64String]);
+          newImages.push(base64String);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    
+    // Clear the input to allow uploading the same file again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (!input.trim() && uploadedImages.length === 0) return;
+    if (!selectedAgent) return;
+    
+    // Add user message to the chat
     const userMessage: Message = {
-      id: `msg-${Date.now()}-user`,
+      id: Date.now().toString(),
       role: 'user',
       content: input,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      images: uploadedImages.length > 0 ? [...uploadedImages] : undefined
     };
     
     setMessages(prev => [...prev, userMessage]);
     setInput('');
+    setUploadedImages([]);
     setLoading(true);
     
-    // 创建一个占位的助手消息
-    const assistantMessageId = `msg-${Date.now()}-assistant`;
-    const assistantMessage: Message = {
-      id: assistantMessageId,
-      role: 'assistant',
-      content: '',
-      timestamp: Date.now()
-    };
-    
-    setMessages(prev => [...prev, assistantMessage]);
-    
     try {
-      // 使用流式响应
-      setIsStreaming(true);
-      let fullResponse = '';
-      
-      const generator = MastraAPI.streamGenerate(selectedAgent.id, {
-        messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        stream: true
-      });
-      
-      for await (const chunk of generator) {
-        fullResponse += chunk;
+      // For streaming responses
+      if (selectedAgent.id === 'GeneralAssistant') {
+        setIsStreaming(true);
         
-        // 更新消息内容
-        setMessages(prev => prev.map(msg => 
-          msg.id === assistantMessageId 
-            ? { ...msg, content: fullResponse } 
-            : msg
-        ));
+        // Create a placeholder for the assistant's message
+        const assistantMessageId = (Date.now() + 1).toString();
+        const assistantMessage: Message = {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now() + 1
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // 转换消息格式为Mastra API需要的格式
+        const formattedMessages = getMessageHistoryForAPI();
+        
+        // 添加用户最新消息
+        const userContent: MessageContent[] = [];
+        if (userMessage.content) {
+          userContent.push({
+            type: 'text',
+            text: userMessage.content
+          });
+        }
+        
+        if (userMessage.images && userMessage.images.length > 0) {
+          userMessage.images.forEach(imageData => {
+            userContent.push({
+              type: 'image',
+              image: imageData
+            });
+          });
+        }
+        
+        formattedMessages.push({
+          role: 'user',
+          content: userContent
+        });
+        
+        // Stream the response
+        const streamGenerator = MastraAPI.streamGenerate(selectedAgent.id, {
+          messages: formattedMessages,
+          stream: true
+        });
+        
+        let fullResponse = '';
+        
+        for await (const chunk of streamGenerator) {
+          fullResponse += chunk;
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === assistantMessageId 
+                ? { ...msg, content: fullResponse } 
+                : msg
+            )
+          );
+        }
+        
+        setIsStreaming(false);
+      } else {
+        // For non-streaming responses
+        // 转换消息格式为Mastra API需要的格式
+        const formattedMessages = getMessageHistoryForAPI();
+        
+        // 添加用户最新消息
+        const userContent: MessageContent[] = [];
+        if (userMessage.content) {
+          userContent.push({
+            type: 'text',
+            text: userMessage.content
+          });
+        }
+        
+        if (userMessage.images && userMessage.images.length > 0) {
+          userMessage.images.forEach(imageData => {
+            userContent.push({
+              type: 'image',
+              image: imageData
+            });
+          });
+        }
+        
+        formattedMessages.push({
+          role: 'user',
+          content: userContent
+        });
+        
+        const response = await MastraAPI.generate(selectedAgent.id, {
+          messages: formattedMessages,
+          stream: false
+        });
+        
+        // Add assistant's response to the chat
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.text,
+          timestamp: Date.now() + 1
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
       }
-      
-      setIsStreaming(false);
     } catch (error) {
       console.error('Error generating response:', error);
-      
-      // 更新错误消息
-      setMessages(prev => prev.map(msg => 
-        msg.id === assistantMessageId 
-          ? { ...msg, content: '抱歉，生成回复时出现错误。请稍后再试。' } 
-          : msg
-      ));
+      toast({
+        title: '生成回复时出错',
+        description: '请稍后再试或联系管理员',
+        variant: 'destructive'
+      });
     } finally {
       setLoading(false);
-      setIsStreaming(false);
     }
+  };
+  
+  // Helper function to format messages for the API
+  const getMessageHistoryForAPI = (): MastraMessage[] => {
+    return messages.map(msg => {
+      if (msg.images && msg.images.length > 0) {
+        const content: MessageContent[] = [];
+        if (msg.content) {
+          content.push({
+            type: 'text',
+            text: msg.content
+          });
+        }
+        
+        msg.images.forEach(imageData => {
+          content.push({
+            type: 'image',
+            image: imageData
+          });
+        });
+        
+        return { role: msg.role, content };
+      } else {
+        return { 
+          role: msg.role, 
+          content: [{
+            type: 'text',
+            text: msg.content
+          }]
+        };
+      }
+    });
   };
 
   const clearConversation = () => {
@@ -324,10 +480,30 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                         </span>
                       </div>
                       
-                      {message.role === 'user' ? (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
-                      ) : (
-                        <Markdown>{message.content}</Markdown>
+                      {/* Display any uploaded images */}
+                      {message.images && message.images.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-2">
+                          {message.images.map((img, index) => (
+                            <div key={`${message.id}-img-${index}`} className="relative">
+                              <img 
+                                src={img} 
+                                alt={`Uploaded ${index + 1}`} 
+                                className="max-w-xs rounded-md object-contain max-h-64" 
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Display text content */}
+                      {message.content && (
+                        <div className={message.role === 'assistant' ? "prose dark:prose-invert max-w-none" : ""}>
+                          {message.role === 'assistant' ? (
+                            <Markdown>{message.content}</Markdown>
+                          ) : (
+                            <p>{message.content}</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -338,26 +514,15 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             
             {/* 输入区域 */}
             <div className="p-4 border-t border-border">
-              <div className="flex space-x-2">
-                <Input
-                  value={input}
-                  onChange={handleInputChange}
-                  onKeyDown={handleKeyPress}
-                  placeholder={`向 ${selectedAgent.name} 发送消息...`}
-                  disabled={loading}
-                  className="flex-1"
-                />
-                <Button 
-                  onClick={handleSubmit}
-                  disabled={!input.trim() || loading}
-                >
-                  {loading ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
+              <ImageUploadInput
+                onSend={(text, images) => {
+                  setInput(text);
+                  setUploadedImages(images);
+                  handleSubmit();
+                }}
+                disabled={loading}
+                placeholder={`向 ${selectedAgent.name} 发送消息...`}
+              />
               {isStreaming && (
                 <p className="text-xs text-gray-500 mt-1 animate-pulse">
                   正在生成回复...

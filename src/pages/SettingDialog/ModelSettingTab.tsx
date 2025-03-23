@@ -9,6 +9,7 @@ import MaxContextMessageCountSlider from '@/components/MaxContextMessageCountSli
 import TemperatureSlider from '@/components/TemperatureSlider'
 import ClaudeSetting from './ClaudeSetting'
 import PPIOSetting from './PPIOSetting'
+import { Separator } from "@/components/ui/separator"
 
 interface ModelConfigProps {
     settingsEdit: ModelSettings
@@ -23,7 +24,7 @@ export default function ModelSettingTab(props: ModelConfigProps) {
                 settings={settingsEdit}
                 setSettings={setSettingsEdit}
             />
-            <hr className="my-4 border-t border-border" />
+            <Separator className="my-4" />
             {settingsEdit.aiProvider === ModelProvider.OpenAI && (
                 <OpenAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}

@@ -17,6 +17,9 @@ importers:
       mastra:
         specifier: ^0.4.2
         version: 0.4.2(@opentelemetry/api@1.9.0)(react@19.0.0)(typescript@5.8.2)
+      qwen-ai-provider:
+        specifier: ^0.1.0
+        version: 0.1.0(zod@3.24.2)
       zod:
         specifier: ^3.24.2
         version: 3.24.2
@@ -2371,6 +2374,12 @@ packages:
 
   quick-format-unescaped@4.0.4:
     resolution: {integrity: sha512-tYC1Q1hgyRuHgloV/YXs2w15unPVh8qfu/qCTfhTYamaw7fyhumKa2yGpdSo87vY32rIclj+4fWYQXUMs9EHvg==}
+
+  qwen-ai-provider@0.1.0:
+    resolution: {integrity: sha512-ylzb71U0WreJPyNOHJTwXvE9+jVSsFhnam5aDfB7hBSUuEajYFIGcvhhuQUgUE43OIpxINMgGHKSicpwJ8x/XQ==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^3.24.1
 
   radash@12.1.0:
     resolution: {integrity: sha512-b0Zcf09AhqKS83btmUeYBS8tFK7XL2e3RvLmZcm0sTdF1/UUlHSsjXdCcWNxe7yfmAlPve5ym0DmKGtTzP6kVQ==}
@@ -5693,6 +5702,12 @@ snapshots:
       side-channel: 1.1.0
 
   quick-format-unescaped@4.0.4: {}
+
+  qwen-ai-provider@0.1.0(zod@3.24.2):
+    dependencies:
+      '@ai-sdk/provider': 1.1.0
+      '@ai-sdk/provider-utils': 2.2.0(zod@3.24.2)
+      zod: 3.24.2
 
   radash@12.1.0: {}
 

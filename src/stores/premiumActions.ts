@@ -92,7 +92,7 @@ export async function activate(licenseKey: string) {
     store.set(settingsAtom, (settings) => {
         const newSettings: Settings = {
             ...settings,
-            aiProvider: ModelProvider.ChatboxAI,
+            aiProvider: ModelProvider.LumosAI,
             licenseKey,
             licenseInstances: {
                 ...(settings.licenseInstances || {}),
@@ -102,8 +102,8 @@ export async function activate(licenseKey: string) {
         }
         if (licenseDetail) {
             newSettings.licenseDetail = licenseDetail
-            if (!newSettings.chatboxAIModel) {
-                newSettings.chatboxAIModel = licenseDetail.defaultModel
+            if (!newSettings.lumosAIModel) {
+                newSettings.lumosAIModel = licenseDetail.defaultModel
             }
         }
         return newSettings

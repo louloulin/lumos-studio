@@ -3,6 +3,7 @@ import Base, { onResultChange } from './base'
 import { API_ORIGIN } from '@/packages/remote'
 import { BaseError, ApiError, NetworkError, LumosAIAPIError } from './errors'
 import { parseJsonOrEmpty } from '@/lib/utils'
+import { MastraAPI } from '@/api/mastra'
 
 export const lumosAIModels: LumosAIModel[] = ['lumosai-3.5', 'lumosai-4']
 
@@ -15,6 +16,7 @@ interface Options {
     licenseDetail?: LumosAILicenseDetail
     language: string
     temperature: number
+    mastraAgentName?: string
 }
 
 interface Config {
@@ -33,6 +35,10 @@ export default class LumosAI extends Base {
     }
 
     async callChatCompletion(rawMessages: Message[], signal?: AbortSignal, onResultChange?: onResultChange): Promise<string> {
+        if (this.options.mastraAgentName) {
+            return this.callMastraChatCompletion(rawMessages, signal, onResultChange)
+        }
+        
         const messages = await populateLumosAIMessage(rawMessages)
         const response = await this.post(
             `${API_ORIGIN}/api/ai/chat`,
@@ -65,6 +71,57 @@ export default class LumosAI extends Base {
             }
         })
         return result
+    }
+
+    async callMastraChatCompletion(rawMessages: Message[], signal?: AbortSignal, onResultChange?: onResultChange): Promise<string> {
+        try {
+            const isRunning = await MastraAPI.isRunning()
+            if (!isRunning) {
+                throw new ApiError('Mastra service is not running')
+            }
+
+            const mastraMessages = rawMessages.map(message => ({
+                role: message.role,
+                content: message.content
+            }))
+
+            if (onResultChange) {
+                let fullResult = ''
+                const streamGenerator = MastraAPI.streamGenerate(
+                    this.options.mastraAgentName || '',
+                    {
+                        messages: mastraMessages,
+                        options: {
+                            temperature: this.options.temperature
+                        }
+                    }
+                )
+
+                for await (const chunk of streamGenerator) {
+                    fullResult += chunk
+                    onResultChange(fullResult)
+                }
+                
+                return fullResult
+            } else {
+                const response = await MastraAPI.generate(
+                    this.options.mastraAgentName || '',
+                    {
+                        messages: mastraMessages,
+                        options: {
+                            temperature: this.options.temperature
+                        }
+                    }
+                )
+                
+                return response.text
+            }
+        } catch (error) {
+            if (error instanceof Error) {
+                throw new ApiError(`Error from Mastra: ${error.message}`)
+            }
+            throw new ApiError('Unknown error from Mastra')
+        }
     }
 
     getHeaders() {

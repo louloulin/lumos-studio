@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Chatbox CE",
-  "version": "0.0.1",
-  "identifier": "xyz.chatboxapp.ce",
+  "productName": "Lumos Studio",
+  "version": "0.1.0",
+  "identifier": "com.lumos.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Chatbox CE",
+        "title": "Lumos",
         "width": 1000,
         "height": 950,
         "resizable": true,

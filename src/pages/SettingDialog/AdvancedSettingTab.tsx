@@ -78,7 +78,7 @@ export function AnalyticsSetting() {
         <div className="space-y-4">
             <div>
                 <p className="text-sm opacity-70">
-                    {t('Chatbox respects your privacy and only uploads anonymous error data and events when necessary. You can change your preferences at any time in the settings.')}
+                    {t('Lumos respects your privacy and only uploads anonymous error data and events when necessary. You can change your preferences at any time in the settings.')}
                 </p>
             </div>
             <div className="mt-2">
@@ -161,7 +161,7 @@ function ExportAndImport(props: { onCancel: () => void }) {
         data['__exported_items'] = exportItems
         data['__exported_at'] = date.toISOString()
         const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`
-        platform.exporter.exportTextFile(`chatbox-exported-data-${dateStr}.json`, JSON.stringify(data))
+        platform.exporter.exportTextFile(`lumos-exported-data-${dateStr}.json`, JSON.stringify(data))
     }
     
     const onImport = async (e: React.ChangeEvent<HTMLInputElement>) => {

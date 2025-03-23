@@ -1,17 +1,20 @@
 {
-  "name": "chatbox-ce",
+  "name": "lumos",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
-  "description": "A desktop client for multiple cutting-edge AI models",
+  "description": "Chat with AI models using a nice UI",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "kill-port": "chmod +x ./kill-port.sh && ./kill-port.sh",
-    "tauri:dev": "npm run kill-port && npm run tauri dev",
-    "tauri:build": "npm run tauri build"
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "types:check": "tsc --noEmit"
   },
   "dependencies": {
     "@braintree/sanitize-url": "^6.0.4",

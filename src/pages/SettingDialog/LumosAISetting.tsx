@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { ChatboxAILicenseDetail, ModelSettings } from '@/shared/types'
+import { LumosAILicenseDetail, ModelSettings } from '@/shared/types'
 import { Trans, useTranslation } from 'react-i18next'
 import PasswordTextField from '@/components/PasswordTextField'
-import ChatboxAIModelSelect from '@/components/ChatboxAIModelSelect'
+import LumosAIModelSelect from '@/components/LumosAIModelSelect'
 import * as remote from '@/packages/remote'
 import platform from '@/packages/platform'
 import { trackingEvent } from '@/packages/event'
@@ -41,7 +41,7 @@ interface SimpleLicenseDetail {
     status: string
 }
 
-export default function ChatboxAISetting(props: ModelConfigProps) {
+export default function LumosAISetting(props: ModelConfigProps) {
     const { settingsEdit, setSettingsEdit } = props
     const { t } = useTranslation()
     const activated = premiumActions.useAutoValidate()
@@ -66,7 +66,7 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
                             <div className="text-red-500">
                                 <Trans i18nKey="This license key has reached the activation limit, <a>click here</a> to manage license and devices to deactivate old devices."
                                     components={{ 
-                                        a: <a href={`https://chatboxai.app/redirect_app/manage_license/${language}`}
+                                        a: <a href={`https://lumosai.app/redirect_app/manage_license/${language}`}
                                              target='_blank' 
                                              rel='noreferrer'
                                              className="font-medium underline" /> 
@@ -107,7 +107,7 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
         <div className="space-y-4">
             <div className="space-y-2">
                 <PasswordTextField
-                    label={t('Chatbox AI License')}
+                    label={t('Lumos AI License')}
                     value={settingsEdit.licenseKey || ''}
                     setValue={onInputChange}
                     placeholder="xxxxxxxxxxxxxxxxxxxxxxxx"
@@ -145,9 +145,9 @@ export default function ChatboxAISetting(props: ModelConfigProps) {
                 </div>
                 {tip && <div className="mt-2">{tip}</div>}
                 {activated && (
-                    <ChatboxAIModelSelect
-                        value={settingsEdit.chatboxAIModel}
-                        onChange={(v) => setSettingsEdit({ ...settingsEdit, chatboxAIModel: v })}
+                    <LumosAIModelSelect
+                        value={settingsEdit.lumosAIModel}
+                        onChange={(v) => setSettingsEdit({ ...settingsEdit, lumosAIModel: v })}
                     />
                 )}
                 <DetailCard licenseKey={settingsEdit.licenseKey} activated={activated} />
@@ -248,11 +248,33 @@ function DetailCard(props: { licenseKey?: string, activated?: boolean }) {
                                 <span className="text-sm text-muted-foreground">
                                     {t('Token')} ({detail.tokenLeft}/{detail.tokenTotal})
                                 </span>
-                                <span className="text-sm font-medium">
-                                    {Math.round((detail.tokenLeft / detail.tokenTotal) * 100)}%
-                                </span>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <span className="text-xs text-blue-600 cursor-help">
+                                                {t('What is this?')}
+                                            </span>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p className="max-w-xs">
+                                                {t('This is the percentage of your monthly token quota remaining.')}
+                                            </p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </div>
-                            <Progress value={(detail.tokenLeft / detail.tokenTotal) * 100} className="h-2" />
+                            <Progress value={detail.tokenLeft} />
+                        </div>
+                        
+                        <div className="pt-2">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="w-full"
+                                onClick={() => platform.openLink(`https://lumosai.app/redirect_app/manage_license/${language}`)}
+                            >
+                                {t('Manage License')}
+                            </Button>
                         </div>
                     </div>
                 )}

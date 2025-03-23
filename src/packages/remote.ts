@@ -4,19 +4,19 @@ import {
     SponsorAboutBanner,
     SponsorAd,
     RemoteConfig,
-    ChatboxAILicenseDetail,
     Settings,
+    LumosAIModel,
 } from '@/shared/types'
 import { ofetch } from 'ofetch'
 
-export const API_ORIGIN = 'https://chatboxai.app'
+export const API_ORIGIN = 'https://lumosai.app'
 
 
 export async function checkNeedUpdate(version: string, os: string, config: Config, settings: Settings) {
     type Response = {
         need_update?: boolean
     }
-    const res = await ofetch<Response>(`${API_ORIGIN}/ce/chatbox_need_update/${version}`, {
+    const res = await ofetch<Response>(`${API_ORIGIN}/ce/lumos_need_update/${version}`, {
         method: 'POST',
         retry: 3,
         body: {
@@ -76,9 +76,54 @@ export async function getDialogConfig(params: { uuid: string; language: string; 
     return res['data'] || null
 }
 
+export interface LumosAILicenseDetail {
+    license_id: string
+    state: 'active' | 'disabled' | 'expired'
+    expiry_date: string
+    license_type: string
+    customer_name: string
+    customer_email: string
+    quota: {
+        [key: string]: Quota
+    }
+    plan_id?: string
+    type: LumosAIModel
+    name: string
+    defaultModel: LumosAIModel
+    remaining_quota_35: number
+    remaining_quota_4: number
+    remaining_quota_image: number
+    image_used_count: number
+    image_total_quota: number
+    token_refreshed_time: string
+    token_expire_time: string | null | undefined
+}
+
+interface Quota {
+    used: number
+    limit: number
+    reset_date: string
+}
+
+export async function getLumosAILicenseDetail(licenseKey: string) {
+    return makeRemoteCall<{
+        data: LumosAILicenseDetail | null
+    }>('getLumosAILicenseDetail', {
+        licenseKey,
+    })
+}
+
+export async function activateLumosAILicense(licenseKey: string) {
+    return makeRemoteCall<{
+        data: LumosAILicenseDetail | null
+    }>('activateLumosAILicense', {
+        licenseKey,
+    })
+}
+
 export async function getLicenseDetail(params: { licenseKey: string }) {
     type Response = {
-        data: ChatboxAILicenseDetail | null
+        data: LumosAILicenseDetail | null
     }
     const res = await ofetch<Response>(`${API_ORIGIN}/api/license/detail`, {
         retry: 3,
@@ -91,7 +136,7 @@ export async function getLicenseDetail(params: { licenseKey: string }) {
 
 export async function getLicenseDetailRealtime(params: { licenseKey: string }) {
     type Response = {
-        data: ChatboxAILicenseDetail | null
+        data: LumosAILicenseDetail | null
     }
     const res = await ofetch<Response>(`${API_ORIGIN}/api/license/detail/realtime`, {
         retry: 3,
@@ -155,4 +200,13 @@ export async function validateLicense(params: {
     })
     const json: Response = await res.json()
     return json['data']
+}
+
+async function makeRemoteCall<T>(endpoint: string, data: any): Promise<T> {
+    const response = await ofetch<T>(`${API_ORIGIN}/api/${endpoint}`, {
+        method: 'POST',
+        retry: 3,
+        body: data
+    });
+    return response;
 }

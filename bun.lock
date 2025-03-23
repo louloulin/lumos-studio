@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "chatbox-ce",
+      "name": "lumos-ce",
       "dependencies": {
         "@braintree/sanitize-url": "^6.0.4",
         "@dnd-kit/core": "^6.0.8",

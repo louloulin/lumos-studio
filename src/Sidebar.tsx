@@ -10,12 +10,21 @@ import { trackingEvent } from './packages/event'
 import { cn } from './lib/utils'
 import { Button } from './components/ui/button'
 import { 
-    Plus, 
+    Menu, 
     Settings, 
+    Plus, 
+    Trash2, 
     Info, 
     Bot, 
-    ImageIcon
+    ImageIcon,
+    Github as GithubIcon
 } from 'lucide-react'
+import platform from '@/packages/platform'
+import { useAtom } from "jotai"
+import { sessionsAtom } from "@/stores/atoms"
+import { useSettingStore } from "@/stores/settings"
+import { useHistoryStore } from "@/stores/history"
+import { create } from "@/stores/sessionActions"
 
 export const drawerWidth = 240
 
@@ -27,12 +36,14 @@ interface Props {
 }
 
 export default function Sidebar(props: Props) {
+    const sessionListRef = useRef<HTMLDivElement>(null)
     const { t } = useTranslation()
+    const [sessions, setSessions] = useAtom(sessionsAtom)
     const versionHook = useVersion()
 
-    const sessionListRef = useRef<HTMLDivElement>(null)
     const handleCreateNewSession = () => {
-        sessionActions.createEmpty('chat')
+        const session = create('chat')
+        setSessions([session, ...sessions])
         if (sessionListRef.current) {
             sessionListRef.current.scrollTo(0, 0)
         }
@@ -47,14 +58,14 @@ export default function Sidebar(props: Props) {
                 <div className="flex flex-col h-full pt-3 pl-2 pr-1">
                     <div className="flex justify-between items-center px-2">
                         <a
-                            href="https://github.com/Bin-Huang/chatbox"
+                            href="https://github.com/louloulinux/lumos-studio"
                             target="_blank"
                             className="flex items-center no-underline"
                         >
                             <img src={icon} className="w-8 h-8 mr-3" />
                             <div className="flex flex-col items-start">
-                                <span className="text-2xl font-medium">Chatbox</span>
-                                <span className="text-[10px] opacity-50">Community Edition</span>
+                                <span className="text-2xl font-medium">Lumos</span>
+                                <span className="text-[10px] opacity-50">Studio</span>
                             </div>
                         </a>
                     </div>
@@ -93,15 +104,7 @@ export default function Sidebar(props: Props) {
                             className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
                         >
                             <Info className="h-4 w-4 mr-2" />
-                            <div className="flex-1 flex items-center">
-                                <span className="opacity-50">
-                                    {t('About')}
-                                    {/\d/.test(versionHook.version) ? `(${versionHook.version})` : ''}
-                                </span>
-                                {versionHook.needCheckUpdate && (
-                                    <span className="ml-2 h-2 w-2 rounded-full bg-primary"></span>
-                                )}
-                            </div>
+                            <span className="flex-1">{t('about')}</span>
                         </button>
 
                         {props.openShadcnTest && (
@@ -110,7 +113,7 @@ export default function Sidebar(props: Props) {
                                 className="w-full flex items-center px-3 py-2 text-sm rounded-md hover:bg-secondary"
                             >
                                 <ImageIcon className="h-4 w-4 mr-2" />
-                                <span className="flex-1 font-medium">Shadcn UI 测试</span>
+                                <span className="flex-1">UI Test</span>
                             </button>
                         )}
                     </nav>

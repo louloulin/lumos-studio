@@ -18,7 +18,7 @@ export const ABOUT_DIALOG_VERSION = '1.0.0'
 
 export function settings(): Settings {
     return {
-        aiProvider: ModelProvider.ChatboxAI,
+        aiProvider: ModelProvider.LumosAI,
         model: 'gpt-3.5-turbo',
         temperature: DEFAULT_TEMPERATURE,
         topP: 1,
@@ -47,12 +47,21 @@ export function settings(): Settings {
         lmStudioModel: '',
         siliconCloudHost: DEFAULT_API_HOST,
         siliconCloudKey: '',
-        siliconCloudModel: 'SiliFlow-3.5',
+        siliconCloudModel: 'custom-model',
         ppioHost: 'https://api.ppio.cloud',
         ppioKey: '',
         ppioModel: 'pplx-14b-chat',
         enableMarkdownRendering: true,
         autoGenerateTitle: true,
+        lumosAIModel: 'lumosai-3.5',
+        mastraAgentName: '',
+        azureEndpoint: '',
+        azureDeploymentName: '',
+        azureDalleDeploymentName: '',
+        azureApikey: '',
+        chatglm6bUrl: '',
+        licenseKey: '',
+        licenseInstances: {},
     }
 }
 

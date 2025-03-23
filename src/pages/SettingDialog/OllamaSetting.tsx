@@ -37,7 +37,7 @@ export function OllamaHostInput(props: {
                             <Trans i18nKey='Please ensure that the Remote Ollama Service is able to connect remotely. For more details, refer to <a>this tutorial</a>.'
                                 components={{
                                     a: <a className='cursor-pointer font-bold' onClick={() => {
-                                        platform.openLink(`https://chatboxai.app/redirect_app/ollama_guide/${language}`)
+                                        platform.openLink(`https://lumosai.app/redirect_app/ollama_guide/${language}`)
                                     }}></a>,
                                 }}
                             />

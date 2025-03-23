@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Chip, TextField, Slider, Typography, Box } from '@mui/material'
 import { useTranslation } from 'react-i18next'
-import PlaylistAddCheckCircleIcon from '@mui/icons-material/PlaylistAddCheckCircle'
-import LightbulbCircleIcon from '@mui/icons-material/LightbulbCircle'
+import { cn } from '@/lib/utils'
+import { Slider } from '@/components/ui/slider'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
 
 export interface Props {
     value: number
@@ -13,16 +14,19 @@ export interface Props {
 export default function TemperatureSlider(props: Props) {
     const { t } = useTranslation()
     const [input, setInput] = useState('0.70')
+    
     useEffect(() => {
         setInput(`${props.value}`)
     }, [props.value])
-    const handleTemperatureChange = (event: Event, newValue: number | number[], activeThumb: number) => {
+    
+    const handleTemperatureChange = (_: any, newValue: number | number[]) => {
         if (typeof newValue === 'number') {
             props.onChange(newValue)
-        } else {
-            props.onChange(newValue[activeThumb])
+        } else if (Array.isArray(newValue)) {
+            props.onChange(newValue[0])
         }
     }
+    
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target.value
         if (value === '' || value.endsWith('.')) {
@@ -42,62 +46,45 @@ export default function TemperatureSlider(props: Props) {
         setInput(num.toString())
         props.onChange(num)
     }
+    
     return (
-        <Box sx={{ margin: '10px' }} className={props.className}>
-            <Box>
-                <Typography gutterBottom>{t('temperature')}</Typography>
-            </Box>
-            <Box
-                sx={{
-                    display: 'flex',
-                    justifyContent: 'center',
-                    margin: '0 auto',
-                }}
-            >
-                <Box sx={{ width: '92%' }}>
+        <div className={cn("my-6 px-3", props.className)}>
+            <div className="mb-2">
+                <h4 className="text-sm font-medium">{t('temperature')}</h4>
+            </div>
+            
+            <div className="flex items-center gap-4">
+                <div className="flex-1 relative">
                     <Slider
-                        value={props.value}
-                        onChange={handleTemperatureChange}
-                        aria-labelledby="discrete-slider"
-                        valueLabelDisplay="auto"
+                        value={[props.value]}
+                        onValueChange={(values) => handleTemperatureChange(null, values)}
                         step={0.01}
                         min={0}
                         max={2}
-                        marks={[
-                            {
-                                value: 0.2,
-                                label: (
-                                    <Chip
-                                        size="small"
-                                        icon={<PlaylistAddCheckCircleIcon />}
-                                        label={t('meticulous')}
-                                        className="opacity-50"
-                                    />
-                                ),
-                            },
-                            {
-                                value: 0.8,
-                                label: (
-                                    <Chip
-                                        size="small"
-                                        icon={<LightbulbCircleIcon />}
-                                        label={t('creative')}
-                                        className="opacity-50"
-                                    />
-                                ),
-                            },
-                        ]}
+                        className="py-4"
                     />
-                </Box>
-                <TextField
-                    sx={{ marginLeft: 2, width: '100px' }}
+                    
+                    <div className="flex justify-between px-1 mt-1 text-xs text-muted-foreground">
+                        <div className="relative -left-2">
+                            <Badge variant="outline" className="font-normal">
+                                {t('meticulous')}
+                            </Badge>
+                        </div>
+                        <div className="relative -right-2">
+                            <Badge variant="outline" className="font-normal">
+                                {t('creative')}
+                            </Badge>
+                        </div>
+                    </div>
+                </div>
+                
+                <Input
                     value={input}
                     onChange={handleInputChange}
                     type="text"
-                    size="small"
-                    variant="outlined"
+                    className="w-20"
                 />
-            </Box>
-        </Box>
+            </div>
+        </div>
     )
 }

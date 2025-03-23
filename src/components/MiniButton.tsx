@@ -1,6 +1,11 @@
 import React from 'react'
-import { Tooltip } from '@mui/material'
 import { cn } from '@/lib/utils'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 export default function MiniButton(props: {
     children: React.ReactNode
@@ -9,7 +14,7 @@ export default function MiniButton(props: {
     className?: string
     style?: React.CSSProperties
     tooltipTitle?: React.ReactNode
-    tooltipPlacement?: "top" | "bottom" | "left" | "right" | "bottom-end" | "bottom-start" | "left-end" | "left-start" | "right-end" | "right-start" | "top-end" | "top-start"
+    tooltipPlacement?: "top" | "bottom" | "left" | "right"
 }) {
     const { onClick, disabled, className, style, tooltipTitle, tooltipPlacement, children } = props
     const button = (
@@ -30,8 +35,15 @@ export default function MiniButton(props: {
         return button
     }
     return (
-        <Tooltip title={tooltipTitle} placement={tooltipPlacement}>
-            {button}
-        </Tooltip>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    {button}
+                </TooltipTrigger>
+                <TooltipContent side={tooltipPlacement}>
+                    <p>{tooltipTitle}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     )
 }

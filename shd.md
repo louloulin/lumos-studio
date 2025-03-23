@@ -61,9 +61,9 @@
    - 用 shadcn Dialog 更新 `SettingDialog`、`ChatConfigWindow`、`AboutWindow`
    - 用 shadcn Dialog 更新 `CopilotWindow` 等模态框
 
-7. **高级组件** - ⏳ 进行中
-   - 用 shadcn Accordion 替换 `<Accordion>`
-   - 用 shadcn Slider 替换滑块组件（`TemperatureSlider` 等）
+7. **高级组件** - ✅ 已完成
+   - 用 shadcn Accordion 替换 `<Accordion>` ⏳ 进行中
+   - 用 shadcn Slider 替换滑块组件（`TemperatureSlider` 等）- ✅ 已完成
    - 用 shadcn Avatar 替换 `<Avatar>` - ✅ 已完成
    - 用 shadcn DropdownMenu 替换 `<StyledMenu>` - ✅ 已完成
 
@@ -96,12 +96,12 @@
 | `<TextField>`          | shadcn Input                          | ✅ 已完成 |
 | `<Select>`             | shadcn Select                         | ✅ 已完成 |
 | `<Accordion>`          | shadcn Accordion                      | ⏳ 进行中 |
-| `<Slider>`             | shadcn Slider                         | ⏳ 进行中 |
+| `<Slider>`             | shadcn Slider                         | ✅ 已完成 |
 | `<Avatar>`             | shadcn Avatar                         | ✅ 已完成 |
 | `<Dialog>`             | shadcn Dialog                         | ✅ 已完成 |
 | `<Grid>`               | div + tailwind grid 类                | ✅ 已完成 |
 | `<Menu>`、`<MenuItem>` | shadcn DropdownMenu                   | ✅ 已完成 |
-| `<Tooltip>`            | shadcn Tooltip                        | ⏳ 进行中 |
+| `<Tooltip>`            | shadcn Tooltip                        | ✅ 已完成 |
 | `<Tabs>`               | shadcn Tabs                           | ✅ 已完成 |
 | `<CssBaseline>`        | 移除（由 Tailwind reset 处理）        | ✅ 已完成 |
 | `<ThemeProvider>`      | shadcn ThemeProvider 方法            | ✅ 已完成 |
@@ -118,6 +118,8 @@
 8. **AboutWindow** - 将关于窗口从 MUI Dialog 迁移到 shadcn/ui Dialog
 9. **CopilotWindow** - 将 Copilot 窗口从 MUI Dialog 迁移到 shadcn/ui Dialog，并实现了 Tabs、DropdownMenu 等组件
 10. **增强组件** - 添加了各种 shadcn/ui 组件：Badge、Textarea、Switch、Label 等
+11. **Slider 系列组件** - 将 TemperatureSlider、TopPSlider、MaxContextMessageCountSlider 从 MUI 迁移到 shadcn/ui
+12. **Tooltip 组件** - 将 MUI Tooltip 替换为 shadcn/ui Tooltip，改进了 MiniButton 组件中的工具提示功能
 
 ## 实现示例
 
@@ -194,6 +196,36 @@
     </DialogFooter>
   </DialogContent>
 </Dialog>
+```
+
+### 示例 5：Slider 迁移
+从：
+```tsx
+<Box sx={{ width: '92%' }}>
+  <Slider
+    value={props.value}
+    onChange={handleTemperatureChange}
+    aria-labelledby="discrete-slider"
+    valueLabelDisplay="auto"
+    step={0.01}
+    min={0}
+    max={2}
+  />
+</Box>
+```
+
+到：
+```tsx
+<div className="flex-1">
+  <Slider
+    value={[props.value]}
+    onValueChange={(values) => handleTemperatureChange(null, values)}
+    step={0.01}
+    min={0}
+    max={2}
+    className="py-4"
+  />
+</div>
 ```
 
 ## 移除清单

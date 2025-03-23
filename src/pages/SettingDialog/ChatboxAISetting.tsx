@@ -1,4 +1,4 @@
-import { Tooltip, Button, ButtonGroup, Card, Typography, Box } from '@mui/material'
+import { Button, ButtonGroup, Card, Typography, Box } from '@mui/material'
 import { ChatboxAILicenseDetail, ModelSettings } from '@/shared/types'
 import { Trans, useTranslation } from 'react-i18next'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
@@ -15,6 +15,12 @@ import { trackingEvent } from '@/packages/event'
 import * as premiumActions from '@/stores/premiumActions'
 import { useAtomValue } from 'jotai'
 import { languageAtom } from '@/stores/atoms'
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface ModelConfigProps {
     settingsEdit: ModelSettings
@@ -298,33 +304,54 @@ function LicenseDetail(props: { licenseKey?: string }) {
                     licenseDetail ? (
                         <>
                             <Box className='grid grid-cols-2'>
-                                <Tooltip title={`${(licenseDetail.remaining_quota_35 * 100).toFixed(2)} %`}>
-                                    <Box className='mr-4 mb-4' >
-                                        <Typography className=''>
-                                            {t('Chatbox AI 3.5 Quota')}
-                                        </Typography>
-                                        <BorderLinearProgress className='mt-1' variant="determinate"
-                                            value={Math.floor(licenseDetail.remaining_quota_35 * 100)} />
-                                    </Box>
-                                </Tooltip>
-                                <Tooltip title={`${(licenseDetail.remaining_quota_4 * 100).toFixed(2)} %`}>
-                                    <Box className='mr-4 mb-4' >
-                                        <Typography className=''>
-                                            {t('Chatbox AI 4 Quota')}
-                                        </Typography>
-                                        <BorderLinearProgress className='mt-1' variant="determinate"
-                                            value={Math.floor(licenseDetail.remaining_quota_4 * 100)} />
-                                    </Box>
-                                </Tooltip>
-                                <Tooltip title={`${licenseDetail.image_total_quota - licenseDetail.image_used_count} / ${licenseDetail.image_total_quota}`}>
-                                    <Box className='mr-4 mb-4' >
-                                        <Typography >
-                                            {t('Chatbox AI Image Quota')}
-                                        </Typography>
-                                        <BorderLinearProgress className='mt-1' variant="determinate"
-                                            value={Math.floor(licenseDetail.remaining_quota_image * 100)} />
-                                    </Box>
-                                </Tooltip>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Box className='mr-4 mb-4' >
+                                                <Typography className=''>
+                                                    {t('Chatbox AI 3.5 Quota')}
+                                                </Typography>
+                                                <BorderLinearProgress className='mt-1' variant="determinate"
+                                                    value={Math.floor(licenseDetail.remaining_quota_35 * 100)} />
+                                            </Box>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{(licenseDetail.remaining_quota_35 * 100).toFixed(2)} %</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Box className='mr-4 mb-4' >
+                                                <Typography className=''>
+                                                    {t('Chatbox AI 4 Quota')}
+                                                </Typography>
+                                                <BorderLinearProgress className='mt-1' variant="determinate"
+                                                    value={Math.floor(licenseDetail.remaining_quota_4 * 100)} />
+                                            </Box>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{(licenseDetail.remaining_quota_4 * 100).toFixed(2)} %</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
+                                <TooltipProvider>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Box className='mr-4 mb-4' >
+                                                <Typography >
+                                                    {t('Chatbox AI Image Quota')}
+                                                </Typography>
+                                                <BorderLinearProgress className='mt-1' variant="determinate"
+                                                    value={Math.floor(licenseDetail.remaining_quota_image * 100)} />
+                                            </Box>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                            <p>{licenseDetail.image_total_quota - licenseDetail.image_used_count} / {licenseDetail.image_total_quota}</p>
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TooltipProvider>
                             </Box>
                             <Box className='grid grid-cols-2'>
                                 <Box className='mr-4 mb-4' >

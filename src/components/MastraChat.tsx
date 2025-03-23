@@ -22,7 +22,12 @@ interface AgentProfile {
   description: string;
 }
 
-const MastraChat: React.FC = () => {
+interface MastraChatProps {
+  sessionId?: string;
+  agentId?: string;
+}
+
+const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const [agents, setAgents] = useState<AgentProfile[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentProfile | null>(null);
   const [input, setInput] = useState('');
@@ -97,6 +102,13 @@ const MastraChat: React.FC = () => {
     const interval = setInterval(checkService, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (sessionId && agentId) {
+      console.log(`Initializing chat for session ${sessionId} with agent ${agentId}`);
+      // Implement session-specific logic here
+    }
+  }, [sessionId, agentId]);
 
   const handleAgentSelect = (agent: AgentProfile) => {
     setSelectedAgent(agent);

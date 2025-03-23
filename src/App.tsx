@@ -17,7 +17,7 @@ import * as premiumActions from './stores/premiumActions'
 import { tauriBridge, initializeTauriEvents } from './tauri-bridge'
 import platform from './packages/platform'
 import { ThemeProvider } from './components/ui/theme-provider'
-import ShadcnTest from './components/ShadcnTest'
+import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
 
@@ -28,25 +28,29 @@ function Main() {
     const [openSettingWindow, setOpenSettingWindow] = useAtom(atoms.openSettingDialogAtom)
     const [openAboutWindow, setOpenAboutWindow] = React.useState(false)
     const [openCopilotWindow, setOpenCopilotWindow] = React.useState(false)
-    const [showShadcnTest, setShowShadcnTest] = React.useState(false)
+    const [showLegacyUI, setShowLegacyUI] = React.useState(false)
     const [sidebarVisible, setSidebarVisible] = useState(true)
+    const currentSession = useAtomValue(atoms.currentSessionAtom);
+
+    // 开发模式下，可以通过URL参数强制显示新UI
+    const [forceNewUI] = useState(() => {
+        return window.location.search.includes('newui=1') || localStorage.getItem('force_new_ui') === 'true';
+    });
+
+    // 显示新界面条件
+    const shouldShowNewUI = forceNewUI && !showLegacyUI;
 
     return (
         <div className="box-border App" spellCheck={spellCheck}>
-            {showShadcnTest ? (
-                <div className="h-full flex flex-col">
-                    <div className="p-4 bg-primary text-primary-foreground flex justify-between items-center">
-                        <h1 className="text-xl font-bold">Shadcn UI 测试</h1>
-                        <button 
-                            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md"
-                            onClick={() => setShowShadcnTest(false)}
-                        >
-                            返回应用
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-auto">
-                        <ShadcnTest />
-                    </div>
+            {shouldShowNewUI ? (
+                <div className="h-full">
+                    <Workspace />
+                    <button 
+                        className="fixed bottom-4 right-4 px-4 py-2 bg-muted text-muted-foreground rounded-md text-xs opacity-30 hover:opacity-100 transition-opacity"
+                        onClick={() => setShowLegacyUI(true)}
+                    >
+                        切换到旧界面
+                    </button>
                 </div>
             ) : (
                 <>
@@ -56,7 +60,7 @@ function Main() {
                                 openCopilotWindow={() => setOpenCopilotWindow(true)}
                                 openAboutWindow={() => setOpenAboutWindow(true)}
                                 setOpenSettingWindow={setOpenSettingWindow}
-                                openShadcnTest={() => setShowShadcnTest(true)}
+                                openShadcnTest={() => setShowLegacyUI(false)}
                                 onToggleVisibility={(visible) => setSidebarVisible(visible)}
                             />
                         </ErrorBoundary>

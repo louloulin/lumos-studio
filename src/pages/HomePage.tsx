@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { useNavigate } from 'react-router-dom';
-import { PenTool, ArrowRight, Settings, MessageSquare } from 'lucide-react';
+import { PenTool, ArrowRight, Settings, MessageSquare, Bot } from 'lucide-react';
 import { useAtom } from 'jotai';
 import { openSettingDialogAtom } from '../stores/atoms';
 import { SettingWindowTab } from '../shared/types';
@@ -74,36 +74,37 @@ const HomePage: React.FC = () => {
           <CardFooter>
             <Button 
               className="w-full justify-between" 
-              variant="outline"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/chat')}
             >
-              即将推出
+              开始聊天
               <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </CardFooter>
         </Card>
 
-        {/* 更多工具卡片 - 可根据需求扩展 */}
+        {/* 智能体卡片 */}
         <Card className="flex flex-col">
           <CardHeader>
-            <CardTitle>更多工具</CardTitle>
+            <CardTitle className="flex items-center">
+              <Bot className="mr-2 h-5 w-5" />
+              智能体
+            </CardTitle>
             <CardDescription>
-              即将推出的功能
+              专业领域的AI智能体
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
             <p className="text-sm">
-              我们正在开发更多创新功能，敬请期待。如有功能建议，请通过设置页面联系我们。
+              探索各种专业领域的AI智能体，包括编程助手、创意伙伴、学习顾问等。根据您的需求选择合适的智能体。
             </p>
           </CardContent>
           <CardFooter>
             <Button 
               className="w-full justify-between" 
-              variant="secondary"
-              onClick={() => openSettings('general' as SettingWindowTab)}
+              onClick={() => navigate('/agents')}
             >
-              查看设置
-              <Settings className="h-4 w-4 ml-2" />
+              浏览智能体
+              <ArrowRight className="h-4 w-4 ml-2" />
             </Button>
           </CardFooter>
         </Card>

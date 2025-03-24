@@ -1,141 +1,230 @@
-import React, { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import ArtifactsCanvas from './ArtifactsCanvas';
+import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
-import { Paintbrush2, Code } from 'lucide-react';
+import { Card } from './ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
+import { Paintbrush2, Image, FileText, Upload, Share2 } from 'lucide-react';
 
+// 定义组件属性
 interface ArtifactsTabProps {
-  sessionId: string;
-  onShareArtifact?: (artifactData: any) => void;
+  onShareArtifact: (artifactData: any) => void;
 }
 
-const ArtifactsTab: React.FC<ArtifactsTabProps> = ({
-  sessionId,
-  onShareArtifact
-}) => {
-  const [activeTab, setActiveTab] = useState<string>('canvas');
-  const [canvasObjects, setCanvasObjects] = useState<any[]>([]);
+// 定义工件类型
+interface Artifact {
+  id: string;
+  type: 'canvas' | 'image' | 'text';
+  title: string;
+  preview: string;
+  dataUrl?: string;
+  content?: string;
+  timestamp: Date;
+}
 
-  // 分享画布内容到对话
-  const handleShareCanvas = () => {
-    if (onShareArtifact && canvasObjects.length > 0) {
-      // 创建画布快照
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      
-      // 设置画布大小
-      canvas.width = 800;
-      canvas.height = 600;
-      
-      // 绘制所有对象
-      // 这里需要实现一个将对象绘制到新画布的逻辑
-      // 简化版本：生成数据URI
-      const dataUrl = canvas.toDataURL('image/png');
-      
-      onShareArtifact({
-        type: 'canvas',
-        dataUrl,
-        objects: canvasObjects
-      });
-    }
-  };
+// 工件标签组件
+const ArtifactsTab: React.FC<ArtifactsTabProps> = ({ onShareArtifact }) => {
+  const [canvasArtifacts, setCanvasArtifacts] = useState<Artifact[]>([]);
+  const [imageArtifacts, setImageArtifacts] = useState<Artifact[]>([]);
+  const [textArtifacts, setTextArtifacts] = useState<Artifact[]>([]);
 
-  // 分享HTML/SVG内容到对话
-  const handleShareCode = () => {
-    if (onShareArtifact) {
-      // 查找HTML/SVG对象
-      const htmlObjects = canvasObjects.filter(obj => obj.type === 'html' || obj.type === 'svg');
-      
-      if (htmlObjects.length > 0) {
-        onShareArtifact({
-          type: 'code',
-          content: htmlObjects.map(obj => obj.props.content).join('\n\n')
-        });
+  // 模拟从本地存储加载工件
+  useEffect(() => {
+    // 从localStorage或其他存储中获取数据
+    const loadArtifacts = () => {
+      try {
+        // 这里应当是从实际存储中加载数据
+        // 示例数据
+        const mockCanvasArtifacts: Artifact[] = [
+          {
+            id: 'canvas1',
+            type: 'canvas',
+            title: '白板草图 1',
+            preview: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            timestamp: new Date(Date.now() - 1000 * 60 * 30)
+          },
+          {
+            id: 'canvas2',
+            type: 'canvas',
+            title: '白板草图 2',
+            preview: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            timestamp: new Date(Date.now() - 1000 * 60 * 20)
+          }
+        ];
+        
+        const mockImageArtifacts: Artifact[] = [
+          {
+            id: 'image1',
+            type: 'image',
+            title: '图像 1',
+            preview: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            dataUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+            timestamp: new Date(Date.now() - 1000 * 60 * 15)
+          }
+        ];
+        
+        const mockTextArtifacts: Artifact[] = [
+          {
+            id: 'text1',
+            type: 'text',
+            title: '笔记 1',
+            preview: '这是一段示例笔记内容...',
+            content: '这是一段示例笔记内容，可以包含更多的文本信息。用户可以在白板或其他区域创建的文本内容会被保存在这里。',
+            timestamp: new Date(Date.now() - 1000 * 60 * 10)
+          }
+        ];
+        
+        setCanvasArtifacts(mockCanvasArtifacts);
+        setImageArtifacts(mockImageArtifacts);
+        setTextArtifacts(mockTextArtifacts);
+      } catch (error) {
+        console.error('Failed to load artifacts:', error);
       }
+    };
+    
+    loadArtifacts();
+  }, []);
+
+  // 分享工件到聊天
+  const handleShareArtifact = (artifact: Artifact) => {
+    switch (artifact.type) {
+      case 'canvas':
+        onShareArtifact({
+          type: 'canvas',
+          dataUrl: artifact.dataUrl
+        });
+        break;
+      case 'image':
+        onShareArtifact({
+          type: 'image',
+          dataUrl: artifact.dataUrl
+        });
+        break;
+      case 'text':
+        onShareArtifact({
+          type: 'text',
+          content: artifact.content
+        });
+        break;
+      default:
+        console.error('Unknown artifact type:', artifact.type);
     }
   };
+
+  // 时间格式化
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // 渲染单个工件卡片
+  const renderArtifactCard = (artifact: Artifact) => (
+    <Card key={artifact.id} className="mb-3 overflow-hidden">
+      <div className="relative">
+        {artifact.type === 'text' ? (
+          <div className="p-3 bg-secondary/10 h-28 overflow-hidden">
+            <p className="text-sm line-clamp-5">{artifact.preview}</p>
+          </div>
+        ) : (
+          <div className="relative h-28 bg-secondary/10">
+            <img 
+              src={artifact.preview} 
+              alt={artifact.title}
+              className="w-full h-full object-contain"
+            />
+          </div>
+        )}
+        
+        <div className="p-2 bg-card flex justify-between items-center">
+          <div>
+            <h4 className="text-sm font-medium truncate">{artifact.title}</h4>
+            <span className="text-xs text-muted-foreground">
+              {formatTime(artifact.timestamp)}
+            </span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8"
+            onClick={() => handleShareArtifact(artifact)}
+          >
+            <Share2 size={16} />
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
 
   return (
     <div className="h-full flex flex-col">
-      <div className="border-b p-2">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="canvas" className="flex items-center gap-2">
-              <Paintbrush2 className="h-4 w-4" />
+      <Tabs defaultValue="canvas">
+        <div className="border-b px-2">
+          <TabsList className="h-9 w-full justify-start space-x-2">
+            <TabsTrigger value="canvas" className="text-xs px-2 py-1">
+              <Paintbrush2 className="mr-1 h-3.5 w-3.5" />
               白板
             </TabsTrigger>
-            <TabsTrigger value="code" className="flex items-center gap-2">
-              <Code className="h-4 w-4" />
-              代码视图
+            <TabsTrigger value="images" className="text-xs px-2 py-1">
+              <Image className="mr-1 h-3.5 w-3.5" />
+              图像
+            </TabsTrigger>
+            <TabsTrigger value="text" className="text-xs px-2 py-1">
+              <FileText className="mr-1 h-3.5 w-3.5" />
+              文本
             </TabsTrigger>
           </TabsList>
-        </Tabs>
-      </div>
-      
-      <div className="flex-1 overflow-hidden">
-        <TabsContent value="canvas" className="h-full m-0 p-0">
-          <ArtifactsCanvas 
-            sessionId={sessionId}
-            onObjectsChange={setCanvasObjects}
-          />
-        </TabsContent>
+        </div>
         
-        <TabsContent value="code" className="h-full m-0 p-4">
-          <div className="h-full overflow-auto">
-            <h3 className="text-lg font-medium mb-4">HTML/SVG 代码内容</h3>
+        <ScrollArea className="flex-1">
+          <div className="p-3">
+            <TabsContent value="canvas" className="mt-0">
+              <div className="space-y-3">
+                {canvasArtifacts.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground">
+                    <Paintbrush2 className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">没有白板内容</p>
+                    <p className="text-xs mt-1">在白板创建的内容将显示在这里</p>
+                  </div>
+                ) : (
+                  canvasArtifacts.map(renderArtifactCard)
+                )}
+              </div>
+            </TabsContent>
             
-            {canvasObjects.filter(obj => obj.type === 'html' || obj.type === 'svg').length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                <p>尚未添加任何HTML或SVG内容</p>
-                <p className="text-sm mt-2">切换到白板标签，添加HTML或SVG内容</p>
+            <TabsContent value="images" className="mt-0">
+              <div className="space-y-3">
+                {imageArtifacts.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground">
+                    <Image className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">没有图像</p>
+                    <p className="text-xs mt-1">上传的图像将显示在这里</p>
+                    <Button variant="outline" size="sm" className="mt-3">
+                      <Upload className="h-3.5 w-3.5 mr-1" />
+                      上传图像
+                    </Button>
+                  </div>
+                ) : (
+                  imageArtifacts.map(renderArtifactCard)
+                )}
               </div>
-            ) : (
-              <div className="space-y-4">
-                {canvasObjects
-                  .filter(obj => obj.type === 'html' || obj.type === 'svg')
-                  .map((obj, index) => (
-                    <div key={obj.id} className="border rounded-md p-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium">
-                          {obj.type === 'html' ? 'HTML内容' : 'SVG内容'} #{index + 1}
-                        </h4>
-                      </div>
-                      <pre className="bg-muted p-3 rounded-md text-sm overflow-auto">
-                        <code>{obj.props.content}</code>
-                      </pre>
-                      <div className="mt-3 p-3 border rounded-md bg-background">
-                        <div 
-                          dangerouslySetInnerHTML={{ __html: obj.props.content }}
-                          className="w-full overflow-auto"
-                          style={{ maxHeight: '200px' }}
-                        />
-                      </div>
-                    </div>
-                  ))
-                }
+            </TabsContent>
+            
+            <TabsContent value="text" className="mt-0">
+              <div className="space-y-3">
+                {textArtifacts.length === 0 ? (
+                  <div className="text-center p-4 text-muted-foreground">
+                    <FileText className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">没有文本内容</p>
+                    <p className="text-xs mt-1">创建的笔记和文本将显示在这里</p>
+                  </div>
+                ) : (
+                  textArtifacts.map(renderArtifactCard)
+                )}
               </div>
-            )}
+            </TabsContent>
           </div>
-        </TabsContent>
-      </div>
-      
-      <div className="border-t p-3 flex justify-end gap-2">
-        <Button 
-          variant="outline" 
-          onClick={handleShareCanvas}
-          disabled={canvasObjects.length === 0}
-        >
-          分享画布到对话
-        </Button>
-        <Button 
-          variant="default" 
-          onClick={handleShareCode}
-          disabled={canvasObjects.filter(obj => obj.type === 'html' || obj.type === 'svg').length === 0}
-        >
-          分享代码到对话
-        </Button>
-      </div>
+        </ScrollArea>
+      </Tabs>
     </div>
   );
 };

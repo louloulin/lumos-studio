@@ -24,6 +24,8 @@ import { TauriAPI } from './shared/tauri-types'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom'
 import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
+import ChatPage from './pages/ChatPage'
+import AgentsPage from './pages/AgentsPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -196,6 +198,8 @@ export default function App() {
                         <Routes>
                             <Route path="/" element={<HomePage />} />
                             <Route path="/whiteboard" element={<WhiteboardPage />} />
+                            <Route path="/chat" element={<ChatPage />} />
+                            <Route path="/agents" element={<AgentsPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

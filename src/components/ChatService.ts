@@ -23,34 +23,23 @@ export interface ChatSession {
   pinned?: boolean;
 }
 
-// 聊天服务类
 class ChatService {
   // 内存中存储所有会话
   private sessions: Map<string, ChatSession> = new Map();
 
-  // 获取会话列表
-  async getSessions(): Promise<ChatSession[]> {
-    try {
-      // 这里应当连接到持久化存储，如localStorage或远程API
-      // 示例实现使用内存存储
-      return Array.from(this.sessions.values()).sort((a, b) => 
-        b.lastUpdated.getTime() - a.lastUpdated.getTime()
-      );
-    } catch (error) {
-      console.error('Failed to get sessions:', error);
-      throw new Error('获取会话列表失败');
+  // 获取会话
+  async getSession(sessionId: string): Promise<ChatSession> {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      // 如果会话不存在，创建一个新会话
+      return this.createSession(`会话 ${new Date().toLocaleString()}`, 'generalAssistant');
     }
+    return session;
   }
 
-  // 获取特定会话
-  async getSession(sessionId: string): Promise<ChatSession | null> {
-    try {
-      // 从存储中获取会话
-      return this.sessions.get(sessionId) || null;
-    } catch (error) {
-      console.error(`Failed to get session ${sessionId}:`, error);
-      throw new Error('获取会话失败');
-    }
+  // 获取所有会话
+  async getSessions(): Promise<ChatSession[]> {
+    return Array.from(this.sessions.values());
   }
 
   // 创建新会话
@@ -85,149 +74,111 @@ class ChatService {
     }
   }
 
-  // 删除会话
-  async deleteSession(sessionId: string): Promise<void> {
-    try {
-      this.sessions.delete(sessionId);
-    } catch (error) {
-      console.error(`Failed to delete session ${sessionId}:`, error);
-      throw new Error('删除会话失败');
-    }
-  }
-
-  // 添加用户消息到当前会话节点
+  // 添加用户消息
   async addUserMessage(
     sessionId: string, 
     text: string
   ): Promise<ChatNode> {
     try {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        throw new Error('会话不存在');
-      }
+      const session = await this.getSession(sessionId);
 
-      // 查找当前节点
-      const currentNode = this.findNodeById(session.rootNode, session.currentNodeId);
-      if (!currentNode) {
-        throw new Error('当前对话节点不存在');
-      }
-
-      // 创建新用户消息节点
-      const newNode: ChatNode = {
+      // 创建用户消息节点
+      const userNode: ChatNode = {
         id: uuidv4(),
         text,
         role: 'user',
         timestamp: new Date(),
         children: [],
-        parentId: currentNode.id
+        parentId: session.currentNodeId
       };
 
-      // 将新节点添加到当前节点的子节点列表
-      currentNode.children.push(newNode);
+      // 找到父节点并添加子节点
+      const parentNode = this.findNodeById(session.rootNode, session.currentNodeId);
+      if (parentNode) {
+        parentNode.children.push(userNode);
+      }
 
-      // 更新当前节点指针和最后更新时间
-      session.currentNodeId = newNode.id;
+      // 更新当前节点和会话的最后更新时间
+      session.currentNodeId = userNode.id;
       session.lastUpdated = new Date();
 
-      return newNode;
+      return userNode;
     } catch (error) {
       console.error(`Failed to add user message to session ${sessionId}:`, error);
       throw new Error('添加用户消息失败');
     }
   }
 
-  // 添加智能体响应到当前会话节点
+  // 添加助手响应
   async addAssistantResponse(
     sessionId: string, 
     text: string
   ): Promise<ChatNode> {
     try {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        throw new Error('会话不存在');
-      }
+      const session = await this.getSession(sessionId);
 
-      // 查找当前节点
-      const currentNode = this.findNodeById(session.rootNode, session.currentNodeId);
-      if (!currentNode) {
-        throw new Error('当前对话节点不存在');
-      }
-
-      // 创建新的助手消息节点
-      const newNode: ChatNode = {
+      // 创建助手消息节点
+      const assistantNode: ChatNode = {
         id: uuidv4(),
         text,
         role: 'assistant',
         timestamp: new Date(),
         children: [],
-        parentId: currentNode.id
+        parentId: session.currentNodeId
       };
 
-      // 将新节点添加到当前节点的子节点列表
-      currentNode.children.push(newNode);
+      // 找到父节点并添加子节点
+      const parentNode = this.findNodeById(session.rootNode, session.currentNodeId);
+      if (parentNode) {
+        parentNode.children.push(assistantNode);
+      }
 
-      // 更新当前节点指针和最后更新时间
-      session.currentNodeId = newNode.id;
+      // 更新当前节点和会话的最后更新时间
+      session.currentNodeId = assistantNode.id;
       session.lastUpdated = new Date();
 
-      return newNode;
+      return assistantNode;
     } catch (error) {
       console.error(`Failed to add assistant response to session ${sessionId}:`, error);
-      throw new Error('添加智能体响应失败');
+      throw new Error('添加助手响应失败');
     }
   }
 
-  // 创建新的对话分支
-  async createBranch(
+  // 更新节点
+  async updateNode(
     sessionId: string, 
-    parentNodeId: string
-  ): Promise<string> {
+    nodeId: string, 
+    text: string
+  ): Promise<ChatNode> {
     try {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        throw new Error('会话不存在');
+      const session = await this.getSession(sessionId);
+
+      // 找到节点
+      const node = this.findNodeById(session.rootNode, nodeId);
+      if (!node) {
+        throw new Error('节点不存在');
       }
 
-      // 查找父节点
-      const parentNode = this.findNodeById(session.rootNode, parentNodeId);
-      if (!parentNode) {
-        throw new Error('父节点不存在');
-      }
+      // 更新节点内容
+      node.text = text;
 
-      // 创建分支标识节点
-      const branchNode: ChatNode = {
-        id: uuidv4(),
-        text: `分支自: ${parentNode.text.substring(0, 20)}${parentNode.text.length > 20 ? '...' : ''}`,
-        role: 'assistant',
-        timestamp: new Date(),
-        children: [],
-        parentId: parentNode.id
-      };
-
-      // 将分支节点添加到父节点的子节点列表
-      parentNode.children.push(branchNode);
-
-      // 更新当前节点指针和最后更新时间
-      session.currentNodeId = branchNode.id;
+      // 更新会话的最后更新时间
       session.lastUpdated = new Date();
 
-      return branchNode.id;
+      return node;
     } catch (error) {
-      console.error(`Failed to create branch in session ${sessionId}:`, error);
-      throw new Error('创建分支失败');
+      console.error(`Failed to update node ${nodeId} in session ${sessionId}:`, error);
+      throw new Error('更新节点失败');
     }
   }
 
-  // 切换到特定节点
+  // 切换到指定节点
   async switchToNode(
     sessionId: string, 
     nodeId: string
   ): Promise<void> {
     try {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        throw new Error('会话不存在');
-      }
+      const session = await this.getSession(sessionId);
 
       // 验证节点存在
       const node = this.findNodeById(session.rootNode, nodeId);
@@ -235,52 +186,12 @@ class ChatService {
         throw new Error('节点不存在');
       }
 
-      // 更新当前节点指针
+      // 更新当前节点
       session.currentNodeId = nodeId;
       session.lastUpdated = new Date();
     } catch (error) {
-      console.error(`Failed to switch to node in session ${sessionId}:`, error);
+      console.error(`Failed to switch to node ${nodeId} in session ${sessionId}:`, error);
       throw new Error('切换节点失败');
-    }
-  }
-
-  // 删除分支
-  async deleteBranch(
-    sessionId: string, 
-    nodeId: string
-  ): Promise<void> {
-    try {
-      const session = this.sessions.get(sessionId);
-      if (!session) {
-        throw new Error('会话不存在');
-      }
-
-      // 不能删除根节点
-      if (nodeId === session.rootNode.id) {
-        throw new Error('不能删除根节点');
-      }
-
-      // 查找目标节点的父节点
-      const parentNode = this.findParentNode(session.rootNode, nodeId);
-      if (!parentNode) {
-        throw new Error('无法找到父节点');
-      }
-
-      // 从父节点的子节点列表中删除目标节点
-      const index = parentNode.children.findIndex(child => child.id === nodeId);
-      if (index !== -1) {
-        parentNode.children.splice(index, 1);
-      }
-
-      // 如果当前节点是被删除的节点或其子节点，则切换到父节点
-      if (this.isNodeOrDescendant(nodeId, session.currentNodeId, session.rootNode)) {
-        session.currentNodeId = parentNode.id;
-      }
-
-      session.lastUpdated = new Date();
-    } catch (error) {
-      console.error(`Failed to delete branch in session ${sessionId}:`, error);
-      throw new Error('删除分支失败');
     }
   }
 
@@ -318,63 +229,83 @@ class ChatService {
     }
   }
 
-  // 辅助方法: 根据ID查找节点
-  private findNodeById(root: ChatNode, nodeId: string): ChatNode | null {
-    if (root.id === nodeId) {
+  // 从指定节点创建分支
+  async createBranchFromNode(
+    sessionId: string, 
+    nodeId: string
+  ): Promise<void> {
+    try {
+      const session = await this.getSession(sessionId);
+
+      // 验证节点存在
+      const node = this.findNodeById(session.rootNode, nodeId);
+      if (!node) {
+        throw new Error('节点不存在');
+      }
+
+      // 更新当前节点
+      session.currentNodeId = nodeId;
+      session.lastUpdated = new Date();
+    } catch (error) {
+      console.error(`Failed to create branch from node ${nodeId} in session ${sessionId}:`, error);
+      throw new Error('创建分支失败');
+    }
+  }
+
+  // 删除分支
+  async deleteBranch(
+    sessionId: string, 
+    nodeId: string
+  ): Promise<void> {
+    try {
+      const session = await this.getSession(sessionId);
+
+      // 不能删除根节点
+      if (nodeId === session.rootNode.id) {
+        throw new Error('不能删除根节点');
+      }
+
+      // 找到父节点
+      const node = this.findNodeById(session.rootNode, nodeId);
+      if (!node || !node.parentId) {
+        throw new Error('节点不存在或没有父节点');
+      }
+
+      const parentNode = this.findNodeById(session.rootNode, node.parentId);
+      if (!parentNode) {
+        throw new Error('父节点不存在');
+      }
+
+      // 从父节点的子节点列表中移除
+      parentNode.children = parentNode.children.filter(child => child.id !== nodeId);
+
+      // 如果当前节点是被删除的节点或其子节点，切换到父节点
+      if (this.isNodeInSubtree(node, session.currentNodeId)) {
+        session.currentNodeId = node.parentId;
+      }
+
+      // 更新会话的最后更新时间
+      session.lastUpdated = new Date();
+    } catch (error) {
+      console.error(`Failed to delete branch ${nodeId} in session ${sessionId}:`, error);
+      throw new Error('删除分支失败');
+    }
+  }
+
+  // 辅助方法: 在树中查找节点
+  private findNodeById(root: ChatNode, id: string): ChatNode | null {
+    if (root.id === id) {
       return root;
     }
 
     for (const child of root.children) {
-      const found = this.findNodeById(child, nodeId);
+      const found = this.findNodeById(child, id);
       if (found) {
         return found;
       }
     }
 
     return null;
-  }
-
-  // 辅助方法: 查找节点的父节点
-  private findParentNode(root: ChatNode, nodeId: string): ChatNode | null {
-    for (const child of root.children) {
-      if (child.id === nodeId) {
-        return root;
-      }
-      
-      const found = this.findParentNode(child, nodeId);
-      if (found) {
-        return found;
-      }
-    }
-
-    return null;
-  }
-
-  // 辅助方法: 检查特定节点是否是另一节点的祖先节点
-  private isNodeOrDescendant(
-    targetNodeId: string, 
-    currentNodeId: string, 
-    root: ChatNode
-  ): boolean {
-    if (targetNodeId === currentNodeId) {
-      return true;
-    }
-
-    const currentNode = this.findNodeById(root, currentNodeId);
-    if (!currentNode) {
-      return false;
-    }
-
-    if (currentNode.parentId === null) {
-      return false;
-    }
-
-    // 递归检查父节点
-    return this.isNodeOrDescendant(
-      targetNodeId, 
-      currentNode.parentId, 
-      root
-    );
   }
 
   // 辅助方法: 获取从指定节点到根节点的路径
@@ -409,8 +340,22 @@ class ChatService {
     // 反转数组，使其按时间顺序排列
     return path.reverse();
   }
+
+  // 辅助方法: 检查节点是否在子树中
+  private isNodeInSubtree(root: ChatNode, nodeId: string): boolean {
+    if (root.id === nodeId) {
+      return true;
+    }
+
+    for (const child of root.children) {
+      if (this.isNodeInSubtree(child, nodeId)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 }
 
-// 导出单例实例
-export const chatService = new ChatService();
-export default chatService; 
+// 单例实例
+export const chatService = new ChatService(); 

@@ -7,7 +7,10 @@
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "bun run index.mjs",
-    "build-for-tauri": "bun run scripts/build-for-tauri.js"
+    "build-for-tauri": "bun run scripts/build-for-tauri.js",
+    "generate": "drizzle-kit generate:sqlite",
+    "push": "drizzle-kit push:sqlite",
+    "studio": "drizzle-kit studio"
   },
   "keywords": [],
   "author": "",
@@ -19,12 +22,15 @@
     "@mastra/core": "^0.6.3",
     "@mastra/memory": "^0.2.4",
     "@tauri-apps/api": "^2.4.0",
+    "better-sqlite3": "^11.9.1",
+    "drizzle-orm": "^0.41.0",
     "mastra": "^0.4.2",
     "qwen-ai-provider": "^0.1.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.11",
+    "bun-types": "^1.2.5",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   }

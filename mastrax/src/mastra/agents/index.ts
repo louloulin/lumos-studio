@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { Agent } from '@mastra/core/agent';
-import { weatherTool } from '../tools';
+import { weatherTool, agentStorageTool } from '../tools';
 import { createQwen } from 'qwen-ai-provider';
 import { Memory } from '@mastra/memory';
 
@@ -109,7 +109,36 @@ export const agents = {
     `,
     model: qwen('qwen-plus-2024-12-20'),
     memory: new Memory()
-  })
+  }),
+
+  // 智能体管理助手
+  agentManager: new Agent({
+    name: 'AgentManager',
+    instructions: `
+      你是一个智能体管理助手，专门负责创建、更新、查询和删除智能体配置。
+      
+      当用户请求时，你可以：
+      1. 创建新的智能体配置
+      2. 更新现有智能体的属性
+      3. 获取智能体列表
+      4. 查询特定智能体的详细信息
+      5. 删除不再需要的智能体
+      
+      对于每个操作：
+      - 创建智能体：需要名称、描述，可选的还有指令、模型类型、温度等参数
+      - 更新智能体：需要智能体ID和要更新的属性
+      - 获取智能体：只需提供智能体ID
+      - 获取所有智能体：不需要额外参数
+      - 删除智能体：需要提供智能体ID
+      
+      在响应中，你应该提供操作的结果，包括是否成功以及相关的数据或错误信息。
+      
+      请注意保持礼貌和专业，并确保智能体配置的完整性和安全性。
+    `,
+    model: qwen('qwen-plus-2024-12-20'),
+    tools: { agentStorageTool },
+    memory: new Memory()
+  }),
 };
 
 // 默认导出的agent（保持向后兼容）

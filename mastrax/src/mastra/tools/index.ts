@@ -1,5 +1,8 @@
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
+import { promises as fs } from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 interface GeocodingResponse {
   results: {
@@ -19,6 +22,282 @@ interface WeatherResponse {
     weather_code: number;
   };
 }
+
+// 定义智能体存储所需的类型
+export interface AgentData {
+  id: string;
+  name: string;
+  description: string;
+  instructions?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  tools?: AgentTool[];
+  systemAgent?: boolean;
+  updatedAt: number;
+  createdAt: number;
+}
+
+export interface AgentTool {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  enabled?: boolean;
+  parameters?: ToolParameter[];
+}
+
+export interface ToolParameter {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  default?: any;
+}
+
+// 获取数据库路径
+const getDbPath = async () => {
+  // 使用项目根目录的memory.db作为数据库文件
+  // 在生产模式中，这个文件会被打包到应用资源目录
+  const currentFilePath = fileURLToPath(import.meta.url);
+  const projectRoot = path.resolve(path.dirname(currentFilePath), '../../../');
+  return path.join(projectRoot, 'memory.db');
+};
+
+// 智能体存储工具 - 提供CRUD操作
+export const agentStorageTool = createTool({
+  id: 'agent-storage',
+  description: '持久化存储智能体信息',
+  inputSchema: z.object({
+    operation: z.enum(['get', 'getAll', 'create', 'update', 'delete']),
+    agent: z.any().optional(),
+    agentId: z.string().optional(),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    data: z.any().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    try {
+      const { operation, agent, agentId } = context;
+      
+      switch (operation) {
+        case 'get':
+          return await getAgent(agentId);
+        case 'getAll':
+          return await getAllAgents();
+        case 'create':
+          return await createAgent(agent);
+        case 'update':
+          return await updateAgent(agent);
+        case 'delete':
+          return await deleteAgent(agentId);
+        default:
+          return {
+            success: false,
+            error: `不支持的操作: ${operation}`,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `存储操作失败: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  },
+});
+
+// 读取JSON数据文件
+const readAgentData = async (): Promise<AgentData[]> => {
+  try {
+    const dbPath = await getDbPath();
+    const dbDir = path.dirname(dbPath);
+    
+    // 确保数据目录存在
+    await fs.mkdir(dbDir, { recursive: true });
+    
+    // JSON文件路径 - 使用与memory.db相同的目录
+    const dataPath = path.join(path.dirname(dbPath), 'agents.json');
+    
+    try {
+      const data = await fs.readFile(dataPath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      // 文件不存在或格式错误，创建空文件并返回空数组
+      await fs.writeFile(dataPath, JSON.stringify([], null, 2), 'utf-8');
+      console.log(`已创建新的智能体存储文件: ${dataPath}`);
+      return [];
+    }
+  } catch (error) {
+    console.error('读取智能体数据失败:', error);
+    return [];
+  }
+};
+
+// 写入JSON数据文件
+const writeAgentData = async (agents: AgentData[]): Promise<boolean> => {
+  try {
+    const dbPath = await getDbPath();
+    
+    // JSON文件路径 - 使用与memory.db相同的目录
+    const dataPath = path.join(path.dirname(dbPath), 'agents.json');
+    
+    await fs.writeFile(dataPath, JSON.stringify(agents, null, 2), 'utf-8');
+    console.log(`智能体数据已保存至: ${dataPath}`);
+    return true;
+  } catch (error) {
+    console.error('写入智能体数据失败:', error);
+    return false;
+  }
+};
+
+// 获取单个智能体
+const getAgent = async (agentId?: string): Promise<{ success: boolean; data?: AgentData; error?: string }> => {
+  if (!agentId) {
+    return {
+      success: false,
+      error: '缺少智能体ID',
+    };
+  }
+
+  const agents = await readAgentData();
+  const agent = agents.find(a => a.id === agentId);
+
+  if (!agent) {
+    return {
+      success: false,
+      error: `未找到ID为 ${agentId} 的智能体`,
+    };
+  }
+
+  return {
+    success: true,
+    data: agent,
+  };
+};
+
+// 获取所有智能体
+const getAllAgents = async (): Promise<{ success: boolean; data: AgentData[]; error?: string }> => {
+  const agents = await readAgentData();
+  return {
+    success: true,
+    data: agents,
+  };
+};
+
+// 创建智能体
+const createAgent = async (agent?: any): Promise<{ success: boolean; data?: AgentData; error?: string }> => {
+  if (!agent || !agent.name) {
+    return {
+      success: false,
+      error: '缺少必要的智能体信息',
+    };
+  }
+
+  const agents = await readAgentData();
+  
+  // 生成唯一ID
+  const newAgent: AgentData = {
+    ...agent,
+    id: agent.id || `agent-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  // 添加到数组
+  agents.push(newAgent);
+  
+  // 写入文件
+  const success = await writeAgentData(agents);
+  if (!success) {
+    return {
+      success: false,
+      error: '保存智能体数据失败',
+    };
+  }
+
+  return {
+    success: true,
+    data: newAgent,
+  };
+};
+
+// 更新智能体
+const updateAgent = async (agent?: any): Promise<{ success: boolean; data?: AgentData; error?: string }> => {
+  if (!agent || !agent.id) {
+    return {
+      success: false,
+      error: '缺少必要的智能体信息或ID',
+    };
+  }
+
+  const agents = await readAgentData();
+  const index = agents.findIndex(a => a.id === agent.id);
+
+  if (index === -1) {
+    return {
+      success: false,
+      error: `未找到ID为 ${agent.id} 的智能体`,
+    };
+  }
+
+  // 更新智能体
+  const updatedAgent: AgentData = {
+    ...agents[index],
+    ...agent,
+    updatedAt: Date.now(),
+  };
+  
+  agents[index] = updatedAgent;
+  
+  // 写入文件
+  const success = await writeAgentData(agents);
+  if (!success) {
+    return {
+      success: false,
+      error: '更新智能体数据失败',
+    };
+  }
+
+  return {
+    success: true,
+    data: updatedAgent,
+  };
+};
+
+// 删除智能体
+const deleteAgent = async (agentId?: string): Promise<{ success: boolean; error?: string }> => {
+  if (!agentId) {
+    return {
+      success: false,
+      error: '缺少智能体ID',
+    };
+  }
+
+  const agents = await readAgentData();
+  const filteredAgents = agents.filter(a => a.id !== agentId);
+  
+  if (filteredAgents.length === agents.length) {
+    return {
+      success: false,
+      error: `未找到ID为 ${agentId} 的智能体`,
+    };
+  }
+  
+  // 写入文件
+  const success = await writeAgentData(filteredAgents);
+  if (!success) {
+    return {
+      success: false,
+      error: '删除智能体数据失败',
+    };
+  }
+
+  return {
+    success: true,
+  };
+};
 
 export const weatherTool = createTool({
   id: 'get-weather',

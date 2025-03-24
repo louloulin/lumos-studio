@@ -11,7 +11,7 @@ try {
 }
 
 import { MastraClient } from '@mastra/client-js';
-import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse } from './types';
+import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse, Tool, ToolExecuteResult } from './types';
 
 // 添加导入
 import { textToSpeech, speakWithWebSpeech } from './speech';
@@ -57,13 +57,37 @@ export const MastraAPI = {
     }
   },
 
-  // 智能体CRUD操作
+  // 获取所有可用工具
+  async getTools(): Promise<string[]> {
+    try {
+      const client = await getClient();
+      const tools = await client.getTools();
+      // 返回工具ID数组
+      return Object.keys(tools || {});
+    } catch (error) {
+      console.error('Failed to get tools:', error);
+      return [];
+    }
+  },
+
+  // 智能体CRUD操作 - 直接使用Tools API
   async createAgent(agentParams: any): Promise<any> {
     try {
       const client = await getClient();
-      // 模拟调用
-      console.log('Creating agent with params:', agentParams);
-      return { id: `agent-${Date.now()}`, ...agentParams };
+      // 获取agent-storage工具
+      const agentStorageTool = client.getTool('agent-storage');
+      
+      // 直接调用工具执行创建操作 - 简化参数传递，Mastra会自动映射到context
+      const result = await agentStorageTool.execute({
+        operation: 'create',
+        agent: agentParams
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '创建智能体失败');
+      }
+      
+      return result.data;
     } catch (error) {
       console.error('Failed to create agent:', error);
       throw error;
@@ -73,9 +97,20 @@ export const MastraAPI = {
   async updateAgent(agentId: string, agentParams: any): Promise<any> {
     try {
       const client = await getClient();
-      // 模拟调用
-      console.log(`Updating agent ${agentId} with params:`, agentParams);
-      return { id: agentId, ...agentParams };
+      // 获取agent-storage工具
+      const agentStorageTool = client.getTool('agent-storage');
+      
+      // 直接调用工具执行更新操作
+      const result = await agentStorageTool.execute({
+        operation: 'update',
+        agent: { id: agentId, ...agentParams }
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || `更新智能体 ${agentId} 失败`);
+      }
+      
+      return result.data;
     } catch (error) {
       console.error(`Failed to update agent ${agentId}:`, error);
       throw error;
@@ -85,11 +120,69 @@ export const MastraAPI = {
   async deleteAgent(agentId: string): Promise<boolean> {
     try {
       const client = await getClient();
-      // 模拟调用
-      console.log(`Deleting agent ${agentId}`);
+      // 获取agent-storage工具
+      const agentStorageTool = client.getTool('agent-storage');
+      
+      // 直接调用工具执行删除操作
+      const result = await agentStorageTool.execute({
+        operation: 'delete',
+        agentId
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || `删除智能体 ${agentId} 失败`);
+      }
+      
       return true;
     } catch (error) {
       console.error(`Failed to delete agent ${agentId}:`, error);
+      throw error;
+    }
+  },
+  
+  // 获取所有本地存储的智能体
+  async getAllAgents(): Promise<any[]> {
+    try {
+      const client = await getClient();
+      // 获取agent-storage工具
+      const agentStorageTool = client.getTool('agent-storage');
+      
+      // 直接调用工具获取所有智能体
+      const result = await agentStorageTool.execute({
+        operation: 'getAll'
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '获取智能体列表失败');
+      }
+      
+      return result.data || [];
+    } catch (error) {
+      console.error('Failed to get all agents:', error);
+      return [];
+    }
+  },
+  
+  // 获取单个智能体详情
+  async getAgent(agentId: string): Promise<any> {
+    try {
+      const client = await getClient();
+      // 获取agent-storage工具
+      const agentStorageTool = client.getTool('agent-storage');
+      
+      // 直接调用工具获取智能体详情
+      const result = await agentStorageTool.execute({
+        operation: 'get',
+        agentId
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || `获取智能体 ${agentId} 失败`);
+      }
+      
+      return result.data;
+    } catch (error) {
+      console.error(`Failed to get agent ${agentId}:`, error);
       throw error;
     }
   },
@@ -335,6 +428,75 @@ export const MastraAPI = {
     } catch (error) {
       console.error('[MastraAPI] Speech recognition failed:', error);
       throw error;
+    }
+  },
+
+  // 从文本中提取智能体数据
+  async extractAgentData(text: string): Promise<any> {
+    try {
+      // 尝试从文本中提取JSON部分
+      const jsonMatch = text.match(/```json([\s\S]*?)```/) || 
+                        text.match(/{[\s\S]*?}/);
+      
+      if (jsonMatch) {
+        // 提取JSON内容并解析
+        const jsonContent = jsonMatch[1] || jsonMatch[0];
+        return JSON.parse(jsonContent.trim());
+      }
+      
+      // 如果没有找到JSON，尝试从文本中提取关键信息
+      const idMatch = text.match(/ID[:：]\s*([a-zA-Z0-9-_]+)/i);
+      const nameMatch = text.match(/名称[:：]\s*(.+)$/m);
+      const descMatch = text.match(/描述[:：]\s*(.+)$/m);
+      
+      if (idMatch || nameMatch) {
+        return {
+          id: idMatch ? idMatch[1].trim() : null,
+          name: nameMatch ? nameMatch[1].trim() : null,
+          description: descMatch ? descMatch[1].trim() : null,
+        };
+      }
+      
+      // 如果还是无法提取，返回原始响应
+      return { text };
+    } catch (error) {
+      console.error('Failed to extract agent data:', error);
+      return { text };
+    }
+  },
+
+  // 从文本中提取智能体列表
+  async extractAgentsList(text: string): Promise<any[]> {
+    try {
+      // 尝试从文本中提取JSON部分
+      const jsonMatch = text.match(/```json([\s\S]*?)```/) || 
+                        text.match(/\[([\s\S]*?)\]/);
+      
+      if (jsonMatch) {
+        // 提取JSON内容并解析
+        const jsonContent = jsonMatch[1] || jsonMatch[0];
+        return JSON.parse(jsonContent.trim());
+      }
+      
+      // 如果没有找到JSON，尝试从文本中提取列表
+      const agents = [];
+      const lines = text.split('\n');
+      
+      for (const line of lines) {
+        // 匹配格式如 "1. 名称：XXX (ID: abc-123)" 或类似模式
+        const match = line.match(/(?:\d+\.\s+)?(?:名称[:：]\s*)?(.+?)\s*(?:\(ID[:：]\s*([a-zA-Z0-9-_]+)\))?$/);
+        if (match) {
+          agents.push({
+            name: match[1].trim(),
+            id: match[2] ? match[2].trim() : null,
+          });
+        }
+      }
+      
+      return agents.length > 0 ? agents : [];
+    } catch (error) {
+      console.error('Failed to extract agents list:', error);
+      return [];
     }
   }
 }; 

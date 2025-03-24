@@ -74,4 +74,24 @@ export interface ToolParameter {
   description: string;
   required: boolean;
   default?: any;
+}
+
+// 工具类型声明
+export interface Tool {
+  details(): Promise<any>;
+  execute(params: Record<string, any>): Promise<ToolExecuteResult>;
+}
+
+export interface ToolExecuteResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+// MastraClient类型扩展
+export interface MastraClient {
+  getAgents(): Promise<any[]>;
+  getAgent(agentName: string): Agent;
+  getTools(): Promise<Record<string, any>>;
+  getTool(toolId: string): Tool;
 } 

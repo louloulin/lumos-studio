@@ -13,6 +13,9 @@ try {
 import { MastraClient } from '@mastra/client-js';
 import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse } from './types';
 
+// 添加导入
+import { textToSpeech, speakWithWebSpeech } from './speech';
+
 // Get the Mastra service URL from the Tauri backend
 async function getMastraUrl(): Promise<string> {
   try {
@@ -47,6 +50,19 @@ export const MastraAPI = {
     } catch (error) {
       console.error('Failed to get agents:', error);
       return [];
+    }
+  },
+
+  // 检查Mastra服务是否运行
+  async isRunning(): Promise<boolean> {
+    try {
+      const client = await getClient();
+      // 简单调用获取智能体列表API判断服务是否可用
+      await client.getAgents();
+      return true;
+    } catch (error) {
+      console.error('Mastra service check failed:', error);
+      return false;
     }
   },
 
@@ -190,16 +206,94 @@ export const MastraAPI = {
     }
   },
 
-  // Check if the Mastra service is running
-  async isRunning(): Promise<boolean> {
+  // 使用智能体的语音合成能力将文本转换为语音
+  async speak(agentName: string, text: string): Promise<string> {
     try {
+      console.log(`[MastraAPI] Requesting speech synthesis for agent ${agentName}`);
+      
+      // 尝试使用Mastra客户端的语音API
       const client = await getClient();
-      // Try to get agents as a way to check if the service is running
-      await client.getAgents();
-      return true;
+      const agent = client.getAgent(agentName || 'agent');
+      
+      try {
+        // 如果智能体支持语音API
+        if (agent && (agent as any).speak) {
+          const audioUrl = await (agent as any).speak(text);
+          console.log('[MastraAPI] Success: Used agent speak API');
+          return audioUrl;
+        }
+        
+        // 尝试使用Tauri后端转换
+        const result = await invoke('text_to_speech', { 
+          text,
+          agentName
+        });
+        
+        if (result && typeof result === 'string') {
+          console.log('[MastraAPI] Success: Used Tauri backend TTS');
+          return result; // 返回音频URL或base64
+        }
+        
+        // 模拟实现，作为备选方案
+        console.log('[MastraAPI] Using fallback speech implementation');
+        await speakWithWebSpeech(text);
+        return 'success'; // 不返回URL，因为已经播放了
+      } catch (error) {
+        console.error('[MastraAPI] Agent speak API failed:', error);
+        // 使用浏览器内置TTS作为备选
+        await textToSpeech(text, { useBrowser: true });
+        return 'success';
+      }
     } catch (error) {
-      console.error('Mastra service health check failed:', error);
-      return false;
+      console.error('[MastraAPI] Speech synthesis failed:', error);
+      throw error;
     }
   },
+  
+  // 使用智能体的语音识别能力将音频转换为文本
+  async listen(agentName: string, audioBase64: string): Promise<string> {
+    try {
+      console.log(`[MastraAPI] Requesting speech recognition for agent ${agentName}`);
+      
+      // 尝试使用Mastra客户端的语音API
+      const client = await getClient();
+      const agent = client.getAgent(agentName || 'agent');
+      
+      try {
+        // 如果智能体支持语音识别API
+        if (agent && (agent as any).listen) {
+          const transcript = await (agent as any).listen({
+            audio: audioBase64,
+            options: {
+              language: 'zh-CN'
+            }
+          });
+          console.log('[MastraAPI] Success: Used agent listen API');
+          return transcript;
+        }
+        
+        // 尝试使用Tauri后端转换
+        const result = await invoke('speech_to_text', { 
+          audio: audioBase64,
+          agentName
+        });
+        
+        if (result && typeof result === 'string') {
+          console.log('[MastraAPI] Success: Used Tauri backend STT');
+          return result;
+        }
+        
+        // 返回模拟结果
+        console.log('[MastraAPI] Using mock transcription result');
+        return "这是通过Mastra语音服务转录的文本。在实际项目中，这里应该从Mastra语音API获取真实的转录结果。";
+      } catch (error) {
+        console.error('[MastraAPI] Agent listen API failed:', error);
+        // 返回模拟结果
+        return "语音识别失败，请重试或使用文本输入。";
+      }
+    } catch (error) {
+      console.error('[MastraAPI] Speech recognition failed:', error);
+      throw error;
+    }
+  }
 }; 

@@ -1,225 +1,166 @@
-import React, { useState, useEffect } from 'react';
-import { Volume2, VolumeX, Settings } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './ui/button';
-import { 
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from './ui/popover';
+import { Play, Pause, Volume2, Settings } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Slider } from './ui/slider';
-import { Label } from './ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Switch } from './ui/switch';
-import { useToast } from './ui/use-toast';
-import { textToSpeech, getAvailableVoices, speakWithWebSpeech } from '../api/speech';
+import { toast } from 'sonner';
+import { MastraAPI } from '@/api/mastra';
 
 interface SpeechPlayerProps {
   text: string;
-  disabled?: boolean;
-  compact?: boolean;
+  agentId: string;
+  className?: string;
 }
 
-const SpeechPlayer: React.FC<SpeechPlayerProps> = ({ text, disabled = false, compact = false }) => {
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [rate, setRate] = useState(1);
-  const [selectedVoice, setSelectedVoice] = useState<string>('');
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [useBrowser, setUseBrowser] = useState(true);
-  const { toast } = useToast();
+export function SpeechPlayer({ text, agentId, className = '' }: SpeechPlayerProps) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [volume, setVolume] = useState(0.8);
+  const [speed, setSpeed] = useState(1.0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
 
-  // 加载可用语音
   useEffect(() => {
-    async function loadVoices() {
-      try {
-        const voices = await getAvailableVoices();
-        setAvailableVoices(voices);
-        
-        // 尝试找到中文语音作为默认选项
-        const chineseVoice = voices.find(v => 
-          v.lang.startsWith('zh') || v.name.includes('Chinese') || v.name.includes('中文')
-        );
-        
-        if (chineseVoice) {
-          setSelectedVoice(chineseVoice.name);
-        } else if (voices.length > 0) {
-          setSelectedVoice(voices[0].name);
-        }
-      } catch (error) {
-        console.error('加载语音列表失败:', error);
-      }
+    // 创建音频元素
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+      
+      // 设置音频事件处理
+      audioRef.current.onended = () => {
+        setIsPlaying(false);
+      };
+      
+      audioRef.current.onerror = (e) => {
+        console.error('音频播放错误:', e);
+        setIsPlaying(false);
+        toast.error('语音播放失败，请重试');
+      };
     }
     
-    loadVoices();
+    // 组件卸载时清理
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      
+      // 释放URL
+      if (audioUrlRef.current && audioUrlRef.current.startsWith('blob:')) {
+        URL.revokeObjectURL(audioUrlRef.current);
+      }
+    };
   }, []);
 
-  // 应用语音合成设置 - 不需要在全局设置这些值
+  // 监听音量和速度变化
   useEffect(() => {
-    // 保留effect依赖以保持响应式
-  }, [volume, rate]);
-
-  // 朗读文本
-  const speak = async () => {
-    if (!text.trim()) {
-      return;
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+      audioRef.current.playbackRate = speed;
     }
+  }, [volume, speed]);
 
-    try {
-      setIsSpeaking(true);
-      
-      // 分割长文本为句子
-      const sentences = text.match(/[^\.!\?]+[\.!\?]+/g) || [text];
-      
-      for (const sentence of sentences) {
-        if (!isSpeaking) break; // 检查是否已停止朗读
-        
-        if (useBrowser) {
-          // 自定义使用Web Speech API的方式，以便直接设置音量和速率
-          const utterance = new SpeechSynthesisUtterance(sentence);
-          utterance.volume = volume;
-          utterance.rate = rate;
+  const togglePlayback = async () => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      // 正在播放，暂停
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      try {
+        // 检查是否已加载音频
+        if (!audioUrlRef.current) {
+          setIsLoading(true);
           
-          // 如果选择了特定语音
-          if (selectedVoice) {
-            const voices = window.speechSynthesis.getVoices();
-            const voice = voices.find(v => v.name === selectedVoice);
-            if (voice) {
-              utterance.voice = voice;
-            }
+          // 使用Mastra API获取音频
+          const audioUrl = await MastraAPI.speak(agentId, text);
+          
+          if (audioUrl && audioUrl !== 'success') {
+            // 如果返回了URL，设置给音频元素
+            audioRef.current.src = audioUrl;
+            audioUrlRef.current = audioUrl;
+          } else if (audioUrl === 'success') {
+            // 如果是"success"，说明已经通过其他方式播放了
+            setIsLoading(false);
+            return;
+          } else {
+            throw new Error('未能获取语音URL');
           }
           
-          // 等待语音播放完成
-          await new Promise<void>((resolve, reject) => {
-            utterance.onend = () => resolve();
-            utterance.onerror = (e) => reject(new Error(`语音播放错误: ${e}`));
-            window.speechSynthesis.speak(utterance);
-          });
-        } else {
-          // 使用通用API
-          await textToSpeech(sentence, {
-            useBrowser: false,
-            voice: selectedVoice
-          });
+          setIsLoading(false);
         }
+        
+        // 播放音频
+        audioRef.current.play();
+        setIsPlaying(true);
+      } catch (error) {
+        console.error('获取或播放音频时出错:', error);
+        setIsLoading(false);
+        toast.error('语音播放失败，请重试');
       }
-    } catch (error) {
-      console.error('语音合成错误:', error);
-      toast({
-        title: '语音播放失败',
-        description: '无法播放语音，请检查浏览器设置或稍后再试。',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSpeaking(false);
     }
   };
-
-  // 停止朗读
-  const stop = () => {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    setIsSpeaking(false);
-  };
-  
-  // 紧凑模式下的渲染
-  if (compact) {
-    return (
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={disabled || !text.trim()}
-        onClick={isSpeaking ? stop : speak}
-        title={isSpeaking ? '停止朗读' : '朗读文本'}
-      >
-        {isSpeaking ? <VolumeX size={16} /> : <Volume2 size={16} />}
-      </Button>
-    );
-  }
 
   return (
-    <div className="flex items-center">
+    <div className={`flex items-center space-x-1 ${className}`}>
       <Button
+        type="button"
+        size="icon"
         variant="ghost"
-        size="sm"
-        disabled={disabled || !text.trim()}
-        onClick={isSpeaking ? stop : speak}
-        className="mr-2"
+        className="rounded-full h-7 w-7"
+        disabled={isLoading}
+        onClick={togglePlayback}
+        title={isPlaying ? '暂停' : '播放'}
       >
-        {isSpeaking ? <VolumeX className="mr-1" /> : <Volume2 className="mr-1" />}
-        {isSpeaking ? '停止朗读' : '朗读文本'}
+        {isLoading ? (
+          <div className="h-3 w-3 rounded-full border-2 border-current border-t-transparent animate-spin" />
+        ) : isPlaying ? (
+          <Pause className="h-3.5 w-3.5" />
+        ) : (
+          <Play className="h-3.5 w-3.5" />
+        )}
       </Button>
       
       <Popover>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="sm" disabled={disabled}>
-            <Settings size={16} />
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="rounded-full h-7 w-7"
+            title="语音设置"
+          >
+            <Volume2 className="h-3.5 w-3.5" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-72">
-          <div className="space-y-4">
-            <h4 className="font-medium mb-2">语音设置</h4>
-            
-            <div className="space-y-2">
-              <Label htmlFor="voice-select">选择语音</Label>
-              <Select 
-                value={selectedVoice} 
-                onValueChange={setSelectedVoice}
-                disabled={!useBrowser}
-              >
-                <SelectTrigger id="voice-select">
-                  <SelectValue placeholder="选择语音" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableVoices.map(voice => (
-                    <SelectItem 
-                      key={voice.name} 
-                      value={voice.name}
-                    >
-                      {voice.name} ({voice.lang})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="volume-slider">音量</Label>
+        <PopoverContent className="w-52 p-3">
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-medium mb-1.5">音量</div>
               <Slider
-                id="volume-slider"
-                value={[volume]}
+                value={[volume * 100]}
                 min={0}
-                max={1}
-                step={0.1}
-                onValueChange={([value]) => setVolume(value)}
+                max={100}
+                step={1}
+                onValueChange={(value) => setVolume(value[0] / 100)}
               />
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="rate-slider">速度</Label>
+            <div>
+              <div className="text-xs font-medium mb-1.5">语速</div>
               <Slider
-                id="rate-slider"
-                value={[rate]}
-                min={0.5}
-                max={2}
-                step={0.1}
-                onValueChange={([value]) => setRate(value)}
+                value={[speed * 100]}
+                min={50}
+                max={200}
+                step={10}
+                onValueChange={(value) => setSpeed(value[0] / 100)}
               />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label htmlFor="use-browser">使用浏览器合成</Label>
-              <Switch
-                id="use-browser"
-                checked={useBrowser}
-                onCheckedChange={setUseBrowser}
-              />
+              <div className="text-xs text-muted-foreground mt-1 text-center">
+                {speed.toFixed(1)}x
+              </div>
             </div>
           </div>
         </PopoverContent>
       </Popover>
     </div>
   );
-};
-
-export default SpeechPlayer; 
+} 

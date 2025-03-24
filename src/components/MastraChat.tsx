@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useToast } from './ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
@@ -6,7 +6,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
-import { SendHorizontal, FileUp, RefreshCw, GitBranch, MoreVertical, Menu, Paintbrush2 } from 'lucide-react';
+import { SendHorizontal, FileUp, RefreshCw, GitBranch, MoreVertical, Menu, Paintbrush2, Plus, ArrowRight, Search, Image, Bot, XCircle, Settings } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import ChatTree from './ChatTree';
 import { chatService, ChatNode } from './ChatService';
@@ -20,8 +20,8 @@ import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import ArtifactsTab from './ArtifactsTab';
 import { MastraAPI } from '../api/mastra'; // 导入Mastra API
 import { MastraMessage } from '../api/types'; // 导入类型定义
-import VoiceRecorder from './VoiceRecorder'; // 导入语音录制组件
-import SpeechPlayer from './SpeechPlayer'; // 导入语音播放组件
+import { VoiceRecorder } from './VoiceRecorder';
+import { SpeechPlayer } from './SpeechPlayer';
 
 // 定义组件属性
 interface MastraChatProps {
@@ -847,7 +847,11 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                         {message.content}
                       </div>
                       {message.role === 'assistant' && (
-                        <SpeechPlayer text={message.content} compact={true} />
+                        <SpeechPlayer
+                          text={message.content}
+                          agentId={selectedAgent?.id || 'generalAssistant'}
+                          className="opacity-70 hover:opacity-100"
+                        />
                       )}
                     </div>
                     
@@ -937,8 +941,8 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
               
               {/* 添加语音输入按钮 */}
               <VoiceRecorder 
-                onTranscript={handleVoiceTranscript}
-                disabled={isTyping}
+                onTranscription={(text) => setInputValue(prev => prev + text)}
+                agentId={selectedAgent?.id || 'generalAssistant'}
               />
             </div>
             

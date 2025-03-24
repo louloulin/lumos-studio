@@ -1,20 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
-import { useToast } from './ui/use-toast';
-import { transcribeAudio } from '../api/speech'; // 导入语音转录服务
+import { Mic, MicOff, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { MastraAPI } from '@/api/mastra';
 
 interface VoiceRecorderProps {
-  onTranscript: (text: string) => void;
-  disabled?: boolean;
+  onTranscription: (text: string) => void;
+  agentId: string;
 }
 
-const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, disabled = false }) => {
+export function VoiceRecorder({ onTranscription, agentId }: VoiceRecorderProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const { toast } = useToast();
 
   // 清理函数
   const cleanup = () => {
@@ -24,55 +23,61 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, disabled = 
     audioChunksRef.current = [];
   };
 
-  // 组件卸载时清理
   useEffect(() => {
     return cleanup;
   }, []);
 
-  // 开始录音
+  // 将Blob转换为Base64字符串
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        // 从data URL中提取base64部分（去掉"data:audio/webm;base64,"前缀）
+        const base64Data = base64String.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const startRecording = async () => {
     try {
-      // 请求麦克风权限
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // 创建 MediaRecorder 实例
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
+      mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
-      
-      // 设置数据处理器
-      mediaRecorder.ondataavailable = (event) => {
+
+      mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
-      
-      // 设置录音结束处理器
-      mediaRecorder.onstop = async () => {
+
+      mediaRecorderRef.current.onstop = async () => {
         setIsRecording(false);
         setIsProcessing(true);
-        
+
         try {
-          // 创建音频 Blob
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-          
-          // 使用我们的语音转录服务
-          const transcript = await transcribeAudio(audioBlob);
-          
-          // 将转录文本发送给父组件
-          onTranscript(transcript);
-          
-          toast({
-            title: '语音转录完成',
-            description: '您可以编辑转录文本后发送。',
-          });
+          if (audioChunksRef.current.length > 0) {
+            // 合并音频块
+            const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            
+            // 转换为Base64
+            const audioBase64 = await blobToBase64(audioBlob);
+            
+            // 使用Mastra API进行转录
+            const text = await MastraAPI.listen(agentId, audioBase64);
+            
+            if (text) {
+              onTranscription(text);
+            } else {
+              toast.error('无法识别语音，请重试或使用文本输入');
+            }
+          }
         } catch (error) {
-          console.error('语音处理错误:', error);
-          toast({
-            title: '语音识别失败',
-            description: '无法处理您的语音。请检查麦克风权限并重试。',
-            variant: 'destructive',
-          });
+          console.error('处理音频时出错:', error);
+          toast.error('处理音频时出错，请重试');
         } finally {
           setIsProcessing(false);
           
@@ -80,26 +85,15 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, disabled = 
           stream.getTracks().forEach(track => track.stop());
         }
       };
-      
-      // 开始录音
-      mediaRecorder.start();
+
+      mediaRecorderRef.current.start();
       setIsRecording(true);
-      
-      toast({
-        title: '开始录音',
-        description: '请说话...',
-      });
     } catch (error) {
-      console.error('麦克风访问错误:', error);
-      toast({
-        title: '无法访问麦克风',
-        description: '请确保您已授予麦克风访问权限。',
-        variant: 'destructive',
-      });
+      console.error('开始录音时出错:', error);
+      toast.error('无法访问麦克风，请检查浏览器权限设置');
     }
   };
 
-  // 停止录音
   const stopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
@@ -107,46 +101,22 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onTranscript, disabled = 
   };
 
   return (
-    <div>
-      {!isRecording && !isProcessing && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={startRecording}
-          disabled={disabled}
-          title="语音输入"
-        >
-          <Mic size={16} className="mr-1" />
-          语音输入
-        </Button>
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className={`rounded-full ${isRecording ? 'bg-red-100 text-red-600 hover:bg-red-200 hover:text-red-700' : ''}`}
+      disabled={isProcessing}
+      onClick={isRecording ? stopRecording : startRecording}
+      title={isRecording ? '停止录音' : '开始语音输入'}
+    >
+      {isProcessing ? (
+        <Loader2 className="h-5 w-5 animate-spin" />
+      ) : isRecording ? (
+        <MicOff className="h-5 w-5" />
+      ) : (
+        <Mic className="h-5 w-5" />
       )}
-      
-      {isRecording && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={stopRecording}
-          className="bg-red-500/10 text-red-500 hover:bg-red-500/20"
-          title="停止录音"
-        >
-          <Square size={16} className="mr-1" />
-          停止录音
-        </Button>
-      )}
-      
-      {isProcessing && (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          title="处理中..."
-        >
-          <Loader2 size={16} className="mr-1 animate-spin" />
-          处理中...
-        </Button>
-      )}
-    </div>
+    </Button>
   );
-};
-
-export default VoiceRecorder; 
+} 

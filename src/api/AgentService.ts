@@ -73,37 +73,8 @@ export const getBuiltinTools = (): AgentTool[] => {
  * 提供智能体的CRUD操作和持久化，集成Mastra API
  */
 export class AgentService {
-  private agents: Agent[] = [];
-  private mastraClient: any = null;
-
   constructor() {
-    this.loadAgents();
-  }
-
-  /**
-   * 从本地存储加载智能体
-   */
-  private loadAgents(): void {
-    try {
-      const storedAgents = localStorage.getItem(LOCAL_AGENTS_KEY);
-      if (storedAgents) {
-        this.agents = JSON.parse(storedAgents);
-      }
-    } catch (error) {
-      console.error('加载智能体失败:', error);
-      this.agents = [];
-    }
-  }
-
-  /**
-   * 保存智能体到本地存储
-   */
-  private saveAgents(): void {
-    try {
-      localStorage.setItem(LOCAL_AGENTS_KEY, JSON.stringify(this.agents));
-    } catch (error) {
-      console.error('保存智能体失败:', error);
-    }
+    // 不再需要加载本地存储
   }
 
   /**
@@ -111,6 +82,24 @@ export class AgentService {
    */
   async getMastraAgents(): Promise<Agent[]> {
     try {
+      // 使用market-agents工具获取智能体市场列表
+      const marketAgents = await MastraAPI.getMarketAgents();
+      
+      // 如果工具API成功，整理数据
+      if (marketAgents && marketAgents.length > 0) {
+        return marketAgents.map(agent => ({
+          id: agent.id || agent.name,
+          name: agent.name,
+          description: agent.description || `Mastra智能体: ${agent.name}`,
+          instructions: agent.instructions,
+          model: agent.model,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens,
+          systemAgent: true
+        }));
+      }
+      
+      // 如果工具API失败或返回为空，尝试使用老方法
       const mastraAgents = await MastraAPI.getAgents();
       return mastraAgents.map(name => ({
         id: name,
@@ -128,29 +117,56 @@ export class AgentService {
    * 获取所有智能体（包括本地和Mastra系统智能体）
    */
   async getAllAgents(): Promise<Agent[]> {
-    const mastraAgents = await this.getMastraAgents();
-    return [...this.agents, ...mastraAgents];
+    try {
+      // 获取本地存储的智能体
+      const localAgents = await this.getLocalAgents();
+      // 获取系统智能体
+      const mastraAgents = await this.getMastraAgents();
+      // 合并并返回
+      return [...localAgents, ...mastraAgents];
+    } catch (error) {
+      console.error('获取所有智能体失败:', error);
+      return [];
+    }
   }
 
   /**
    * 获取本地创建的智能体
    */
-  getLocalAgents(): Agent[] {
-    return [...this.agents];
+  async getLocalAgents(): Promise<Agent[]> {
+    try {
+      // 通过agent-storage工具获取本地存储的智能体
+      const agents = await MastraAPI.getAllAgents();
+      // 过滤掉系统智能体
+      return agents.filter(agent => !agent.systemAgent).map(agent => ({
+        ...agent,
+        systemAgent: false
+      }));
+    } catch (error) {
+      console.error('获取本地智能体失败:', error);
+      return [];
+    }
   }
 
   /**
    * 根据ID获取智能体
    */
   async getAgent(id: string): Promise<Agent | null> {
-    // 先检查本地智能体
-    const localAgent = this.agents.find(agent => agent.id === id);
-    if (localAgent) {
-      return localAgent;
-    }
-
-    // 如果不是本地智能体，尝试获取Mastra智能体
     try {
+      // 首先尝试获取本地智能体
+      try {
+        const agent = await MastraAPI.getAgent(id);
+        if (agent) {
+          return {
+            ...agent,
+            systemAgent: agent.systemAgent || false
+          };
+        }
+      } catch (localError) {
+        console.warn(`从本地获取智能体 ${id} 失败:`, localError);
+      }
+      
+      // 如果本地获取失败，尝试获取系统智能体
       const mastraAgents = await this.getMastraAgents();
       return mastraAgents.find(agent => agent.id === id) || null;
     } catch (error) {
@@ -164,7 +180,6 @@ export class AgentService {
    */
   async createAgent(agent: Omit<Agent, 'id'>): Promise<Agent> {
     try {
-      // 调用Mastra API创建智能体
       // 准备创建智能体的参数
       const createParams = {
         name: agent.name,
@@ -173,38 +188,22 @@ export class AgentService {
         model: agent.model || 'gpt-4o',
         temperature: agent.temperature || 0.7,
         maxTokens: agent.maxTokens || 4000,
-        tools: agent.tools || []
+        tools: agent.tools || [],
+        systemAgent: false
       };
       
       // 调用Mastra API创建智能体
       const response = await MastraAPI.createAgent(createParams);
       
-      // 构建完整的智能体对象
-      const newAgent: Agent = {
+      // 返回创建的智能体
+      return {
         ...agent,
         id: response.id || this.generateUniqueId(),
         systemAgent: false
       };
-      
-      // 保存到本地
-      this.agents.push(newAgent);
-      this.saveAgents();
-      
-      return newAgent;
     } catch (error) {
-      console.error('创建Mastra智能体失败:', error);
-      
-      // 创建失败，降级为本地智能体
-      const localAgent: Agent = {
-        ...agent,
-        id: this.generateUniqueId(),
-        systemAgent: false
-      };
-      
-      this.agents.push(localAgent);
-      this.saveAgents();
-      
-      return localAgent;
+      console.error('创建智能体失败:', error);
+      throw error;
     }
   }
 
@@ -213,60 +212,29 @@ export class AgentService {
    */
   async updateAgent(agent: Agent): Promise<Agent | null> {
     try {
-      // 检查是否为本地智能体
-      const index = this.agents.findIndex(a => a.id === agent.id);
-      
-      if (index !== -1) {
-        // 如果是本地智能体，先更新本地
-        this.agents[index] = { ...agent };
-        this.saveAgents();
-        
-        // 如果该智能体已注册到Mastra，也更新Mastra
-        if (!agent.systemAgent) {
-          try {
-            // 准备更新参数
-            const updateParams = {
-              name: agent.name,
-              description: agent.description,
-              instructions: agent.instructions || '',
-              model: agent.model || 'gpt-4o',
-              temperature: agent.temperature || 0.7,
-              maxTokens: agent.maxTokens || 4000,
-              tools: agent.tools || []
-            };
-            
-            // 调用Mastra API更新智能体
-            await MastraAPI.updateAgent(agent.id, updateParams);
-          } catch (mastraError) {
-            console.warn('更新Mastra智能体失败，但本地已更新:', mastraError);
-          }
-        }
-        
-        return this.agents[index];
-      } else if (!agent.systemAgent) {
-        // 如果不是本地智能体，但也不是系统智能体，尝试直接更新Mastra
-        // 准备更新参数
-        const updateParams = {
-          name: agent.name,
-          description: agent.description,
-          instructions: agent.instructions || '',
-          model: agent.model || 'gpt-4o',
-          temperature: agent.temperature || 0.7,
-          maxTokens: agent.maxTokens || 4000,
-          tools: agent.tools || []
-        };
-        
-        // 调用Mastra API更新智能体
-        await MastraAPI.updateAgent(agent.id, updateParams);
-        
-        // 添加到本地缓存
-        this.agents.push(agent);
-        this.saveAgents();
-        
-        return agent;
+      // 如果是系统智能体，则不允许更新
+      if (agent.systemAgent) {
+        console.warn('不能更新系统智能体');
+        return null;
       }
+
+      // 准备更新参数
+      const updateParams = {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        instructions: agent.instructions || '',
+        model: agent.model || 'gpt-4o',
+        temperature: agent.temperature || 0.7,
+        maxTokens: agent.maxTokens || 4000,
+        tools: agent.tools || [],
+        systemAgent: false
+      };
       
-      return null;
+      // 调用Mastra API更新智能体
+      await MastraAPI.updateAgent(agent.id, updateParams);
+      
+      return agent;
     } catch (error) {
       console.error(`更新智能体 ${agent.id} 失败:`, error);
       return null;
@@ -278,28 +246,20 @@ export class AgentService {
    */
   async deleteAgent(id: string): Promise<boolean> {
     try {
-      // 本地删除
-      const initialLength = this.agents.length;
-      const agentToDelete = this.agents.find(agent => agent.id === id);
-      
-      this.agents = this.agents.filter(agent => agent.id !== id);
-      
-      if (this.agents.length !== initialLength) {
-        this.saveAgents();
-        
-        // 如果不是系统智能体，也从Mastra删除
-        if (agentToDelete && !agentToDelete.systemAgent) {
-          try {
-            await MastraAPI.deleteAgent(id);
-          } catch (error) {
-            console.warn(`删除Mastra智能体 ${id} 失败:`, error);
-          }
-        }
-        
-        return true;
+      // 先验证智能体是否存在
+      const agent = await this.getAgent(id);
+      if (!agent) {
+        return false;
       }
       
-      return false;
+      // 验证是否为系统智能体
+      if (agent.systemAgent) {
+        console.warn('不能删除系统智能体');
+        return false;
+      }
+      
+      // 调用Mastra API删除智能体
+      return await MastraAPI.deleteAgent(id);
     } catch (error) {
       console.error(`删除智能体 ${id} 失败:`, error);
       return false;
@@ -309,13 +269,18 @@ export class AgentService {
   /**
    * 导出智能体为JSON
    */
-  exportAgent(id: string): string | null {
-    const agent = this.agents.find(a => a.id === id);
-    if (!agent) {
+  async exportAgent(id: string): Promise<string | null> {
+    try {
+      const agent = await this.getAgent(id);
+      if (!agent) {
+        return null;
+      }
+
+      return JSON.stringify(agent, null, 2);
+    } catch (error) {
+      console.error(`导出智能体 ${id} 失败:`, error);
       return null;
     }
-
-    return JSON.stringify(agent, null, 2);
   }
 
   /**
@@ -326,38 +291,30 @@ export class AgentService {
       // 解析智能体数据
       const agent = JSON.parse(agentData) as Agent;
       
-      // 确保智能体ID是唯一的
-      agent.id = this.generateUniqueId();
+      // 确保智能体不是系统智能体
       agent.systemAgent = false;
       
-      // 如果已连接到Mastra服务，则尝试同时导入到Mastra
-      if (await MastraAPI.isRunning()) {
-        try {
-          // 准备创建智能体的参数
-          const createParams = {
-            name: agent.name,
-            description: agent.description,
-            instructions: agent.instructions || '',
-            model: agent.model || 'gpt-4o',
-            temperature: agent.temperature || 0.7,
-            maxTokens: agent.maxTokens || 4000,
-            tools: agent.tools || []
-          };
-          
-          // 调用Mastra API创建智能体
-          const response = await MastraAPI.createAgent(createParams);
-          
-          // 更新智能体ID
-          agent.id = response.id || agent.id;
-        } catch (mastraError) {
-          console.warn('导入到Mastra失败，仅本地导入:', mastraError);
-        }
-      }
+      // 准备创建智能体的参数
+      const createParams = {
+        name: agent.name,
+        description: agent.description,
+        instructions: agent.instructions || '',
+        model: agent.model || 'gpt-4o',
+        temperature: agent.temperature || 0.7,
+        maxTokens: agent.maxTokens || 4000,
+        tools: agent.tools || [],
+        systemAgent: false
+      };
       
-      // 本地保存
-      this.agents.push(agent);
-      this.saveAgents();
-      return agent;
+      // 调用Mastra API创建智能体
+      const response = await MastraAPI.createAgent(createParams);
+      
+      // 返回创建的智能体
+      return {
+        ...agent,
+        id: response.id,
+        systemAgent: false
+      };
     } catch (error) {
       console.error('导入智能体失败:', error);
       return null;

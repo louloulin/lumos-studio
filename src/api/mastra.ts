@@ -49,11 +49,37 @@ export const MastraAPI = {
   async getAgents(): Promise<string[]> {
     try {
       const client = await getClient();
-      const agents = await client.getAgents();
-      return Array.isArray(agents) ? agents.map(agent => agent.name) : [];
+      
+      // 尝试获取market-agents工具
+      const marketAgentsTool = client.getTool('market-agents');
+      
+      // 通过工具API获取市场智能体列表
+      const result = await marketAgentsTool.execute({
+        data: {
+          operation: 'list'
+        }
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '获取智能体市场列表失败');
+      }
+      
+      // 如果返回的是完整的agent对象数组，提取名称
+      const agents = result.data || [];
+      return Array.isArray(agents) 
+        ? agents.map(agent => typeof agent === 'string' ? agent : agent.name) 
+        : [];
     } catch (error) {
-      console.error('Failed to get agents:', error);
-      return [];
+      console.error('Failed to get market agents:', error);
+      // 如果工具API失败，尝试使用普通的getAgents API
+      try {
+        const client = await getClient();
+        const agents = await client.getAgents();
+        return Array.isArray(agents) ? agents.map(agent => agent.name) : [];
+      } catch (fallbackError) {
+        console.error('Fallback for getting agents also failed:', fallbackError);
+        return [];
+      }
     }
   },
 
@@ -77,10 +103,12 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具执行创建操作 - 简化参数传递，Mastra会自动映射到context
+      // 直接调用工具执行创建操作 - 简化参数传递
       const result = await agentStorageTool.execute({
-        operation: 'create',
-        agent: agentParams
+        data: {
+          operation: 'create',
+          agent: agentParams
+        }
       });
       
       if (!result.success) {
@@ -102,8 +130,10 @@ export const MastraAPI = {
       
       // 直接调用工具执行更新操作
       const result = await agentStorageTool.execute({
-        operation: 'update',
-        agent: { id: agentId, ...agentParams }
+        data: {
+          operation: 'update',
+          agent: { id: agentId, ...agentParams }
+        }
       });
       
       if (!result.success) {
@@ -125,8 +155,10 @@ export const MastraAPI = {
       
       // 直接调用工具执行删除操作
       const result = await agentStorageTool.execute({
-        operation: 'delete',
-        agentId
+        data: {
+          operation: 'delete',
+          agentId
+        }
       });
       
       if (!result.success) {
@@ -149,7 +181,9 @@ export const MastraAPI = {
       
       // 直接调用工具获取所有智能体
       const result = await agentStorageTool.execute({
-        operation: 'getAll'
+        data: {
+          operation: 'getAll'
+        }
       });
       
       if (!result.success) {
@@ -172,8 +206,10 @@ export const MastraAPI = {
       
       // 直接调用工具获取智能体详情
       const result = await agentStorageTool.execute({
-        operation: 'get',
-        agentId
+        data: {
+          operation: 'get',
+          agentId
+        }
       });
       
       if (!result.success) {
@@ -498,5 +534,59 @@ export const MastraAPI = {
       console.error('Failed to extract agents list:', error);
       return [];
     }
-  }
+  },
+
+  // 获取智能体市场数据
+  async getMarketAgents(): Promise<any[]> {
+    try {
+      const client = await getClient();
+      
+      // 尝试获取market-agents工具
+      const marketAgentsTool = client.getTool('market-agents');
+      
+      // 通过工具API获取市场智能体列表
+      const result = await marketAgentsTool.execute({
+        data: {
+          operation: 'list',
+          includeDetails: true
+        }
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || '获取智能体市场列表失败');
+      }
+      
+      return result.data || [];
+    } catch (error) {
+      console.error('Failed to get market agents:', error);
+      return [];
+    }
+  },
+
+  // 获取特定市场智能体详情
+  async getMarketAgent(agentId: string): Promise<any> {
+    try {
+      const client = await getClient();
+      
+      // 尝试获取market-agents工具
+      const marketAgentsTool = client.getTool('market-agents');
+      
+      // 通过工具API获取智能体详情
+      const result = await marketAgentsTool.execute({
+        data: {
+          operation: 'get',
+          agentId
+        }
+      });
+      
+      if (!result.success) {
+        throw new Error(result.error || `获取市场智能体 ${agentId} 失败`);
+      }
+      
+      return result.data;
+    } catch (error) {
+      console.error(`Failed to get market agent ${agentId}:`, error);
+      throw error;
+    }
+  },
 }; 

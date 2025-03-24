@@ -21,6 +21,8 @@ import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
 import { TauriAPI } from './shared/tauri-types'
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
+import WhiteboardPage from './pages/WhiteboardPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -188,7 +190,11 @@ export default function App() {
     return (
         <ErrorBoundary>
             <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                <Main />
+                <Router>
+                    <Routes>
+                        <Route path="/" element={<WhiteboardPage />} />
+                    </Routes>
+                </Router>
             </ThemeProvider>
         </ErrorBoundary>
     )

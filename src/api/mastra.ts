@@ -19,7 +19,7 @@ async function getMastraUrl(): Promise<string> {
     return await invoke('get_mastra_url');
   } catch (error) {
     console.error('Failed to get Mastra service URL:', error);
-    return 'http://localhost:4111'; // Default fallback
+    return 'http://localhost:4112'; // 修改默认端口为4112
   }
 }
 

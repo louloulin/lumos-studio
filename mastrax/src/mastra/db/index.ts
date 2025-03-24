@@ -1,21 +1,23 @@
-import { drizzle } from 'drizzle-orm/libsql';
-import { createClient } from '@libsql/client';
+import { Database } from "bun:sqlite";
+import { drizzle } from 'drizzle-orm/bun-sqlite';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const dbPath = join(__dirname, '../../../agent.db');
 
-const client = createClient({
-  url: `file:${dbPath}`,
-});
+// 创建 Bun SQLite 数据库连接
+const sqlite = new Database(dbPath);
 
-export const db = drizzle(client);
+// 启用 WAL 模式以提高性能
+sqlite.run("PRAGMA journal_mode = WAL");
 
-export async function initDatabase() {
+// 使用 Drizzle ORM 包装 SQLite 连接
+export const db = drizzle(sqlite);
+
+export function initDatabase() {
   try {
     // 确保数据库连接正常
-    await client.execute('PRAGMA journal_mode = WAL');
     console.log('数据库初始化成功');
     return true;
   } catch (error) {
@@ -24,9 +26,9 @@ export async function initDatabase() {
   }
 }
 
-export async function closeDatabase() {
+export function closeDatabase() {
   try {
-    await client.close();
+    sqlite.close();
     console.log('数据库连接已关闭');
     return true;
   } catch (error) {

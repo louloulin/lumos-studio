@@ -6,10 +6,18 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
-import { SendHorizontal, FileUp, RefreshCw, GitBranch } from 'lucide-react';
+import { SendHorizontal, FileUp, RefreshCw, GitBranch, MoreVertical, Menu, Paintbrush2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import ChatTree from './ChatTree';
 import { chatService, ChatNode } from './ChatService';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from './ui/dropdown-menu';
+import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
+import ArtifactsTab from './ArtifactsTab';
 
 // 定义组件属性
 interface MastraChatProps {
@@ -24,6 +32,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  image?: string;
 }
 
 // 定义智能体类型
@@ -47,6 +56,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const [currentNodeId, setCurrentNodeId] = useState<string>('');
   const [chatTree, setChatTree] = useState<ChatNode | null>(null);
   const { toast } = useToast();
+  const [showArtifacts, setShowArtifacts] = useState(false);
   
   // 模拟从API获取智能体信息
   useEffect(() => {
@@ -369,6 +379,44 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     setShowBranchView(!showBranchView);
   };
 
+  // 处理白板内容分享到对话
+  const handleShareArtifact = (artifactData: any) => {
+    if (artifactData.type === 'canvas') {
+      // 分享画布图像
+      const message: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: '[分享画布内容]',
+        timestamp: new Date(),
+        image: artifactData.dataUrl
+      };
+      
+      // 添加消息到对话历史
+      setMessages(prev => [...prev, message]);
+      
+      // 发送给智能体处理
+      // 这里根据实际需求实现
+      
+    } else if (artifactData.type === 'code') {
+      // 分享代码内容
+      const message: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: `\`\`\`html\n${artifactData.content}\n\`\`\``,
+        timestamp: new Date()
+      };
+      
+      // 添加消息到对话历史
+      setMessages(prev => [...prev, message]);
+      
+      // 发送给智能体处理
+      // 这里根据实际需求实现
+    }
+    
+    // 关闭白板对话框
+    setShowArtifacts(false);
+  };
+
   return (
     <div className="h-full flex">
       {/* 对话树侧边栏 */}
@@ -501,10 +549,27 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
           </div>
           
           <div className="flex justify-between items-center mt-2">
-            <Button variant="ghost" size="sm">
-              <FileUp size={16} className="mr-1" />
-              上传文件
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm">
+                <FileUp size={16} className="mr-1" />
+                上传文件
+              </Button>
+              
+              <Dialog open={showArtifacts} onOpenChange={setShowArtifacts}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Paintbrush2 size={16} className="mr-1" />
+                    白板(Artifacts)
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl h-[80vh]">
+                  <ArtifactsTab 
+                    sessionId={sessionId} 
+                    onShareArtifact={handleShareArtifact}
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
             
             <Button variant="ghost" size="sm" onClick={clearConversation}>
               <RefreshCw size={16} className="mr-1" />

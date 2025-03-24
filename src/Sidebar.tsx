@@ -34,6 +34,7 @@ interface Props {
     setOpenSettingWindow(name: 'ai' | 'display' | null): void
     openShadcnTest?(): void
     onToggleVisibility?(visible: boolean): void
+    currentPage?: string
 }
 
 export default function Sidebar(props: Props) {

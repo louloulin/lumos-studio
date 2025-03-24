@@ -37,6 +37,28 @@ function Main() {
     const [showLegacyUI, setShowLegacyUI] = React.useState(false)
     const [sidebarVisible, setSidebarVisible] = useState(true)
     const currentSession = useAtomValue(atoms.currentSessionAtom);
+    // Get the current route/page from URL
+    const [currentPage, setCurrentPage] = useState(() => {
+        const path = window.location.pathname;
+        if (path.includes('/chat')) return 'chat';
+        if (path.includes('/agents')) return 'agents';
+        if (path.includes('/whiteboard')) return 'whiteboard';
+        return 'home';
+    });
+    
+    // Listen for route changes
+    useEffect(() => {
+        const handleRouteChange = () => {
+            const path = window.location.pathname;
+            if (path.includes('/chat')) setCurrentPage('chat');
+            else if (path.includes('/agents')) setCurrentPage('agents');
+            else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
+            else setCurrentPage('home');
+        };
+        
+        window.addEventListener('popstate', handleRouteChange);
+        return () => window.removeEventListener('popstate', handleRouteChange);
+    }, []);
 
     // 开发模式下，可以通过URL参数强制显示新UI
     const [forceNewUI] = useState(() => {
@@ -82,7 +104,7 @@ function Main() {
         <div className="box-border App w-full h-full" spellCheck={spellCheck}>
             {shouldShowNewUI ? (
                 <div className="h-full w-full">
-                    <Workspace />
+                    <Workspace currentPage={currentPage} />
                 </div>
             ) : (
                 <>
@@ -94,12 +116,14 @@ function Main() {
                                 setOpenSettingWindow={setOpenSettingWindow}
                                 openShadcnTest={() => setShowLegacyUI(false)}
                                 onToggleVisibility={(visible) => setSidebarVisible(visible)}
+                                currentPage={currentPage}
                             />
                         </ErrorBoundary>
                         <ErrorBoundary>
                             <MainPane 
                                 sidebarVisible={sidebarVisible} 
                                 onSwitchToNewUI={() => setShowLegacyUI(false)}
+                                currentPage={currentPage}
                             />
                         </ErrorBoundary>
                     </div>
@@ -196,10 +220,10 @@ export default function App() {
                 <div className="w-full h-full overflow-hidden tauri-window-container">
                     <Router>
                         <Routes>
-                            <Route path="/" element={<HomePage />} />
-                            <Route path="/whiteboard" element={<WhiteboardPage />} />
-                            <Route path="/chat" element={<ChatPage />} />
-                            <Route path="/agents" element={<AgentsPage />} />
+                            <Route path="/" element={<Main />} />
+                            <Route path="/whiteboard" element={<Main />} />
+                            <Route path="/chat" element={<Main />} />
+                            <Route path="/agents" element={<Main />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

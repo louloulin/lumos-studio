@@ -42,7 +42,7 @@ interface ChatSession {
 type ViewType = 'chat' | 'market' | 'editor' | 'settings' | 'workflow' | 'agent-manager';
 
 // 工作区组件
-const Workspace: React.FC = () => {
+const Workspace: React.FC<{ currentPage?: string }> = ({ currentPage }) => {
   // 状态管理
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -56,6 +56,25 @@ const Workspace: React.FC = () => {
   
   // 从URL获取初始视图
   useEffect(() => {
+    // 如果接收到currentPage属性，使用它来设置活动视图
+    if (currentPage) {
+      switch (currentPage) {
+        case 'chat':
+          setActiveView('chat');
+          break;
+        case 'agents':
+          setActiveView('agent-manager');
+          break;
+        case 'whiteboard':
+          setActiveView('workflow');
+          break;
+        case 'home':
+        default:
+          setActiveView('chat');
+          break;
+      }
+    }
+    
     const handleRouteChange = () => {
       const hash = window.location.hash.substring(1);
       if (hash) {
@@ -107,7 +126,7 @@ const Workspace: React.FC = () => {
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
     };
-  }, [sessions, selectedSessionId, editingAgentId]);
+  }, [sessions, selectedSessionId, editingAgentId, currentPage]);
 
   // 更新URL hash
   const navigateTo = (view: ViewType, param?: string) => {

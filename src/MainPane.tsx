@@ -14,9 +14,10 @@ import { Session, SessionType } from '@/shared/types';
 interface MainPaneProps {
     sidebarVisible?: boolean;
     onSwitchToNewUI?: () => void;
+    currentPage?: string;
 }
 
-const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true, onSwitchToNewUI }) => {
+const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true, onSwitchToNewUI, currentPage }) => {
     const [isMastraMode, setIsMastraMode] = useState(false);
     const [currentSessionId] = useAtom(atoms.currentSessionIdAtom);
     const currentSession = useAtomValue(atoms.currentSessionAtom);
@@ -24,6 +25,7 @@ const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true, onSwitchToNe
     const isSessionSelected = !!currentSessionId;
     const [hasError, setHasError] = useState(false);
     const [isFallback, setIsFallback] = useState(false);
+    const settings = useAtomValue(atoms.settingsAtom);
     
     // 尝试获取当前会话，如果出错则使用默认值
     let safeCurrentSession: Session = currentSession || {
@@ -93,7 +95,10 @@ const MainPane: React.FC<MainPaneProps> = ({ sidebarVisible = true, onSwitchToNe
     // 选择显示传统聊天界面还是Mastra聊天界面
     const renderChatInterface = () => {
         if (isMastraMode) {
-            return <MastraChat />;
+            return <MastraChat 
+                sessionId={currentSessionId || "default-session"} 
+                agentId={settings?.mastraAgentName || "default-agent"} 
+            />;
         } else {
             return (
                 <>

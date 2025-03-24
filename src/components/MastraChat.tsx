@@ -18,6 +18,8 @@ import {
 } from './ui/dropdown-menu';
 import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import ArtifactsTab from './ArtifactsTab';
+import { MastraAPI } from '../api/mastra'; // 导入Mastra API
+import { MastraMessage } from '../api/types'; // 导入类型定义
 
 // 定义组件属性
 interface MastraChatProps {
@@ -58,23 +60,55 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const { toast } = useToast();
   const [showArtifacts, setShowArtifacts] = useState(false);
   
-  // 模拟从API获取智能体信息
+  // 检查Mastra服务是否运行
   useEffect(() => {
-    // 这里应当替换为实际的API调用，用于获取智能体数据
+    const checkMastraService = async () => {
+      try {
+        const isRunning = await MastraAPI.isRunning();
+        if (!isRunning) {
+          toast({
+            title: 'Mastra服务未运行',
+            description: '无法连接到Mastra服务，请确保服务已启动。',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        console.error('Error checking Mastra service:', error);
+      }
+    };
+    
+    checkMastraService();
+  }, [toast]);
+  
+  // 从API获取智能体信息
+  useEffect(() => {
     const fetchAgent = async () => {
       try {
-        // 模拟API响应
-        const mockAgent: Agent = {
-          id: agentId,
-          name: agentId === 'gpt-4' ? '通用助手' : 
-                agentId === 'code-assistant' ? '代码助手' : 
-                agentId === 'creative-writer' ? '创意写作' : 
-                '智能助手',
-          description: '我是一个智能助手，可以回答您的问题和提供帮助。',
-          avatar: undefined
-        };
+        // 尝试从Mastra获取智能体列表
+        const agents = await MastraAPI.getAgents();
         
-        setSelectedAgent(mockAgent);
+        // 如果找到匹配的智能体，使用它
+        if (agents.includes(agentId)) {
+          const mockAgent: Agent = {
+            id: agentId,
+            name: agentId,
+            description: `Mastra智能体: ${agentId}`,
+            avatar: undefined
+          };
+          setSelectedAgent(mockAgent);
+        } else {
+          // 使用模拟数据作为备选
+          const mockAgent: Agent = {
+            id: agentId,
+            name: agentId === 'gpt-4' ? '通用助手' : 
+                  agentId === 'code-assistant' ? '代码助手' : 
+                  agentId === 'creative-writer' ? '创意写作' : 
+                  '智能助手',
+            description: '我是一个智能助手，可以回答您的问题和提供帮助。',
+            avatar: undefined
+          };
+          setSelectedAgent(mockAgent);
+        }
       } catch (error) {
         console.error('Error fetching agent:', error);
         toast({
@@ -134,7 +168,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       }
     };
     
-    if (sessionId) {
+    if (sessionId && selectedAgent) {
       fetchChatHistory();
     }
   }, [sessionId, agentId, selectedAgent, toast]);
@@ -162,57 +196,149 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       setCurrentNodeId(userNode.id);
       
       // 更新消息列表
-      setMessages(prev => [
-        ...prev,
-        {
-          id: userNode.id,
-          role: 'user',
-          content: userMessageContent,
-          timestamp: userNode.timestamp
-        }
-      ]);
+      const userMessage: Message = {
+        id: userNode.id,
+        role: 'user',
+        content: userMessageContent,
+        timestamp: userNode.timestamp
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
       
       // 设置输入中状态
       setIsTyping(true);
       
-      // 模拟API调用获取响应
+      // 创建一个临时消息表示正在加载
+      const tempId = Date.now().toString();
+      const tempMessage: Message = {
+        id: tempId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true
+      };
+      
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // 准备消息历史
+      const mastraMessages: MastraMessage[] = [
+        ...messages
+          .filter(msg => !msg.isStreaming)
+          .map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          })),
+        { role: 'user', content: userMessageContent }
+      ];
+      
+      // 使用流式API获取回复
       try {
-        // 这里应该替换为实际的API调用，如Mastra generate API
-        // const response = await MastraAPI.generate(agentId, userMessageContent);
+        let fullResponse = '';
         
-        // 模拟延迟
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        for await (const chunk of MastraAPI.streamGenerate(agentId, {
+          messages: mastraMessages,
+          options: {
+            temperature: 0.7,
+            max_tokens: 2048
+          }
+        })) {
+          // 更新消息内容
+          fullResponse += chunk;
+          
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? { ...msg, content: fullResponse } 
+                : msg
+            )
+          );
+          
+          // 滚动到最新消息
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
         
-        // 模拟响应
-        const responseContent = `这是对"${userMessageContent}"的回复。作为${selectedAgent?.name || '智能助手'}，我很高兴能够帮助您。`;
+        // 生成完成后，添加最终消息到聊天服务
+        const assistantNode = await chatService.addAssistantResponse(sessionId, fullResponse);
         
-        // 添加助手回复到聊天服务
-        const assistantNode = await chatService.addAssistantResponse(sessionId, responseContent);
+        // 更新消息，移除流式标记
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === tempId 
+              ? { 
+                  id: assistantNode.id,
+                  role: 'assistant',
+                  content: fullResponse,
+                  timestamp: assistantNode.timestamp,
+                  isStreaming: false
+                } 
+              : msg
+          )
+        );
         
         // 更新当前节点
         setCurrentNodeId(assistantNode.id);
-        
-        // 更新消息列表
-        setMessages(prev => [
-          ...prev,
-          {
-            id: assistantNode.id,
-            role: 'assistant',
-            content: responseContent,
-            timestamp: assistantNode.timestamp
-          }
-        ]);
         
         // 更新对话树
         const updatedTree = await chatService.getChatTree(sessionId);
         setChatTree(updatedTree);
       } catch (error) {
-        console.error('Error generating response:', error);
-        toast({
-          title: '生成回复失败',
-          description: '无法获取智能体响应，请稍后再试。',
-          variant: 'destructive',
-        });
+        console.error('Error in stream generation:', error);
+        
+        // 如果流式生成失败，尝试非流式API
+        try {
+          const response = await MastraAPI.generate(agentId, {
+            messages: mastraMessages,
+            options: {
+              temperature: 0.7,
+              max_tokens: 2048
+            }
+          });
+          
+          // 添加助手回复到聊天服务
+          const assistantNode = await chatService.addAssistantResponse(sessionId, response.text);
+          
+          // 更新消息列表
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? {
+                    id: assistantNode.id,
+                    role: 'assistant',
+                    content: response.text,
+                    timestamp: assistantNode.timestamp,
+                    isStreaming: false
+                  } 
+                : msg
+            )
+          );
+          
+          // 更新当前节点
+          setCurrentNodeId(assistantNode.id);
+          
+          // 更新对话树
+          const updatedTree = await chatService.getChatTree(sessionId);
+          setChatTree(updatedTree);
+        } catch (generateError) {
+          console.error('Error in normal generation:', generateError);
+          // 更新错误消息
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? {
+                    ...msg,
+                    content: '抱歉，生成回复时出错了。请稍后再试。',
+                    isStreaming: false
+                  } 
+                : msg
+            )
+          );
+          
+          toast({
+            title: '生成回复失败',
+            description: '无法获取智能体响应，请稍后再试。',
+            variant: 'destructive',
+          });
+        }
       } finally {
         setIsTyping(false);
       }
@@ -395,7 +521,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       setMessages(prev => [...prev, message]);
       
       // 发送给智能体处理
-      // 这里根据实际需求实现
+      // 这里应该实现实际将图片发送给智能体的逻辑，暂不实现
       
     } else if (artifactData.type === 'code') {
       // 分享代码内容
@@ -410,7 +536,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       setMessages(prev => [...prev, message]);
       
       // 发送给智能体处理
-      // 这里根据实际需求实现
+      sendMessage();
     }
     
     // 关闭白板对话框
@@ -497,6 +623,17 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                     }`}
                   >
                     {message.content}
+                    {/* 如果有图片，显示图片 */}
+                    {message.image && (
+                      <div className="mt-2">
+                        <img 
+                          src={message.image} 
+                          alt="Shared canvas" 
+                          className="max-w-full rounded-md" 
+                          style={{ maxHeight: '300px' }}
+                        />
+                      </div>
+                    )}
                     <div className="text-xs mt-1 opacity-70 text-right">
                       {message.timestamp.toLocaleTimeString()}
                     </div>

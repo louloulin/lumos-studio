@@ -20,6 +20,8 @@ import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
 import ArtifactsTab from './ArtifactsTab';
 import { MastraAPI } from '../api/mastra'; // 导入Mastra API
 import { MastraMessage } from '../api/types'; // 导入类型定义
+import VoiceRecorder from './VoiceRecorder'; // 导入语音录制组件
+import SpeechPlayer from './SpeechPlayer'; // 导入语音播放组件
 
 // 定义组件属性
 interface MastraChatProps {
@@ -754,6 +756,13 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     setShowArtifacts(false);
   };
 
+  // 处理语音转录
+  const handleVoiceTranscript = (text: string) => {
+    setInputValue(text);
+    // 将焦点设置到输入框
+    document.querySelector('textarea')?.focus();
+  };
+
   return (
     <div className="h-full flex">
       {/* 对话树侧边栏 */}
@@ -833,7 +842,15 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                         : 'bg-muted'
                     }`}
                   >
-                    {message.content}
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1 mr-2">
+                        {message.content}
+                      </div>
+                      {message.role === 'assistant' && (
+                        <SpeechPlayer text={message.content} compact={true} />
+                      )}
+                    </div>
+                    
                     {/* 如果有图片，显示图片 */}
                     {message.image && (
                       <div className="mt-2">
@@ -917,6 +934,12 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                   />
                 </DialogContent>
               </Dialog>
+              
+              {/* 添加语音输入按钮 */}
+              <VoiceRecorder 
+                onTranscript={handleVoiceTranscript}
+                disabled={isTyping}
+              />
             </div>
             
             <Button variant="ghost" size="sm" onClick={clearConversation}>

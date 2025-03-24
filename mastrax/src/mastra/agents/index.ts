@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { Agent } from '@mastra/core/agent';
-import { weatherTool, agentStorageTool } from '../tools';
+import { weatherTool, agentStorageTool, type AgentData } from '../tools';
 import { createQwen } from 'qwen-ai-provider';
 import { Memory } from '@mastra/memory';
 
@@ -152,4 +152,57 @@ export function getAgentNames(): string[] {
 // 根据名称获取智能体
 export function getAgentByName(name: string): Agent | undefined {
   return (agents as Record<string, Agent>)[name];
+}
+
+// 获取已安装的智能体列表
+export async function getInstalledAgents(): Promise<AgentData[]> {
+  if (!agentStorageTool || !agentStorageTool.execute) {
+    console.error('agentStorageTool 未正确初始化');
+    return [];
+  }
+
+  try {
+    const result = await agentStorageTool.execute({
+      context: {
+        operation: 'getAll'
+      }
+    });
+
+    if (result.success) {
+      return result.data;
+    } else {
+      console.error('获取智能体列表失败:', result.error);
+      return [];
+    }
+  } catch (error) {
+    console.error('获取智能体列表时发生错误:', error);
+    return [];
+  }
+}
+
+// 获取单个智能体
+export async function getInstalledAgent(agentId: string): Promise<AgentData | null> {
+  if (!agentStorageTool || !agentStorageTool.execute) {
+    console.error('agentStorageTool 未正确初始化');
+    return null;
+  }
+
+  try {
+    const result = await agentStorageTool.execute({
+      context: {
+        operation: 'get',
+        agentId
+      }
+    });
+
+    if (result.success) {
+      return result.data;
+    } else {
+      console.error('获取智能体失败:', result.error);
+      return null;
+    }
+  } catch (error) {
+    console.error('获取智能体时发生错误:', error);
+    return null;
+  }
 }

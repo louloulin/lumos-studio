@@ -1,540 +1,517 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MastraAPI } from '../api/mastra';
-import { Input } from './ui/input';
-import { Button } from './ui/button';
-import { Send, User, Bot, Plus, RefreshCw, Settings, Image as ImageIcon, X } from 'lucide-react';
+import { useToast } from './ui/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import Markdown from './Markdown';
-import { Skeleton } from '../components/ui/skeleton';
-import { cn } from '../lib/utils';
-import { toast } from '@/hooks/use-toast';
-import ImageUploadInput from './ImageUploadInput';
-import { MessageContent, MastraMessage } from '../api/types';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Separator } from './ui/separator';
+import { ScrollArea } from './ui/scroll-area';
+import { SendHorizontal, FileUp, RefreshCw, GitBranch } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import ChatTree from './ChatTree';
+import { chatService, ChatNode } from './ChatService';
 
+// 定义组件属性
+interface MastraChatProps {
+  sessionId: string;
+  agentId: string;
+}
+
+// 定义消息类型
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
-  timestamp: number;
-  images?: string[]; // Base64 encoded images
+  timestamp: Date;
+  isStreaming?: boolean;
 }
 
-interface AgentProfile {
+// 定义智能体类型
+interface Agent {
   id: string;
   name: string;
-  avatar?: string;
   description: string;
+  avatar?: string;
 }
 
-interface MastraChatProps {
-  sessionId?: string;
-  agentId?: string;
-}
-
+// 主聊天组件
 const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
-  const [agents, setAgents] = useState<AgentProfile[]>([]);
-  const [selectedAgent, setSelectedAgent] = useState<AgentProfile | null>(null);
-  const [input, setInput] = useState('');
+  // 状态管理
   const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [isServiceRunning, setIsServiceRunning] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // 映射智能体名称到配置文件
-  const agentProfiles: Record<string, Omit<AgentProfile, 'id'>> = {
-    'WeatherAssistant': {
-      name: '天气助手',
-      avatar: '/agents/weather-assistant.png',
-      description: '提供天气信息和预报的专业助手'
-    },
-    'GeneralAssistant': {
-      name: '通用助手',
-      avatar: '/agents/general-assistant.png',
-      description: '能够回答各种问题的多功能助手'
-    },
-    'CustomerSupport': {
-      name: '客户服务',
-      avatar: '/agents/customer-support.png',
-      description: '专业的客户支持代表，解决技术问题'
-    },
-    'CreativeWriter': {
-      name: '创意写作',
-      avatar: '/agents/creative-writer.png',
-      description: '帮助进行创意写作和内容创作的助手'
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [showBranchView, setShowBranchView] = useState(false);
+  const [currentNodeId, setCurrentNodeId] = useState<string>('');
+  const [chatTree, setChatTree] = useState<ChatNode | null>(null);
+  const { toast } = useToast();
+  
+  // 模拟从API获取智能体信息
+  useEffect(() => {
+    // 这里应当替换为实际的API调用，用于获取智能体数据
+    const fetchAgent = async () => {
+      try {
+        // 模拟API响应
+        const mockAgent: Agent = {
+          id: agentId,
+          name: agentId === 'gpt-4' ? '通用助手' : 
+                agentId === 'code-assistant' ? '代码助手' : 
+                agentId === 'creative-writer' ? '创意写作' : 
+                '智能助手',
+          description: '我是一个智能助手，可以回答您的问题和提供帮助。',
+          avatar: undefined
+        };
+        
+        setSelectedAgent(mockAgent);
+      } catch (error) {
+        console.error('Error fetching agent:', error);
+        toast({
+          title: '获取智能体信息失败',
+          description: '无法加载智能体数据，请稍后再试。',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    fetchAgent();
+  }, [agentId, toast]);
+  
+  // 获取对话历史
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      try {
+        // 从聊天服务获取会话数据
+        const session = await chatService.getSession(sessionId);
+        
+        if (!session) {
+          // 如果会话不存在，创建新会话
+          await chatService.createSession(
+            selectedAgent?.name || '新对话', 
+            agentId
+          );
+          setMessages([]);
+          return;
+        }
+        
+        // 获取当前节点ID
+        setCurrentNodeId(session.currentNodeId);
+        
+        // 获取对话历史
+        const history = await chatService.getChatHistory(sessionId);
+        
+        // 转换为消息格式
+        const chatMessages: Message[] = history.map(node => ({
+          id: node.id,
+          role: node.role,
+          content: node.text,
+          timestamp: node.timestamp
+        }));
+        
+        setMessages(chatMessages);
+        
+        // 获取完整对话树
+        const tree = await chatService.getChatTree(sessionId);
+        setChatTree(tree);
+      } catch (error) {
+        console.error('Error fetching chat history:', error);
+        toast({
+          title: '获取对话历史失败',
+          description: '无法加载对话历史，请稍后再试。',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    if (sessionId) {
+      fetchChatHistory();
     }
-  };
-
+  }, [sessionId, agentId, selectedAgent, toast]);
+  
   // 自动滚动到最新消息
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // 检查Mastra服务状态并加载智能体
-  useEffect(() => {
-    const checkService = async () => {
-      try {
-        const running = await MastraAPI.isRunning();
-        setIsServiceRunning(running);
-        
-        if (running) {
-          const availableAgents = await MastraAPI.getAgents();
-          const profiledAgents = availableAgents.map(name => ({
-            id: name,
-            ...(agentProfiles[name] || {
-              name,
-              avatar: undefined,
-              description: `${name} 智能体`
-            })
-          }));
-          
-          setAgents(profiledAgents);
-          
-          if (profiledAgents.length > 0 && !selectedAgent) {
-            setSelectedAgent(profiledAgents[0]);
-          }
-        }
-      } catch (error) {
-        console.error('Error checking Mastra service:', error);
-        setIsServiceRunning(false);
-      }
-    };
-    
-    checkService();
-    
-    // 设置定期检查服务状态
-    const interval = setInterval(checkService, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    if (sessionId && agentId) {
-      console.log(`Initializing chat for session ${sessionId} with agent ${agentId}`);
-      // Implement session-specific logic here
-    }
-  }, [sessionId, agentId]);
-
-  const handleAgentSelect = (agent: AgentProfile) => {
-    setSelectedAgent(agent);
-    // 可以选择是否清除消息历史
-    // setMessages([]);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInput(e.target.value);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    
-    const newImages: string[] = [];
-    
-    Array.from(files).forEach(file => {
-      // Check if file is an image
-      if (!file.type.startsWith('image/')) {
-        toast({
-          title: '不支持的文件类型',
-          description: '请上传图片文件 (JPG, PNG, GIF等)',
-          variant: 'destructive'
-        });
-        return;
-      }
-      
-      // Check file size (limit to 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({
-          title: '文件过大',
-          description: '图片大小不能超过5MB',
-          variant: 'destructive'
-        });
-        return;
-      }
-      
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (e.target?.result) {
-          const base64String = e.target.result.toString();
-          setUploadedImages(prev => [...prev, base64String]);
-          newImages.push(base64String);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-    
-    // Clear the input to allow uploading the same file again
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
   
-  const removeImage = (index: number) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSubmit = async () => {
-    if (!input.trim() && uploadedImages.length === 0) return;
-    if (!selectedAgent) return;
-    
-    // Add user message to the chat
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-      timestamp: Date.now(),
-      images: uploadedImages.length > 0 ? [...uploadedImages] : undefined
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setUploadedImages([]);
-    setLoading(true);
+  // 发送消息
+  const sendMessage = async () => {
+    if (!inputValue.trim()) return;
     
     try {
-      // For streaming responses
-      if (selectedAgent.id === 'GeneralAssistant') {
-        setIsStreaming(true);
-        
-        // Create a placeholder for the assistant's message
-        const assistantMessageId = (Date.now() + 1).toString();
-        const assistantMessage: Message = {
-          id: assistantMessageId,
-          role: 'assistant',
-          content: '',
-          timestamp: Date.now() + 1
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
-        
-        // 转换消息格式为Mastra API需要的格式
-        const formattedMessages = getMessageHistoryForAPI();
-        
-        // 添加用户最新消息
-        const userContent: MessageContent[] = [];
-        if (userMessage.content) {
-          userContent.push({
-            type: 'text',
-            text: userMessage.content
-          });
-        }
-        
-        if (userMessage.images && userMessage.images.length > 0) {
-          userMessage.images.forEach(imageData => {
-            userContent.push({
-              type: 'image',
-              image: imageData
-            });
-          });
-        }
-        
-        formattedMessages.push({
+      // 添加用户消息到状态
+      const userMessageContent = inputValue.trim();
+      
+      // 清空输入框
+      setInputValue('');
+      
+      // 添加用户消息到聊天服务
+      const userNode = await chatService.addUserMessage(sessionId, userMessageContent);
+      
+      // 更新当前节点
+      setCurrentNodeId(userNode.id);
+      
+      // 更新消息列表
+      setMessages(prev => [
+        ...prev,
+        {
+          id: userNode.id,
           role: 'user',
-          content: userContent
-        });
-        
-        // Stream the response
-        const streamGenerator = MastraAPI.streamGenerate(selectedAgent.id, {
-          messages: formattedMessages,
-          stream: true
-        });
-        
-        let fullResponse = '';
-        
-        for await (const chunk of streamGenerator) {
-          fullResponse += chunk;
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === assistantMessageId 
-                ? { ...msg, content: fullResponse } 
-                : msg
-            )
-          );
+          content: userMessageContent,
+          timestamp: userNode.timestamp
         }
+      ]);
+      
+      // 设置输入中状态
+      setIsTyping(true);
+      
+      // 模拟API调用获取响应
+      try {
+        // 这里应该替换为实际的API调用，如Mastra generate API
+        // const response = await MastraAPI.generate(agentId, userMessageContent);
         
-        setIsStreaming(false);
-      } else {
-        // For non-streaming responses
-        // 转换消息格式为Mastra API需要的格式
-        const formattedMessages = getMessageHistoryForAPI();
+        // 模拟延迟
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
-        // 添加用户最新消息
-        const userContent: MessageContent[] = [];
-        if (userMessage.content) {
-          userContent.push({
-            type: 'text',
-            text: userMessage.content
-          });
-        }
+        // 模拟响应
+        const responseContent = `这是对"${userMessageContent}"的回复。作为${selectedAgent?.name || '智能助手'}，我很高兴能够帮助您。`;
         
-        if (userMessage.images && userMessage.images.length > 0) {
-          userMessage.images.forEach(imageData => {
-            userContent.push({
-              type: 'image',
-              image: imageData
-            });
-          });
-        }
+        // 添加助手回复到聊天服务
+        const assistantNode = await chatService.addAssistantResponse(sessionId, responseContent);
         
-        formattedMessages.push({
-          role: 'user',
-          content: userContent
+        // 更新当前节点
+        setCurrentNodeId(assistantNode.id);
+        
+        // 更新消息列表
+        setMessages(prev => [
+          ...prev,
+          {
+            id: assistantNode.id,
+            role: 'assistant',
+            content: responseContent,
+            timestamp: assistantNode.timestamp
+          }
+        ]);
+        
+        // 更新对话树
+        const updatedTree = await chatService.getChatTree(sessionId);
+        setChatTree(updatedTree);
+      } catch (error) {
+        console.error('Error generating response:', error);
+        toast({
+          title: '生成回复失败',
+          description: '无法获取智能体响应，请稍后再试。',
+          variant: 'destructive',
         });
-        
-        const response = await MastraAPI.generate(selectedAgent.id, {
-          messages: formattedMessages,
-          stream: false
-        });
-        
-        // Add assistant's response to the chat
-        const assistantMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: response.text,
-          timestamp: Date.now() + 1
-        };
-        
-        setMessages(prev => [...prev, assistantMessage]);
+      } finally {
+        setIsTyping(false);
       }
     } catch (error) {
-      console.error('Error generating response:', error);
+      console.error('Error sending message:', error);
       toast({
-        title: '生成回复时出错',
-        description: '请稍后再试或联系管理员',
-        variant: 'destructive'
+        title: '发送消息失败',
+        description: '消息发送失败，请稍后再试。',
+        variant: 'destructive',
       });
-    } finally {
-      setLoading(false);
     }
   };
   
-  // Helper function to format messages for the API
-  const getMessageHistoryForAPI = (): MastraMessage[] => {
-    return messages.map(msg => {
-      if (msg.images && msg.images.length > 0) {
-        const content: MessageContent[] = [];
-        if (msg.content) {
-          content.push({
-            type: 'text',
-            text: msg.content
-          });
+  // 清除对话
+  const clearConversation = async () => {
+    if (window.confirm('确定要清除当前对话吗？此操作不可撤销。')) {
+      try {
+        // 删除当前会话
+        await chatService.deleteSession(sessionId);
+        
+        // 创建新会话
+        const newSession = await chatService.createSession(
+          selectedAgent?.name || '新对话', 
+          agentId
+        );
+        
+        // 更新状态
+        setMessages([]);
+        setCurrentNodeId(newSession.currentNodeId);
+        
+        // 获取对话树
+        const tree = await chatService.getChatTree(newSession.id);
+        setChatTree(tree);
+        
+        toast({
+          title: '对话已清除',
+          description: '已成功清除对话历史。',
+        });
+      } catch (error) {
+        console.error('Error clearing conversation:', error);
+        toast({
+          title: '清除对话失败',
+          description: '无法清除对话，请稍后再试。',
+          variant: 'destructive',
+        });
+      }
+    }
+  };
+  
+  // 创建新分支
+  const handleCreateBranch = async (parentNodeId: string) => {
+    try {
+      // 创建新分支
+      const newBranchId = await chatService.createBranch(sessionId, parentNodeId);
+      
+      // 更新当前节点
+      setCurrentNodeId(newBranchId);
+      
+      // 更新对话历史
+      const history = await chatService.getChatHistory(sessionId);
+      const chatMessages: Message[] = history.map(node => ({
+        id: node.id,
+        role: node.role,
+        content: node.text,
+        timestamp: node.timestamp
+      }));
+      setMessages(chatMessages);
+      
+      // 更新对话树
+      const updatedTree = await chatService.getChatTree(sessionId);
+      setChatTree(updatedTree);
+      
+      toast({
+        title: '分支已创建',
+        description: '新的对话分支已创建成功。',
+      });
+    } catch (error) {
+      console.error('Error creating branch:', error);
+      toast({
+        title: '创建分支失败',
+        description: '无法创建新分支，请稍后再试。',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // 删除分支
+  const handleDeleteBranch = async (nodeId: string) => {
+    if (window.confirm('确定要删除这个分支吗？所有相关消息都将被删除。此操作不可撤销。')) {
+      try {
+        // 删除分支
+        await chatService.deleteBranch(sessionId, nodeId);
+        
+        // 更新对话历史
+        const history = await chatService.getChatHistory(sessionId);
+        const chatMessages: Message[] = history.map(node => ({
+          id: node.id,
+          role: node.role,
+          content: node.text,
+          timestamp: node.timestamp
+        }));
+        setMessages(chatMessages);
+        
+        // 更新当前节点
+        const session = await chatService.getSession(sessionId);
+        if (session) {
+          setCurrentNodeId(session.currentNodeId);
         }
         
-        msg.images.forEach(imageData => {
-          content.push({
-            type: 'image',
-            image: imageData
-          });
-        });
+        // 更新对话树
+        const updatedTree = await chatService.getChatTree(sessionId);
+        setChatTree(updatedTree);
         
-        return { role: msg.role, content };
-      } else {
-        return { 
-          role: msg.role, 
-          content: [{
-            type: 'text',
-            text: msg.content
-          }]
-        };
+        toast({
+          title: '分支已删除',
+          description: '对话分支已成功删除。',
+        });
+      } catch (error) {
+        console.error('Error deleting branch:', error);
+        toast({
+          title: '删除分支失败',
+          description: '无法删除分支，请稍后再试。',
+          variant: 'destructive',
+        });
       }
-    });
+    }
   };
-
-  const clearConversation = () => {
-    setMessages([]);
+  
+  // 选择对话节点
+  const handleSelectNode = async (nodeId: string) => {
+    try {
+      // 切换到选定节点
+      await chatService.switchToNode(sessionId, nodeId);
+      
+      // 更新当前节点
+      setCurrentNodeId(nodeId);
+      
+      // 更新对话历史
+      const history = await chatService.getChatHistory(sessionId);
+      const chatMessages: Message[] = history.map(node => ({
+        id: node.id,
+        role: node.role,
+        content: node.text,
+        timestamp: node.timestamp
+      }));
+      setMessages(chatMessages);
+      
+      toast({
+        title: '节点已切换',
+        description: '已切换到选定的对话节点。',
+      });
+    } catch (error) {
+      console.error('Error selecting node:', error);
+      toast({
+        title: '切换节点失败',
+        description: '无法切换到选定节点，请稍后再试。',
+        variant: 'destructive',
+      });
+    }
   };
-
-  if (!isServiceRunning) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <div className="w-16 h-16 mb-4 rounded-full bg-red-100 flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 text-red-500" />
-        </div>
-        <h2 className="text-xl font-semibold mb-2">Mastra 服务未运行</h2>
-        <p className="text-gray-600 mb-4 max-w-md">
-          无法连接到 Mastra 服务。请检查您的配置并重新启动应用程序。
-        </p>
-        <Button onClick={() => window.location.reload()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          重新加载
-        </Button>
-      </div>
-    );
-  }
+  
+  // 切换分支视图
+  const toggleBranchView = () => {
+    setShowBranchView(!showBranchView);
+  };
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* 侧边栏: 智能体列表 */}
-      <div className="w-64 border-r border-border bg-muted/30 flex flex-col h-full">
-        <div className="p-4 border-b border-border">
-          <h2 className="text-lg font-semibold">智能体列表</h2>
+    <div className="h-full flex">
+      {/* 对话树侧边栏 */}
+      {showBranchView && (
+        <div className="w-64 h-full">
+          <ChatTree 
+            sessionId={sessionId}
+            onSelectNode={handleSelectNode}
+            onCreateBranch={handleCreateBranch}
+            onDeleteBranch={handleDeleteBranch}
+            currentNodeId={currentNodeId}
+          />
+        </div>
+      )}
+      
+      {/* 主聊天区域 */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* 聊天头部 */}
+        <div className="border-b border-border p-3 flex justify-between items-center">
+          <div className="flex items-center">
+            <Avatar className="h-8 w-8 mr-2">
+              {selectedAgent?.avatar ? (
+                <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
+              ) : null}
+              <AvatarFallback>
+                {selectedAgent?.name?.substring(0, 2) || 'AI'}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <h3 className="font-medium">{selectedAgent?.name || '智能助手'}</h3>
+              <p className="text-xs text-muted-foreground">
+                会话ID: {sessionId.substring(0, 8)}...
+              </p>
+            </div>
+          </div>
+          
+          <div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={toggleBranchView}
+              className={showBranchView ? 'bg-primary/10' : ''}
+            >
+              <GitBranch size={16} className="mr-1" />
+              {showBranchView ? '隐藏分支树' : '显示分支树'}
+            </Button>
+          </div>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          {agents.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              <p>加载智能体中...</p>
-              <div className="mt-2 space-y-2">
-                <Skeleton className="h-12 w-full rounded-md" />
-                <Skeleton className="h-12 w-full rounded-md" />
-                <Skeleton className="h-12 w-full rounded-md" />
-              </div>
-            </div>
-          ) : (
-            agents.map(agent => (
-              <div
-                key={agent.id}
-                className={cn(
-                  "flex items-center p-3 rounded-lg cursor-pointer transition-colors",
-                  selectedAgent?.id === agent.id 
-                    ? "bg-primary/10 text-primary" 
-                    : "hover:bg-primary/5"
-                )}
-                onClick={() => handleAgentSelect(agent)}
-              >
-                <Avatar className="h-8 w-8 mr-3">
-                  {agent.avatar ? (
-                    <AvatarImage src={agent.avatar} alt={agent.name} />
+        {/* 消息列表 */}
+        <ScrollArea className="flex-1 p-4">
+          <div className="space-y-4">
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500">
+                <Avatar className="h-16 w-16 mb-4">
+                  {selectedAgent?.avatar ? (
+                    <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
                   ) : null}
-                  <AvatarFallback className="bg-primary/10 text-primary">
-                    {agent.name.slice(0, 2)}
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                    {selectedAgent?.name?.substring(0, 2) || 'AI'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="overflow-hidden">
-                  <p className="font-medium truncate">{agent.name}</p>
-                  <p className="text-xs text-gray-500 truncate">{agent.description}</p>
-                </div>
+                <h3 className="text-xl font-medium mb-2">{selectedAgent?.name || '智能助手'}</h3>
+                <p className="max-w-sm">{selectedAgent?.description || '我是一个智能助手，可以回答您的问题和提供帮助。'}</p>
+                <p className="mt-4 text-sm">发送消息开始对话</p>
               </div>
-            ))
-          )}
-        </div>
-        
-        <div className="p-3 border-t border-border mt-auto">
-          <Button variant="outline" className="w-full" onClick={clearConversation}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            清除对话
-          </Button>
-        </div>
-      </div>
-      
-      {/* 主内容区: 聊天界面 */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {selectedAgent ? (
-          <>
-            {/* 对话历史 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center text-gray-500">
-                  <Avatar className="h-16 w-16 mb-4">
-                    {selectedAgent.avatar ? (
-                      <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
-                    ) : null}
-                    <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                      {selectedAgent.name.slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <h3 className="text-xl font-medium mb-2">{selectedAgent.name}</h3>
-                  <p className="max-w-sm">{selectedAgent.description}</p>
-                  <p className="mt-4 text-sm">发送消息开始对话</p>
-                </div>
-              ) : (
-                messages.map(message => (
+            ) : (
+              messages.map(message => (
+                <div
+                  key={message.id}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
                   <div
-                    key={message.id}
-                    className={cn(
-                      "flex items-start",
-                      message.role === 'user' ? "justify-end" : "justify-start"
-                    )}
+                    className={`p-3 rounded-lg max-w-3xl ${
+                      message.role === 'user' 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted'
+                    }`}
                   >
-                    <div
-                      className={cn(
-                        "max-w-3xl rounded-lg p-4",
-                        message.role === 'user'
-                          ? "bg-primary text-primary-foreground ml-12"
-                          : "bg-muted mr-12"
-                      )}
-                    >
-                      <div className="flex items-center mb-2">
-                        <Avatar className="h-6 w-6 mr-2">
-                          {message.role === 'user' ? (
-                            <User className="h-4 w-4" />
-                          ) : selectedAgent.avatar ? (
-                            <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                        </Avatar>
-                        <span className="font-medium text-sm">
-                          {message.role === 'user' ? '你' : selectedAgent.name}
-                        </span>
-                        <span className="ml-2 text-xs opacity-70">
-                          {new Date(message.timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-                      
-                      {/* Display any uploaded images */}
-                      {message.images && message.images.length > 0 && (
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {message.images.map((img, index) => (
-                            <div key={`${message.id}-img-${index}`} className="relative">
-                              <img 
-                                src={img} 
-                                alt={`Uploaded ${index + 1}`} 
-                                className="max-w-xs rounded-md object-contain max-h-64" 
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {/* Display text content */}
-                      {message.content && (
-                        <div className={message.role === 'assistant' ? "prose dark:prose-invert max-w-none" : ""}>
-                          {message.role === 'assistant' ? (
-                            <Markdown>{message.content}</Markdown>
-                          ) : (
-                            <p>{message.content}</p>
-                          )}
-                        </div>
-                      )}
+                    {message.content}
+                    <div className="text-xs mt-1 opacity-70 text-right">
+                      {message.timestamp.toLocaleTimeString()}
                     </div>
                   </div>
-                ))
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+                </div>
+              ))
+            )}
             
-            {/* 输入区域 */}
-            <div className="p-4 border-t border-border">
-              <ImageUploadInput
-                onSend={(text, images) => {
-                  setInput(text);
-                  setUploadedImages(images);
-                  handleSubmit();
-                }}
-                disabled={loading}
-                placeholder={`向 ${selectedAgent.name} 发送消息...`}
-              />
-              {isStreaming && (
-                <p className="text-xs text-gray-500 mt-1 animate-pulse">
-                  正在生成回复...
-                </p>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <p className="text-gray-500">请从左侧选择一个智能体开始对话</p>
+            {/* 显示输入中状态 */}
+            {isTyping && (
+              <div className="flex justify-start">
+                <div className="p-3 rounded-lg bg-muted max-w-3xl">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* 用于自动滚动的引用 */}
+            <div ref={messagesEndRef} />
           </div>
-        )}
+        </ScrollArea>
+        
+        {/* 输入区域 */}
+        <div className="p-3 border-t border-border">
+          <div className="flex">
+            <Textarea
+              className="flex-1 min-h-10 resize-none"
+              placeholder="输入消息..."
+              value={inputValue}
+              onChange={e => setInputValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              rows={1}
+            />
+            <Button 
+              className="ml-2" 
+              disabled={!inputValue.trim() || isTyping}
+              onClick={sendMessage}
+            >
+              <SendHorizontal size={18} />
+            </Button>
+          </div>
+          
+          <div className="flex justify-between items-center mt-2">
+            <Button variant="ghost" size="sm">
+              <FileUp size={16} className="mr-1" />
+              上传文件
+            </Button>
+            
+            <Button variant="ghost" size="sm" onClick={clearConversation}>
+              <RefreshCw size={16} className="mr-1" />
+              清除对话
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

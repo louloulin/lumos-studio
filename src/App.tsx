@@ -21,8 +21,9 @@ import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
 import { TauriAPI } from './shared/tauri-types'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom'
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom'
 import WhiteboardPage from './pages/WhiteboardPage'
+import HomePage from './pages/HomePage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -192,7 +193,9 @@ export default function App() {
             <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
                 <Router>
                     <Routes>
-                        <Route path="/" element={<WhiteboardPage />} />
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/whiteboard" element={<WhiteboardPage />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </Router>
             </ThemeProvider>

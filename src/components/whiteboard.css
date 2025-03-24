@@ -18,6 +18,7 @@
   width: 100% !important;
   height: 100% !important;
   background: transparent !important;
+  touch-action: none;
 }
 
 /* 确保canvas元素尺寸正确 */
@@ -31,12 +32,24 @@
   z-index: 1;
 }
 
-/* 修复锁图标尺寸 */
+/* 彻底隐藏锁图标 */
+.excalidraw [data-testid="lock-button"],
 .excalidraw-app.is-collaborating .CollabButton--lock,
-.excalidraw-app .CollabButton--lock {
-  max-width: 2rem;
-  max-height: 2rem;
-  opacity: 0.7;
+.excalidraw-app .CollabButton--lock,
+.excalidraw .CollabButton,
+.excalidraw svg[aria-label="lock"],
+.excalidraw .CollabButton--lock,
+.excalidraw svg[id*="lock"],
+.excalidraw img[alt*="lock"],
+.excalidraw *[class*="lock"],
+.excalidraw *[id*="lock"] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  position: absolute !important;
+  pointer-events: none !important;
 }
 
 /* 确保工具栏正确显示 */
@@ -61,7 +74,22 @@
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 }
 
-/* 确保工具正确工作 */
-.excalidraw [data-testid="lock-button"] {
+/* 确保鼠标和触控正常工作 */
+.excalidraw-wrapper {
+  touch-action: none;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* 修复可能的初始化问题 */
+.excalidraw .encrypted-icon {
+  display: none !important;
+}
+
+/* 修复协作图标可能导致的问题 */
+.excalidraw-app .CollabButton,
+.CollabButton--lock,
+.CollabButton {
   display: none !important;
 } 

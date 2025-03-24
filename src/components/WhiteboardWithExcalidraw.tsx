@@ -26,7 +26,7 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
     });
   }, []);
 
-  // 确保白板组件加载后获得焦点
+  // 确保白板组件加载后获得焦点并处理锁图标问题
   useEffect(() => {
     if (containerRef.current) {
       setTimeout(() => {
@@ -39,6 +39,14 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
           cancelable: true
         });
         containerRef.current?.dispatchEvent(clickEvent);
+        
+        // 尝试通过DOM操作隐藏锁图标
+        const lockElements = document.querySelectorAll('.CollabButton--lock, [data-testid="lock-button"]');
+        lockElements.forEach((el) => {
+          if (el instanceof HTMLElement) {
+            el.style.display = 'none';
+          }
+        });
       }, 200);
     }
   }, [excalidrawAPI]);
@@ -161,6 +169,18 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
     }
   };
 
+  // 清除锁图标的dom元素
+  const removeLockIcons = () => {
+    setTimeout(() => {
+      const lockElements = document.querySelectorAll('.CollabButton--lock, [data-testid="lock-button"]');
+      lockElements.forEach((el) => {
+        if (el instanceof HTMLElement) {
+          el.style.display = 'none';
+        }
+      });
+    }, 100);
+  };
+
   return (
     <div 
       className="flex flex-col h-full border rounded-md overflow-hidden"
@@ -197,7 +217,7 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
       </div>
       
       {/* Excalidraw组件 */}
-      <div className="flex-1 relative whiteboard-container">
+      <div className="flex-1 relative whiteboard-container" onMouseEnter={removeLockIcons} onTouchStart={removeLockIcons}>
         <Excalidraw
           initialData={{
             elements: whiteboardState.elements || [],
@@ -205,10 +225,14 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
               viewBackgroundColor: '#ffffff',
               theme: THEME.LIGHT,
               isLoading: false
-            }
+            },
+            scrollToContent: true
           }}
           onChange={handleChange}
-          excalidrawAPI={api => setExcalidrawAPI(api)}
+          excalidrawAPI={api => {
+            setExcalidrawAPI(api);
+            removeLockIcons();
+          }}
           autoFocus={true}
           UIOptions={{
             canvasActions: {
@@ -217,6 +241,9 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
               saveAsImage: true,
               saveToActiveFile: true,
               toggleTheme: true
+            },
+            tools: {
+              image: true
             }
           }}
           viewModeEnabled={viewModeEnabled}

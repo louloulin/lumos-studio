@@ -103,7 +103,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             description: `Mastra智能体: ${agentId}`,
             avatar: undefined
           };
-          setSelectedAgent(agent);
+    setSelectedAgent(agent);
           console.log(`使用Mastra智能体: ${agentId}`);
         } else if (agentNames.length > 0) {
           // 如果找不到指定的智能体但有其他智能体，使用第一个可用的智能体
@@ -169,9 +169,9 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             agentId
           );
           setMessages([]);
-          return;
-        }
-        
+        return;
+      }
+      
         // 获取当前节点ID
         setCurrentNodeId(session.currentNodeId);
         
@@ -229,14 +229,14 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       setCurrentNodeId(userNode.id);
       
       // 更新消息列表
-      const userMessage: Message = {
+    const userMessage: Message = {
         id: userNode.id,
-        role: 'user',
+      role: 'user',
         content: userMessageContent,
         timestamp: userNode.timestamp
-      };
-      
-      setMessages(prev => [...prev, userMessage]);
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
       
       // 设置输入中状态
       setIsTyping(true);
@@ -245,8 +245,8 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       const tempId = Date.now().toString();
       const tempMessage: Message = {
         id: tempId,
-        role: 'assistant',
-        content: '',
+          role: 'assistant',
+          content: '',
         timestamp: new Date(),
         isStreaming: true
       };
@@ -777,19 +777,19 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             <Avatar className="h-8 w-8 mr-2">
               {selectedAgent?.avatar ? (
                 <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
-              ) : null}
+                  ) : null}
               <AvatarFallback>
                 {selectedAgent?.name?.substring(0, 2) || 'AI'}
-              </AvatarFallback>
-            </Avatar>
+                  </AvatarFallback>
+                </Avatar>
             <div>
               <h3 className="font-medium">{selectedAgent?.name || '智能助手'}</h3>
               <p className="text-xs text-muted-foreground">
                 会话ID: {sessionId.substring(0, 8)}...
               </p>
-            </div>
-          </div>
-          
+                </div>
+        </div>
+        
           <div>
             <Button 
               variant="outline" 
@@ -799,36 +799,36 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             >
               <GitBranch size={16} className="mr-1" />
               {showBranchView ? '隐藏分支树' : '显示分支树'}
-            </Button>
-          </div>
+          </Button>
         </div>
-        
+      </div>
+      
         {/* 消息列表 */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {messages.length === 0 ? (
+              {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500">
-                <Avatar className="h-16 w-16 mb-4">
+                  <Avatar className="h-16 w-16 mb-4">
                   {selectedAgent?.avatar ? (
-                    <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
-                  ) : null}
-                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                      <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
+                    ) : null}
+                    <AvatarFallback className="bg-primary/10 text-primary text-lg">
                     {selectedAgent?.name?.substring(0, 2) || 'AI'}
-                  </AvatarFallback>
-                </Avatar>
+                    </AvatarFallback>
+                  </Avatar>
                 <h3 className="text-xl font-medium mb-2">{selectedAgent?.name || '智能助手'}</h3>
                 <p className="max-w-sm">{selectedAgent?.description || '我是一个智能助手，可以回答您的问题和提供帮助。'}</p>
-                <p className="mt-4 text-sm">发送消息开始对话</p>
-              </div>
-            ) : (
-              messages.map(message => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
+                  <p className="mt-4 text-sm">发送消息开始对话</p>
+                </div>
+              ) : (
+                messages.map(message => (
                   <div
+                    key={message.id}
+                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
                     className={`p-3 rounded-lg max-w-3xl ${
-                      message.role === 'user' 
+                        message.role === 'user'
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted'
                     }`}
@@ -843,15 +843,15 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                           className="max-w-full rounded-md" 
                           style={{ maxHeight: '300px' }}
                         />
-                      </div>
-                    )}
+                        </div>
+                      )}
                     <div className="text-xs mt-1 opacity-70 text-right">
                       {message.timestamp.toLocaleTimeString()}
                     </div>
+                    </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
             
             {/* 显示输入中状态 */}
             {isTyping && (
@@ -863,15 +863,15 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                     <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
                 </div>
-              </div>
+            </div>
             )}
             
             {/* 用于自动滚动的引用 */}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
-        
-        {/* 输入区域 */}
+            
+            {/* 输入区域 */}
         <div className="p-3 border-t border-border">
           <div className="flex">
             <Textarea

@@ -1,10 +1,68 @@
 /* 白板容器样式 */
 .whiteboard-container {
-  position: relative;
   width: 100%;
   height: 100%;
+  position: relative;
+}
+
+.whiteboard-container > div {
+  width: 100%;
+  height: 100%;
+}
+
+.whiteboard-container .excalidraw {
+  --color-primary: #6366f1;
+  --color-primary-darker: #4338ca;
+  --color-primary-darkest: #312e81;
+  --color-primary-light: #818cf8;
+  --color-primary-lighter: #a5b4fc;
+  
+  height: 100% !important;
+  width: 100% !important;
+  position: absolute;
+}
+
+/* 确保白板内容撑满容器 */
+.excalidraw-wrapper,
+.excalidraw .layer-ui__wrapper {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* 隐藏协作锁图标 */
+.CollabButton--lock,
+[data-testid="lock-button"] {
+  display: none !important;
+}
+
+/* 自适应移动设备 */
+@media (max-width: 767px) {
+  .whiteboard-container {
+    touch-action: none;
+  }
+  
+  .whiteboard-container .excalidraw .App-menu_top {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+/* Tauri窗口内整体样式 */
+.tauri-window-container {
+  width: 100%;
+  height: 100vh;
   overflow: hidden;
-  background-color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+:root {
+  --vh: 1vh;
+}
+
+/* 优化滚动行为 */
+* {
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 覆盖Excalidraw默认样式 */
@@ -32,31 +90,6 @@
   z-index: 1;
 }
 
-/* 彻底隐藏锁图标 */
-.excalidraw [data-testid="lock-button"],
-.excalidraw-app.is-collaborating .CollabButton--lock,
-.excalidraw-app .CollabButton--lock,
-.excalidraw .CollabButton,
-.excalidraw svg[aria-label="lock"],
-.excalidraw .CollabButton--lock,
-.excalidraw svg[id*="lock"],
-.excalidraw img[alt*="lock"],
-.excalidraw *[class*="lock"],
-.excalidraw *[id*="lock"] {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  position: absolute !important;
-  pointer-events: none !important;
-}
-
-/* 确保工具栏正确显示 */
-.excalidraw-app .Island {
-  box-shadow: 0 1px 5px rgba(0,0,0,0.12);
-}
-
 /* 消除不必要的边框 */
 .excalidraw .App {
   border: none !important;
@@ -72,14 +105,6 @@
 .excalidraw button:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
-}
-
-/* 确保鼠标和触控正常工作 */
-.excalidraw-wrapper {
-  touch-action: none;
-  position: relative;
-  width: 100%;
-  height: 100%;
 }
 
 /* 修复可能的初始化问题 */

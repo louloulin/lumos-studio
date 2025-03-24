@@ -77,14 +77,14 @@ function Main() {
     };
 
     return (
-        <div className="box-border App" spellCheck={spellCheck}>
+        <div className="box-border App w-full h-full" spellCheck={spellCheck}>
             {shouldShowNewUI ? (
-                <div className="h-full">
+                <div className="h-full w-full">
                     <Workspace />
                 </div>
             ) : (
                 <>
-                    <div className="h-full flex">
+                    <div className="h-full w-full flex">
                         <ErrorBoundary>
                             <Sidebar
                                 openCopilotWindow={() => setOpenCopilotWindow(true)}
@@ -182,7 +182,7 @@ export default function App() {
 
     if (!initialized) {
         return (
-            <div className="flex justify-center items-center h-screen">
+            <div className="flex justify-center items-center h-screen w-full">
                 <div>Initializing application...</div>
             </div>
         );
@@ -191,13 +191,15 @@ export default function App() {
     return (
         <ErrorBoundary>
             <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                <Router>
-                    <Routes>
-                        <Route path="/" element={<HomePage />} />
-                        <Route path="/whiteboard" element={<WhiteboardPage />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                </Router>
+                <div className="w-full h-full overflow-hidden tauri-window-container">
+                    <Router>
+                        <Routes>
+                            <Route path="/" element={<HomePage />} />
+                            <Route path="/whiteboard" element={<WhiteboardPage />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </Router>
+                </div>
             </ThemeProvider>
         </ErrorBoundary>
     )

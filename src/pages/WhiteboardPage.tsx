@@ -16,22 +16,31 @@ const WhiteboardPage: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
   const navigate = useNavigate();
 
-  // 检测屏幕大小
+  // 检测窗口大小变化
   useEffect(() => {
-    const checkMobile = () => {
-      const isMobileView = window.innerWidth < 768;
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const isMobileView = width < 768;
+      
+      setWindowSize({ width, height });
       setIsMobile(isMobileView);
+      
       // 在移动设备上默认折叠侧边栏
       if (isMobileView && !isSidebarCollapsed) {
         setIsSidebarCollapsed(true);
       }
     };
     
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [isSidebarCollapsed]);
 
   // 确保白板状态正确初始化
@@ -60,7 +69,7 @@ const WhiteboardPage: React.FC = () => {
   // 如果状态未加载完成，显示加载指示器
   if (!isLoaded || !whiteboardState?.sessionId) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex w-full h-full items-center justify-center tauri-window-container">
         <div className="text-center">
           <p className="text-lg">正在加载白板...</p>
         </div>
@@ -87,9 +96,9 @@ const WhiteboardPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col w-full h-full overflow-hidden tauri-window-container bg-background">
       {/* 顶部导航栏 */}
-      <header className="flex justify-between items-center px-4 py-2 border-b">
+      <header className="flex justify-between items-center px-4 py-2 border-b shrink-0">
         <div className="flex items-center">
           <Button 
             variant="ghost" 
@@ -117,9 +126,15 @@ const WhiteboardPage: React.FC = () => {
       </header>
       
       {/* 主体内容 - 自适应布局 */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 w-full overflow-hidden">
         {/* 白板区域 */}
-        <div className={`flex-1 ${!isSidebarCollapsed && isMobile ? 'hidden' : ''} p-2`}>
+        <div 
+          className={`flex-1 ${!isSidebarCollapsed && isMobile ? 'hidden' : ''} h-full`}
+          style={{ 
+            height: '100%',
+            maxHeight: '100%' 
+          }}
+        >
           <WhiteboardWithExcalidraw onSendToChat={handleSendToChat} />
         </div>
         
@@ -127,17 +142,18 @@ const WhiteboardPage: React.FC = () => {
         <div 
           className={`
             ${isSidebarCollapsed ? 'hidden' : isMobile ? 'w-full' : 'w-1/3'} 
-            flex flex-col border-l p-2
+            flex flex-col border-l h-full
           `}
+          style={{ maxHeight: '100%' }}
         >
-          <Tabs defaultValue="chat" className="flex-1 flex flex-col">
-            <TabsList className="mb-2">
+          <Tabs defaultValue="chat" className="flex-1 flex flex-col h-full">
+            <TabsList className="mx-2 mt-2 mb-1 shrink-0">
               <TabsTrigger value="chat">文字聊天</TabsTrigger>
               <TabsTrigger value="voice">语音聊天</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="chat" className="flex-1 flex flex-col">
-              <div className="flex-1 border rounded-md p-2 overflow-hidden">
+            <TabsContent value="chat" className="flex-1 flex flex-col m-0 p-2 overflow-hidden">
+              <div className="flex-1 border rounded-md overflow-hidden">
                 <Chat 
                   sessionId={whiteboardState.sessionId}
                   agentId={whiteboardState.agentId}
@@ -147,7 +163,7 @@ const WhiteboardPage: React.FC = () => {
               </div>
             </TabsContent>
             
-            <TabsContent value="voice" className="flex-1">
+            <TabsContent value="voice" className="flex-1 m-0 p-2 overflow-hidden">
               <div className="border rounded-md h-full">
                 <VoiceChat 
                   sessionId={whiteboardState.sessionId}

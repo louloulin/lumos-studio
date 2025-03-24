@@ -18,6 +18,24 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
   const [viewModeEnabled, setViewModeEnabled] = useState<boolean>(whiteboardState.viewMode === 'presentation');
   const [excalidrawAPI, setExcalidrawAPI] = useState<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+
+  // 监听窗口大小变化
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // 当元素变化时保存到状态
   const handleChange = useCallback((elements: any) => {
@@ -183,13 +201,17 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
 
   return (
     <div 
-      className="flex flex-col h-full border rounded-md overflow-hidden"
+      className="flex flex-col h-full w-full border rounded-md overflow-hidden"
       ref={containerRef}
       tabIndex={0}
       onClick={handleActivateBoard}
+      style={{ 
+        height: '100%',
+        maxHeight: '100%'
+      }}
     >
       {/* 工具栏 */}
-      <div className="flex justify-between items-center p-2 border-b">
+      <div className="flex justify-between items-center p-2 border-b shrink-0">
         <div className="flex space-x-2">
           <Button variant="outline" size="sm" onClick={handleUndo}>
             <Undo className="h-4 w-4" />
@@ -217,7 +239,12 @@ const WhiteboardWithExcalidraw: React.FC<WhiteboardWithExcalidrawProps> = ({ onS
       </div>
       
       {/* Excalidraw组件 */}
-      <div className="flex-1 relative whiteboard-container" onMouseEnter={removeLockIcons} onTouchStart={removeLockIcons}>
+      <div 
+        className="flex-1 relative whiteboard-container" 
+        onMouseEnter={removeLockIcons} 
+        onTouchStart={removeLockIcons}
+        style={{ height: 'calc(100% - 40px)' }}
+      >
         <Excalidraw
           initialData={{
             elements: whiteboardState.elements || [],

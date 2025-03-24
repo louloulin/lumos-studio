@@ -29,7 +29,8 @@ async function getMastraUrl(): Promise<string> {
 // Initialize Mastra client instance
 let mastraClient: MastraClient | null = null;
 
-async function getClient() {
+// 获取Mastra客户端实例
+export async function getClient() {
   if (!mastraClient) {
     const baseUrl = await getMastraUrl();
     mastraClient = new MastraClient({
@@ -41,6 +42,9 @@ async function getClient() {
 
 // Mastra API client
 export const MastraAPI = {
+  // 导出getClient方法
+  getClient,
+  
   // Get available agents
   async getAgents(): Promise<string[]> {
     try {
@@ -50,6 +54,43 @@ export const MastraAPI = {
     } catch (error) {
       console.error('Failed to get agents:', error);
       return [];
+    }
+  },
+
+  // 智能体CRUD操作
+  async createAgent(agentParams: any): Promise<any> {
+    try {
+      const client = await getClient();
+      // 模拟调用
+      console.log('Creating agent with params:', agentParams);
+      return { id: `agent-${Date.now()}`, ...agentParams };
+    } catch (error) {
+      console.error('Failed to create agent:', error);
+      throw error;
+    }
+  },
+
+  async updateAgent(agentId: string, agentParams: any): Promise<any> {
+    try {
+      const client = await getClient();
+      // 模拟调用
+      console.log(`Updating agent ${agentId} with params:`, agentParams);
+      return { id: agentId, ...agentParams };
+    } catch (error) {
+      console.error(`Failed to update agent ${agentId}:`, error);
+      throw error;
+    }
+  },
+
+  async deleteAgent(agentId: string): Promise<boolean> {
+    try {
+      const client = await getClient();
+      // 模拟调用
+      console.log(`Deleting agent ${agentId}`);
+      return true;
+    } catch (error) {
+      console.error(`Failed to delete agent ${agentId}:`, error);
+      throw error;
     }
   },
 

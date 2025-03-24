@@ -16,36 +16,8 @@ import {
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Badge } from './ui/badge';
-
-// 定义工具接口
-interface Tool {
-  id: string;
-  name: string;
-  description: string;
-  category: string;
-  icon: React.ReactNode;
-  enabled: boolean;
-  configOptions?: any;
-}
-
-// 定义智能体接口
-interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  avatar?: string;
-  instructions: string;
-  model: string;
-  temperature: number;
-  maxTokens: number;
-  tools: Tool[];
-  knowledge: {
-    enabled: boolean;
-    sources: string[];
-  };
-  welcome: string;
-  multimodal: boolean;
-}
+import { Agent, AgentTool } from '@/api/types';
+import { agentService, getBuiltinTools } from '@/api/AgentService';
 
 // 模拟大型语言模型选项
 const modelOptions = [
@@ -58,58 +30,6 @@ const modelOptions = [
   { value: 'mistral-large', label: 'Mistral Large' },
 ];
 
-// 示例工具列表
-const availableTools: Tool[] = [
-  {
-    id: 'web-search',
-    name: '网络搜索',
-    description: '从互联网搜索最新信息',
-    category: '网络',
-    icon: <Wrench className="h-4 w-4" />,
-    enabled: true
-  },
-  {
-    id: 'weather-api',
-    name: '天气查询',
-    description: '获取实时天气数据',
-    category: 'API',
-    icon: <Wrench className="h-4 w-4" />,
-    enabled: false
-  },
-  {
-    id: 'code-interpreter',
-    name: '代码执行',
-    description: '分析数据和执行代码',
-    category: '开发',
-    icon: <Wrench className="h-4 w-4" />,
-    enabled: false
-  },
-  {
-    id: 'calculator',
-    name: '计算器',
-    description: '执行数学计算',
-    category: '工具',
-    icon: <Wrench className="h-4 w-4" />,
-    enabled: true
-  },
-  {
-    id: 'dalle',
-    name: 'DALL-E',
-    description: '生成图像',
-    category: '创意',
-    icon: <Image className="h-4 w-4" />,
-    enabled: false
-  },
-  {
-    id: 'file-reader',
-    name: '文件读取',
-    description: '读取和分析各种格式的文件',
-    category: '文档',
-    icon: <Database className="h-4 w-4" />,
-    enabled: false
-  }
-];
-
 // 默认智能体配置
 const defaultAgent: Agent = {
   id: 'new-agent',
@@ -119,13 +39,8 @@ const defaultAgent: Agent = {
   model: 'gpt-4-turbo',
   temperature: 0.7,
   maxTokens: 4000,
-  tools: availableTools,
-  knowledge: {
-    enabled: false,
-    sources: []
-  },
-  welcome: '你好！我是你的AI助手，有什么我可以帮助你的吗？',
-  multimodal: true
+  tools: getBuiltinTools(),
+  systemAgent: false
 };
 
 interface AgentEditorProps {
@@ -142,14 +57,28 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
 
   // 加载智能体数据
   useEffect(() => {
-    if (agentId && agentId !== 'new-agent') {
-      setLoading(true);
-      // 这里应该是API调用，目前模拟
-      setTimeout(() => {
-        setAgent(defaultAgent);
-        setLoading(false);
-      }, 500);
-    }
+    const fetchAgent = async () => {
+      if (agentId && agentId !== 'new-agent') {
+        setLoading(true);
+        try {
+          const loadedAgent = await agentService.getAgent(agentId);
+          if (loadedAgent) {
+            // 确保Agent有所有必要字段
+            setAgent({
+              ...defaultAgent,
+              ...loadedAgent,
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load agent:', error);
+          setErrorMessage('加载智能体数据时出错，请重试。');
+        } finally {
+          setLoading(false);
+        }
+      }
+    };
+    
+    fetchAgent();
   }, [agentId]);
 
   // 更新基本信息
@@ -160,9 +89,11 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
 
   // 更新工具状态
   const updateToolStatus = (toolId: string, enabled: boolean) => {
+    if (!agent.tools) return;
+    
     setAgent(prev => ({
       ...prev,
-      tools: prev.tools.map(tool => 
+      tools: prev.tools?.map(tool => 
         tool.id === toolId ? { ...tool, enabled } : tool
       )
     }));
@@ -172,17 +103,34 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
   // 保存智能体
   const saveAgent = async () => {
     setLoading(true);
+    setErrorMessage(null);
+    
     try {
-      // 这里应该调用API保存智能体
-      console.log('Saving agent:', agent);
-      setTimeout(() => {
-        setLoading(false);
+      // 创建或更新智能体
+      let savedAgent: Agent | null;
+      
+      if (agentId === 'new-agent' || !agentId) {
+        // 创建新智能体
+        savedAgent = await agentService.createAgent(agent);
+      } else {
+        // 更新现有智能体
+        savedAgent = await agentService.updateAgent(agent);
+      }
+      
+      if (savedAgent) {
+        setAgent(savedAgent);
         setIsDirty(false);
-        if (onSave) onSave(agent);
-      }, 800);
+        setErrorMessage(null);
+        
+        if (onSave) onSave(savedAgent);
+      } else {
+        setErrorMessage('保存智能体失败，请检查您的网络连接并重试。');
+      }
     } catch (error) {
+      console.error('Failed to save agent:', error);
+      setErrorMessage('保存智能体时发生错误: ' + (error instanceof Error ? error.message : '未知错误'));
+    } finally {
       setLoading(false);
-      setErrorMessage('保存智能体时出错，请稍后重试。');
     }
   };
 
@@ -195,7 +143,7 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-semibold">
-            {agentId === 'new-agent' ? '创建智能体' : '编辑智能体'}
+            {agentId === 'new-agent' || !agentId ? '创建智能体' : '编辑智能体'}
           </h1>
         </div>
         <div className="flex gap-2">
@@ -207,8 +155,14 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
             onClick={saveAgent} 
             disabled={!isDirty || loading}
           >
-            <Save className="h-4 w-4 mr-2" />
-            保存
+            {loading ? (
+              <span className="animate-pulse">保存中...</span>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                保存
+              </>
+            )}
           </Button>
         </div>
       </div>
@@ -255,282 +209,112 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
                     id="agent-description"
                     value={agent.description}
                     onChange={(e) => updateBasicInfo('description', e.target.value)}
-                    placeholder="描述这个智能体的功能和用途"
-                    rows={2}
+                    placeholder="简要描述此智能体的功能和用途"
+                    rows={3}
                   />
                 </div>
+                {/* 头像上传功能可以在这里添加 */}
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="agent-welcome">欢迎消息</Label>
-              <Input
-                id="agent-welcome"
-                value={agent.welcome}
-                onChange={(e) => updateBasicInfo('welcome', e.target.value)}
-                placeholder="智能体向用户打招呼的第一条消息"
-              />
             </div>
           </CardContent>
         </Card>
 
-        {/* 选项卡区域 */}
-        <Tabs defaultValue="instructions" className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4">
-            <TabsTrigger value="instructions" className="flex gap-1 items-center">
-              <MessageSquare className="h-4 w-4" />
-              <span>指令</span>
-            </TabsTrigger>
-            <TabsTrigger value="model" className="flex gap-1 items-center">
-              <Brain className="h-4 w-4" />
-              <span>模型</span>
-            </TabsTrigger>
-            <TabsTrigger value="tools" className="flex gap-1 items-center">
-              <Wrench className="h-4 w-4" />
-              <span>工具</span>
-            </TabsTrigger>
-            <TabsTrigger value="knowledge" className="flex gap-1 items-center">
-              <Database className="h-4 w-4" />
-              <span>知识库</span>
-            </TabsTrigger>
-          </TabsList>
-
-          {/* 指令选项卡 */}
-          <TabsContent value="instructions">
-            <Card>
-              <CardHeader>
-                <CardTitle>系统指令</CardTitle>
-                <CardDescription>定义智能体的行为、个性和能力</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertTitle>提示</AlertTitle>
-                    <AlertDescription>
-                      详细的系统指令可以让智能体更好地理解它的角色和任务。
-                    </AlertDescription>
-                  </Alert>
-                  <Textarea
-                    value={agent.instructions}
-                    onChange={(e) => updateBasicInfo('instructions', e.target.value)}
-                    placeholder="输入系统指令..."
-                    rows={12}
-                    className="font-mono"
-                  />
-                </div>
-              </CardContent>
-              <CardFooter className="flex justify-between">
-                <Button variant="outline" size="sm">
-                  使用模板
-                </Button>
-                <Button variant="outline" size="sm">
-                  验证
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          {/* 模型选项卡 */}
-          <TabsContent value="model">
-            <Card>
-              <CardHeader>
-                <CardTitle>模型配置</CardTitle>
-                <CardDescription>选择和配置大语言模型</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="model-select">大语言模型</Label>
-                  <Select
-                    value={agent.model}
-                    onValueChange={(value) => updateBasicInfo('model', value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择大语言模型" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {modelOptions.map((model) => (
-                        <SelectItem key={model.value} value={model.value}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="temperature">温度 ({agent.temperature})</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {agent.temperature < 0.3 ? '更保守' : agent.temperature > 0.7 ? '更创意' : '平衡'}
-                    </span>
-                  </div>
-                  <input
-                    id="temperature"
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={agent.temperature}
-                    onChange={(e) => updateBasicInfo('temperature', parseFloat(e.target.value))}
-                    className="w-full"
-                  />
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>精确</span>
-                    <span>创意</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <Label htmlFor="max-tokens">最大输出</Label>
-                    <span className="text-xs text-muted-foreground">
-                      {agent.maxTokens} tokens
-                    </span>
-                  </div>
-                  <input
-                    id="max-tokens"
-                    type="range"
-                    min="1000"
-                    max="8000"
-                    step="1000"
-                    value={agent.maxTokens}
-                    onChange={(e) => updateBasicInfo('maxTokens', parseInt(e.target.value))}
-                    className="w-full"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="multimodal">多模态</Label>
-                    <p className="text-sm text-muted-foreground">
-                      允许智能体处理图像和文本
-                    </p>
-                  </div>
-                  <Switch
-                    id="multimodal"
-                    checked={agent.multimodal}
-                    onCheckedChange={(checked) => updateBasicInfo('multimodal', checked)}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* 工具选项卡 */}
-          <TabsContent value="tools">
-            <Card>
-              <CardHeader>
-                <CardTitle>工具配置</CardTitle>
-                <CardDescription>选择智能体可以使用的工具</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {agent.tools.map((tool) => (
-                    <div key={tool.id} className="flex items-start justify-between py-3 border-b border-border last:border-0">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-md border border-border flex items-center justify-center">
-                          {tool.icon}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-medium">{tool.name}</h4>
-                            <Badge variant="outline" className="text-xs">
-                              {tool.category}
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">
-                            {tool.description}
-                          </p>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={tool.enabled}
-                        onCheckedChange={(checked) => updateToolStatus(tool.id, checked)}
-                      />
-                    </div>
+        {/* 模型和参数配置 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>模型和参数</CardTitle>
+            <CardDescription>选择语言模型和生成参数</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-2">
+              <Label htmlFor="agent-model">模型</Label>
+              <Select
+                value={agent.model}
+                onValueChange={(value) => updateBasicInfo('model', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择语言模型" />
+                </SelectTrigger>
+                <SelectContent>
+                  {modelOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
                   ))}
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" className="w-full">
-                  <Settings className="h-4 w-4 mr-2" />
-                  配置工具参数
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                选择底层语言模型将决定智能体的能力和成本
+              </p>
+            </div>
 
-          {/* 知识库选项卡 */}
-          <TabsContent value="knowledge">
-            <Card>
-              <CardHeader>
-                <CardTitle>知识库配置</CardTitle>
-                <CardDescription>上传文档以提高智能体的知识量</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="knowledge-base">启用知识库</Label>
+            <div>
+              <Label className="mb-2 block">温度 ({agent.temperature})</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">0.0</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={agent.temperature}
+                  onChange={(e) => updateBasicInfo('temperature', parseFloat(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-sm">1.0</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                较低的值使输出更确定，较高的值使输出更多样化
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="agent-instructions">系统指令</Label>
+              <Textarea
+                id="agent-instructions"
+                value={agent.instructions || ''}
+                onChange={(e) => updateBasicInfo('instructions', e.target.value)}
+                placeholder="给智能体的详细指令..."
+                rows={6}
+              />
+              <p className="text-sm text-muted-foreground">
+                系统指令定义智能体的行为、能力和限制
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* 工具集成 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>工具集成</CardTitle>
+            <CardDescription>启用智能体可以使用的工具</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {agent.tools && agent.tools.map(tool => (
+                <div key={tool.id} className="flex items-start space-x-3 p-3 border rounded-md">
+                  <Checkbox
+                    id={`tool-${tool.id}`}
+                    checked={!!tool.enabled}
+                    onCheckedChange={(checked) => updateToolStatus(tool.id, !!checked)}
+                  />
+                  <div className="flex-1">
+                    <Label
+                      htmlFor={`tool-${tool.id}`}
+                      className="text-base font-medium cursor-pointer"
+                    >
+                      {tool.name}
+                    </Label>
                     <p className="text-sm text-muted-foreground">
-                      允许智能体访问自定义知识
+                      {tool.description}
                     </p>
                   </div>
-                  <Switch
-                    id="knowledge-base"
-                    checked={agent.knowledge.enabled}
-                    onCheckedChange={(checked) => 
-                      setAgent(prev => ({
-                        ...prev,
-                        knowledge: {
-                          ...prev.knowledge,
-                          enabled: checked
-                        }
-                      }))
-                    }
-                  />
                 </div>
-
-                {agent.knowledge.enabled && (
-                  <>
-                    <Separator />
-                    <div className="bg-muted/50 rounded-lg border border-dashed border-border p-6 text-center">
-                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                      <h3 className="text-sm font-medium">拖放文档或点击上传</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        支持PDF、TXT、DOCX、MD等格式，最大50MB
-                      </p>
-                      <Button variant="secondary" size="sm" className="mt-4">
-                        选择文件
-                      </Button>
-                    </div>
-
-                    {agent.knowledge.sources.length === 0 ? (
-                      <div className="text-center py-6 text-muted-foreground">
-                        <p className="text-sm">尚未上传任何知识源</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <h3 className="text-sm font-medium">
-                          已上传知识源 ({agent.knowledge.sources.length})
-                        </h3>
-                        <div className="space-y-1">
-                          {agent.knowledge.sources.map((source, index) => (
-                            <div key={index} className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded">
-                              <div className="text-sm truncate">{source}</div>
-                              <Button variant="ghost" size="icon" className="h-7 w-7">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

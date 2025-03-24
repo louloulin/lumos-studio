@@ -76,7 +76,7 @@
     "sanitize-filename": "^1.6.3",
     "sonner": "^2.0.1",
     "tailwindcss-animate": "^1.0.7",
-    "uuid": "^9.0.0",
+    "uuid": "^9.0.1",
     "web-vitals": "^4.2.4"
   },
   "devDependencies": {
@@ -92,7 +92,7 @@
     "@types/react": "^18.2.8",
     "@types/react-dom": "^18.2.4",
     "@types/react-syntax-highlighter": "^15.5.9",
-    "@types/uuid": "^9.0.1",
+    "@types/uuid": "^9.0.8",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.14",
     "clsx": "^2.1.1",

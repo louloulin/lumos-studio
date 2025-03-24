@@ -186,7 +186,7 @@ importers:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.17)
       uuid:
-        specifier: ^9.0.0
+        specifier: ^9.0.1
         version: 9.0.1
       web-vitals:
         specifier: ^4.2.4
@@ -229,7 +229,7 @@ importers:
         specifier: ^15.5.9
         version: 15.5.13
       '@types/uuid':
-        specifier: ^9.0.1
+        specifier: ^9.0.8
         version: 9.0.8
       '@vitejs/plugin-react':
         specifier: ^4.3.4

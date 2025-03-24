@@ -26,6 +26,9 @@ import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
 import ChatPage from './pages/ChatPage'
 import AgentsPage from './pages/AgentsPage'
+import WorkflowPage from './pages/WorkflowPage'
+import WorkflowEditorPage from './pages/WorkflowEditorPage'
+import WorkflowRunPage from './pages/WorkflowRunPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -43,6 +46,7 @@ function Main() {
         if (path.includes('/chat')) return 'chat';
         if (path.includes('/agents')) return 'agents';
         if (path.includes('/whiteboard')) return 'whiteboard';
+        if (path.includes('/workflow')) return 'workflow';
         return 'home';
     });
     
@@ -53,6 +57,7 @@ function Main() {
             if (path.includes('/chat')) setCurrentPage('chat');
             else if (path.includes('/agents')) setCurrentPage('agents');
             else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
+            else if (path.includes('/workflow')) setCurrentPage('workflow');
             else setCurrentPage('home');
         };
         
@@ -224,6 +229,9 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
+                            <Route path="/workflow" element={<Main />} />
+                            <Route path="/workflow/editor/:id" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

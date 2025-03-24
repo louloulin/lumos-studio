@@ -14,7 +14,7 @@ import {
   LifeBuoy,
   LogOut,
   Bot,
-  GitBranch
+  Share2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
@@ -27,6 +27,7 @@ import AgentMarket from './AgentMarket';
 import AgentEditor from './AgentEditor';
 import SettingsPage from './SettingsPage';
 import WorkflowBuilder from './WorkflowBuilder';
+import AgentsPage from "../pages/AgentsPage";
 
 // 定义会话类型
 interface ChatSession {
@@ -41,8 +42,11 @@ interface ChatSession {
 // 视图类型
 type ViewType = 'chat' | 'market' | 'editor' | 'settings' | 'workflow' | 'agent-manager';
 
-// 工作区组件
-const Workspace: React.FC<{ currentPage?: string }> = ({ currentPage }) => {
+interface WorkspaceProps {
+  currentPage: string;
+}
+
+const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   // 状态管理
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -272,6 +276,26 @@ const Workspace: React.FC<{ currentPage?: string }> = ({ currentPage }) => {
 
   // 渲染主内容
   const renderMainContent = () => {
+    // 如果currentPage属性被提供，我们用它来决定显示哪个页面
+    if (currentPage) {
+      switch (currentPage) {
+        case 'agents':
+          return <AgentsPage />;
+        case 'workflow':
+          return <WorkflowBuilder />;
+        case 'whiteboard':
+          // 使用工作流组件代替不存在的Whiteboard组件
+          return <WorkflowBuilder />;
+        case 'chat':
+          // 如果是聊天页面，使用现有逻辑
+          break;
+        default:
+          // 如果没有匹配的页面，继续使用现有逻辑
+          break;
+      }
+    }
+    
+    // 使用现有的activeView逻辑作为后备
     if (activeView === 'chat' && currentSession) {
       return <MastraChat sessionId={currentSession.id} agentId={currentSession.agentId} />;
     } else if (activeView === 'market') {
@@ -405,8 +429,8 @@ const Workspace: React.FC<{ currentPage?: string }> = ({ currentPage }) => {
             if (isMobile) setMobileSidebarOpen(false);
           }}
         >
-          <GitBranch className="h-5 w-5" />
-          {!sidebarCollapsed && <span className="ml-2">工作流构建器</span>}
+          <Share2 className="h-5 w-5" />
+          {!sidebarCollapsed && <span className="ml-2">工作流</span>}
         </Button>
 
         <Button 

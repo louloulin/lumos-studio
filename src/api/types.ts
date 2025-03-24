@@ -51,7 +51,10 @@ export interface Agent {
   avatar?: string;
   instructions?: string;
   model?: string;
+  temperature?: number;
+  maxTokens?: number;
   tools?: AgentTool[];
+  systemAgent?: boolean; // 标记是否为系统智能体
 }
 
 // 智能体工具
@@ -60,6 +63,7 @@ export interface AgentTool {
   name: string;
   description: string;
   icon?: string;
+  enabled?: boolean;
   parameters?: ToolParameter[];
 }
 

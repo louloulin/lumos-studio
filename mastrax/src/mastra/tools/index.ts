@@ -55,6 +55,17 @@ export interface ToolParameter {
   default?: any;
 }
 
+// 定义日志类型
+export interface AgentLog {
+  id: string;
+  agentId: string;
+  operation: string;
+  timestamp: number;
+  details: any;
+  status: 'success' | 'error';
+  error?: string;
+}
+
 // 获取数据库路径
 const getDbPath = async () => {
   // 使用项目根目录的memory.db作为数据库文件
@@ -81,18 +92,73 @@ export const agentStorageTool = createTool({
   execute: async ({ context }) => {
     try {
       const { operation, agent, agentId } = context;
+      let result;
       
       switch (operation) {
         case 'get':
-          return await getAgent(agentId);
+          result = await getAgent(agentId);
+          await addAgentLog({
+            agentId: agentId || '',
+            operation: 'get',
+            timestamp: Date.now(),
+            details: { agentId },
+            status: result.success ? 'success' : 'error',
+            error: result.error,
+          });
+          return result;
+          
         case 'getAll':
-          return await getAllAgents();
+          result = await getAllAgents();
+          await addAgentLog({
+            agentId: 'all',
+            operation: 'getAll',
+            timestamp: Date.now(),
+            details: { count: result.data?.length || 0 },
+            status: result.success ? 'success' : 'error',
+            error: result.error,
+          });
+          return result;
+          
         case 'create':
-          return await createAgent(agent);
+          result = await createAgent(agent);
+          await addAgentLog({
+            agentId: result.data?.id || '',
+            operation: 'create',
+            timestamp: Date.now(),
+            details: { agent: result.data },
+            status: result.success ? 'success' : 'error',
+            error: result.error,
+          });
+          return result;
+          
         case 'update':
-          return await updateAgent(agent);
+          result = await updateAgent(agent);
+          await addAgentLog({
+            agentId: agent?.id || '',
+            operation: 'update',
+            timestamp: Date.now(),
+            details: { 
+              before: (await getAgent(agent?.id))?.data,
+              after: result.data 
+            },
+            status: result.success ? 'success' : 'error',
+            error: result.error,
+          });
+          return result;
+          
         case 'delete':
-          return await deleteAgent(agentId);
+          const agentToDelete = await getAgent(agentId);
+          result = await deleteAgent(agentId);
+          await addAgentLog({
+            agentId: agentId || '',
+            operation: 'delete',
+            timestamp: Date.now(),
+            details: { deletedAgent: agentToDelete.data },
+            status: result.success ? 'success' : 'error',
+            error: result.error,
+          });
+          return result;
+          
         default:
           return {
             success: false,
@@ -100,9 +166,18 @@ export const agentStorageTool = createTool({
           };
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      await addAgentLog({
+        agentId: context.agentId || context.agent?.id || '',
+        operation: context.operation,
+        timestamp: Date.now(),
+        details: { error: errorMessage },
+        status: 'error',
+        error: errorMessage,
+      });
       return {
         success: false,
-        error: `存储操作失败: ${error instanceof Error ? error.message : String(error)}`,
+        error: `存储操作失败: ${errorMessage}`,
       };
     }
   },
@@ -379,3 +454,116 @@ function getWeatherCondition(code: number): string {
   };
   return conditions[code] || 'Unknown';
 }
+
+// 读取日志数据文件
+const readAgentLogs = async (): Promise<AgentLog[]> => {
+  try {
+    const dbPath = await getDbPath();
+    const logsPath = path.join(path.dirname(dbPath), 'agent-logs.json');
+    
+    try {
+      const data = await fs.readFile(logsPath, 'utf-8');
+      return JSON.parse(data);
+    } catch (error) {
+      await fs.writeFile(logsPath, JSON.stringify([], null, 2), 'utf-8');
+      console.log(`已创建新的智能体日志文件: ${logsPath}`);
+      return [];
+    }
+  } catch (error) {
+    console.error('读取智能体日志失败:', error);
+    return [];
+  }
+};
+
+// 写入日志数据文件
+const writeAgentLogs = async (logs: AgentLog[]): Promise<boolean> => {
+  try {
+    const dbPath = await getDbPath();
+    const logsPath = path.join(path.dirname(dbPath), 'agent-logs.json');
+    
+    await fs.writeFile(logsPath, JSON.stringify(logs, null, 2), 'utf-8');
+    console.log(`智能体日志已保存至: ${logsPath}`);
+    return true;
+  } catch (error) {
+    console.error('写入智能体日志失败:', error);
+    return false;
+  }
+};
+
+// 添加日志记录
+const addAgentLog = async (log: Omit<AgentLog, 'id'>): Promise<boolean> => {
+  try {
+    const logs = await readAgentLogs();
+    const newLog: AgentLog = {
+      ...log,
+      id: `log-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    };
+    logs.push(newLog);
+    return await writeAgentLogs(logs);
+  } catch (error) {
+    console.error('添加日志记录失败:', error);
+    return false;
+  }
+};
+
+// 日志查询工具
+export const agentLogsTool = createTool({
+  id: 'agent-logs',
+  description: '查询智能体操作日志',
+  inputSchema: z.object({
+    operation: z.enum(['getAll', 'getByAgent']),
+    agentId: z.string().optional(),
+    startTime: z.number().optional(),
+    endTime: z.number().optional(),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    data: z.array(z.any()).optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    try {
+      const { operation, agentId, startTime, endTime } = context;
+      const logs = await readAgentLogs();
+      
+      let filteredLogs = logs;
+      
+      // 按时间范围过滤
+      if (startTime) {
+        filteredLogs = filteredLogs.filter(log => log.timestamp >= startTime);
+      }
+      if (endTime) {
+        filteredLogs = filteredLogs.filter(log => log.timestamp <= endTime);
+      }
+      
+      switch (operation) {
+        case 'getAll':
+          return {
+            success: true,
+            data: filteredLogs,
+          };
+        case 'getByAgent':
+          if (!agentId) {
+            return {
+              success: false,
+              error: '缺少智能体ID',
+            };
+          }
+          return {
+            success: true,
+            data: filteredLogs.filter(log => log.agentId === agentId),
+          };
+        default:
+          return {
+            success: false,
+            error: `不支持的操作: ${operation}`,
+          };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: `日志查询失败: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  },
+});

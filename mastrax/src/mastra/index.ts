@@ -8,6 +8,6 @@ export const mastra = new Mastra({
   agents: agents,
   logger: createLogger({
     name: 'Mastra',
-    level: 'info',
+    level: process.env.NODE_ENV === 'development' ? 'debug' : 'info'
   }),
 });

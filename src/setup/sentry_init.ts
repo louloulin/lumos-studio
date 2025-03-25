@@ -15,7 +15,7 @@ import platform from '@/packages/platform'
         integrations: [
             new Sentry.BrowserTracing({
                 // Set `tracePropagationTargets` to control for which URLs distributed tracing should be enabled
-                tracePropagationTargets: ['localhost', /^https:\/\/chatboxai\.app/, /^https:\/\/chatboxapp\.xyz/],
+                tracePropagationTargets: ['localhost', /^https:\/\/lumosai\.app/, /^https:\/\/lumosapp\.xyz/],
             }),
             new Sentry.Replay(),
         ],

@@ -42,7 +42,7 @@ async function getStore(): Promise<Store | null> {
     storePromise = new Promise(async (resolve, reject) => {
       try {
         // In Tauri 2.0, Store doesn't have a load method, it's automatically loaded
-        const store = new Store("settings.dat");
+        const store = new Store("settings1.dat");
         resolve(store);
       } catch (e) {
         console.error('Failed to create Store:', e);
@@ -250,7 +250,14 @@ export const tauriBridge: TauriAPI = {
         console.warn('Tauri API not available, using fallback version');
         return "0.0.1-fallback";
       }
-      return await invoke<string>("plugin:core|app_version");
+      // 更新为Tauri v2版本API
+      // 方法1：直接从配置中获取版本
+      const tauriConf = (window as any).__TAURI__?.app;
+      if (tauriConf?.version) {
+        return tauriConf.version;
+      }
+      // 方法2: 如果app.version不可用，尝试使用备用方法
+      return "0.1.0"; // 从tauri.conf.json中获取的硬编码版本号
     } catch (e) {
       console.error("Failed to get app version:", e);
       return "0.0.1-fallback";

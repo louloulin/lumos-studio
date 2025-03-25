@@ -1,18 +1,18 @@
-import { ChatboxAILicenseDetail, ChatboxAIModel, Message, MessageRole } from '@/shared/types'
+import { LumosAILicenseDetail, LumosAIModel, Message, MessageRole } from '@/shared/types'
 import Base, { onResultChange } from './base'
 import { API_ORIGIN } from '@/packages/remote'
-import { BaseError, ApiError, NetworkError, ChatboxAIAPIError } from './errors'
+import { BaseError, ApiError, NetworkError, LumosAIAPIError } from './errors'
 import { parseJsonOrEmpty } from '@/lib/utils'
 
-export const chatboxAIModels: ChatboxAIModel[] = ['chatboxai-3.5', 'chatboxai-4']
+export const lumosAIModels: LumosAIModel[] = ['lumosai-3.5', 'lumosai-4']
 
 interface Options {
     licenseKey?: string
-    chatboxAIModel?: ChatboxAIModel
+    lumosAIModel?: LumosAIModel
     licenseInstances?: {
         [key: string]: string
     }
-    licenseDetail?: ChatboxAILicenseDetail
+    licenseDetail?: LumosAILicenseDetail
     language: string
     temperature: number
 }
@@ -21,8 +21,8 @@ interface Config {
     uuid: string
 }
 
-export default class ChatboxAI extends Base {
-    public name = 'ChatboxAI'
+export default class LumosAI extends Base {
+    public name = 'LumosAI'
 
     public options: Options
     public config: Config
@@ -33,13 +33,13 @@ export default class ChatboxAI extends Base {
     }
 
     async callChatCompletion(rawMessages: Message[], signal?: AbortSignal, onResultChange?: onResultChange): Promise<string> {
-        const messages = await populateChatboxAIMessage(rawMessages)
+        const messages = await populateLumosAIMessage(rawMessages)
         const response = await this.post(
             `${API_ORIGIN}/api/ai/chat`,
             this.getHeaders(),
             {
                 uuid: this.config.uuid,
-                model: this.options.chatboxAIModel || 'chatboxai-3.5',
+                model: this.options.lumosAIModel || 'lumosai-3.5',
                 messages,
                 temperature: this.options.temperature,
                 language: this.options.language,
@@ -54,7 +54,7 @@ export default class ChatboxAI extends Base {
             }
             const data = JSON.parse(message)
             if (data.error) {
-                throw new ApiError(`Error from Chatbox AI: ${JSON.stringify(data)}`)
+                throw new ApiError(`Error from Lumos AI: ${JSON.stringify(data)}`)
             }
             const word = data.choices[0]?.delta?.content
             if (word !== undefined) {
@@ -97,9 +97,9 @@ export default class ChatboxAI extends Base {
                 if (!res.ok) {
                     const response = await res.text().catch((e) => '')
                     const errorCodeName = parseJsonOrEmpty(response)?.error?.code
-                    const chatboxAIError = ChatboxAIAPIError.fromCodeName(response, errorCodeName)
-                    if (chatboxAIError) {
-                        throw chatboxAIError
+                    const lumosAIError = LumosAIAPIError.fromCodeName(response, errorCodeName)
+                    if (lumosAIError) {
+                        throw lumosAIError
                     }
                     throw new ApiError(`Status Code ${res.status}, ${response}`)
                 }
@@ -139,9 +139,9 @@ export default class ChatboxAI extends Base {
                 if (!res.ok) {
                     const response = await res.text().catch((e) => '')
                     const errorCodeName = parseJsonOrEmpty(response)?.error?.code
-                    const chatboxAIError = ChatboxAIAPIError.fromCodeName(response, errorCodeName)
-                    if (chatboxAIError) {
-                        throw chatboxAIError
+                    const lumosAIError = LumosAIAPIError.fromCodeName(response, errorCodeName)
+                    if (lumosAIError) {
+                        throw lumosAIError
                     }
                     throw new ApiError(`Status Code ${res.status}, ${response}`)
                 }
@@ -165,7 +165,7 @@ export default class ChatboxAI extends Base {
 
 }
 
-export interface ChatboxAIMessage {
+export interface LumosAIMessage {
     role: MessageRole
     content: string
     pictures?: {
@@ -176,10 +176,10 @@ export interface ChatboxAIMessage {
     }[]
 }
 
-export async function populateChatboxAIMessage(rawMessages: Message[]): Promise<ChatboxAIMessage[]> {
-    const messages: ChatboxAIMessage[] = []
+export async function populateLumosAIMessage(rawMessages: Message[]): Promise<LumosAIMessage[]> {
+    const messages: LumosAIMessage[] = []
     for (const raw of rawMessages) {
-        const newMessage: ChatboxAIMessage = {
+        const newMessage: LumosAIMessage = {
             role: raw.role,
             content: raw.content,
         }

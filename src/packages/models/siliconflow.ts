@@ -1,5 +1,5 @@
 import { Message } from '@/shared/types'
-import { ApiError, ChatboxAIAPIError } from './errors'
+import { ApiError, LumosAIAPIError } from './errors'
 import Base, { onResultChange } from './base'
 
 interface Options {
@@ -34,7 +34,7 @@ export default class SiliconFlow extends Base {
                 e instanceof ApiError &&
                 e.message.includes('Invalid content type. image_url is only supported by certain models.')
             ) {
-                throw ChatboxAIAPIError.fromCodeName('model_not_support_image', 'model_not_support_image')
+                throw LumosAIAPIError.fromCodeName('model_not_support_image', 'model_not_support_image')
             }
             throw e
         }

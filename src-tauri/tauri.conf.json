@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Chatbox CE",
-  "version": "0.0.1",
-  "identifier": "xyz.chatboxapp.ce",
+  "productName": "Lumos Studio",
+  "version": "0.1.0",
+  "identifier": "com.lumos.studio",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -10,19 +10,29 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Chatbox CE",
-        "width": 1000,
-        "height": 950,
-        "resizable": true,
-        "fullscreen": false,
-        "label": "main"
-      }
-    ],
     "security": {
       "csp": null
-    }
+    },
+    "windows": [
+      {
+        "title": "Lumos Studio",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 375,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "label": "main",
+        "visible": true,
+        "maximized": false,
+        "transparent": false,
+        "shadow": true,
+        "theme": "Dark"
+      }
+    ],
+    "withGlobalTauri": true
   },
   "bundle": {
     "active": true,
@@ -33,6 +43,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
+    ],
+    "resources": [
+      "resources/mastrax_dist/**/*"
     ]
   },
   "plugins": {
@@ -52,6 +65,14 @@
     "opener": {
       "path": true,
       "allowed-origins": ["*"]
+    },
+    "http": {
+      "all": true,
+      "request": true,
+      "scope": ["http://localhost:4111/*"]
+    },
+    "process": {
+      "all": true
     }
   }
 }

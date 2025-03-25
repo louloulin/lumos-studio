@@ -1,125 +1,115 @@
 import React from 'react'
-import { Trans } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import { Message } from '@/shared/types'
 import { aiProviderNameHash } from '@/packages/models'
 import * as atoms from '@/stores/atoms'
 import * as settingActions from '@/stores/settingActions'
 import { useSetAtom } from 'jotai'
-import { ChatboxAIAPIError } from '@/packages/models/errors'
+import { LumosAIAPIError } from '@/packages/models/errors'
 import platform from '@/packages/platform'
 import { trackingEvent } from '@/packages/event'
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { cn } from "@/lib/utils"
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { cn } from '@/lib/utils'
 
 export default function MessageErrTips(props: { msg: Message }) {
     const { msg } = props
-    const setOpenSettingDialogAtom = useSetAtom(atoms.openSettingDialogAtom)
-    if (!msg.error) {
-        return null
-    }
+    const setOpenDialog = useSetAtom(atoms.openDialogAtom)
+    const setSetting = useSetAtom(atoms.settingsAtom)
+    const [onlyShowTips, setOnlyShowTips] = React.useState(false)
     const tips: React.ReactNode[] = []
-    let onlyShowTips = false 
-    if (msg.error.startsWith('API Error')) {
-        tips.push(
-            <Trans
-                i18nKey="api error tips"
-                values={{
-                    aiProvider: msg.aiProvider ? aiProviderNameHash[msg.aiProvider] : 'AI Provider',
-                }}
-                components={[
-                    <a
-                        className="underline hover:text-primary"
-                        href={`https://chatboxai.app/redirect_app/faqs/${settingActions.getLanguage()}`}
-                        target="_blank"
-                    ></a>,
-                ]}
-            />
-        )
-    } else if (msg.error.startsWith('Network Error')) {
-        tips.push(
-            <Trans
-                i18nKey="network error tips"
-                values={{
-                    host: msg.errorExtra?.['host'] || 'AI Provider',
-                }}
-            />
-        )
-        const proxy = settingActions.getProxy()
-        if (proxy) {
-            tips.push(<Trans i18nKey="network proxy error tips" values={{ proxy }} />)
+    
+    React.useEffect(() => {
+        if (msg.errorCode) {
+            setOnlyShowTips(true)
         }
-    } else if (msg.errorCode === 10003) {
-        tips.push(
-            <Trans
-                i18nKey="ai provider no implemented paint tips"
-                values={{
-                    aiProvider: msg.aiProvider ? aiProviderNameHash[msg.aiProvider] : 'AI Provider',
-                }}
-                components={[
-                    <button 
-                        className="cursor-pointer font-bold text-primary underline"
-                        onClick={() => setOpenSettingDialogAtom('ai')}
-                    ></button>,
-                ]}
-            />
-        )
-    } else if (msg.errorCode && ChatboxAIAPIError.getDetail(msg.errorCode)) {
-        const chatboxAIErrorDetail = ChatboxAIAPIError.getDetail(msg.errorCode)
-        if (chatboxAIErrorDetail) {
-            onlyShowTips = true
-            tips.push(
-                <Trans
-                    i18nKey={chatboxAIErrorDetail.i18nKey}
-                    values={{
-                        model: msg.model,
-                    }}
-                    components={{
-                        OpenSettingButton: (
-                            <button 
-                                className="cursor-pointer italic text-primary underline"
-                                onClick={() => setOpenSettingDialogAtom('ai')}
-                            ></button>
-                        ),
-                        OpenMorePlanButton: (
-                            <button 
-                                className="cursor-pointer italic text-primary underline" 
-                                onClick={() => {
-                                    platform.openLink('https://chatboxai.app/redirect_app/view_more_plans')
-                                    trackingEvent('click_view_more_plans_button_from_upgrade_error_tips', { event_category: 'user' })
-                                }}
-                            ></button>
-                        )
-                    }}
+    }, [msg.errorCode])
+    
+    const openSettingDialog = () => {
+        setOpenDialog('setting')
+        settingActions.setTab('ai')(setSetting)
+    }
+    
+    let content: React.ReactNode = null
+    
+    if (!msg.error) {
+        // pass
+    } else if (msg.error.includes('network error') || msg.error.includes('Failed to fetch') || msg.error.includes('Network Error')) {
+        if (msg.aiProvider) {
+            const host = aiProviderNameHash[msg.aiProvider]
+            content = (
+                <Trans i18nKey="network error tips"
+                    values={{ host }}
                 />
             )
         }
-    } else {
-        tips.push(
+    } else if (msg.error.includes('proxy')) {
+        const proxy = msg.error.match(/proxy\s*=\s*([^\s,]+)/)?.[1] || ''
+        content = (
+            <Trans i18nKey="network proxy error tips"
+                values={{ proxy }}
+            />
+        )
+    } else if (msg.error.includes('api error')) {
+        content = (
+            <Trans i18nKey="api error tips"
+                values={{ aiProvider: msg.aiProvider }}
+                components={{
+                    0: <a
+                        className='underline cursor-pointer'
+                        onClick={() => {
+                            platform.openLink('https://lumosai.app/redirect_app/faqs/en')
+                        }}
+                    />,
+                }}
+            />
+        )
+    } else if (msg.errorCode) {
+        content = (
             <Trans
-                i18nKey="unknown error tips"
-                components={[
-                    <a
-                        className="underline hover:text-primary"
-                        href={`https://chatboxai.app/redirect_app/faqs/${settingActions.getLanguage()}`}
-                        target="_blank"
-                    ></a>,
-                ]}
+                i18nKey={msg.error}
+                values={{
+                    model: msg.model,
+                }}
+                components={{
+                    OpenSettingButton: <a
+                        className='underline cursor-pointer'
+                        onClick={() => {
+                            openSettingDialog()
+                        }}
+                    />,
+                    OpenMorePlanButton: <a
+                        className='underline cursor-pointer'
+                        onClick={() => {
+                            window.open('https://lumosai.app/pricing?ref=app', '_blank')
+                        }}
+                    />,
+                }}
+            />
+        )
+    } else {
+        content = (
+            <Trans i18nKey="unknown error tips"
+                components={{
+                    0: <a
+                        className='underline cursor-pointer'
+                        onClick={() => {
+                            trackingEvent('open_faq')
+                            platform.openLink('https://lumosai.app/redirect_app/faqs/en')
+                        }}
+                    />,
+                }}
             />
         )
     }
-    return (
-        <Alert variant="destructive" className="mt-2 mb-4">
+    
+    if (content) {
+        tips.push(React.cloneElement(content as React.ReactElement, { key: 'error-tip' }))
+    }
+    
+    return tips.length === 0 ? null : (
+        <Alert variant="destructive" className={cn("mb-4 dark:text-red-400 text-red-700", onlyShowTips && 'bg-transparent border-transparent')}>
             <AlertDescription>
-                <div className="font-semibold">
-                    {tips.map((tip, i) => (<span key={i}>{tip}</span>))}
-                </div>
-                {
-                    !onlyShowTips && (
-                        <div className="mt-2 text-sm opacity-80">
-                            {msg.error}
-                        </div>
-                    )
-                }
+                {tips}
             </AlertDescription>
         </Alert>
     )

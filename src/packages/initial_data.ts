@@ -57,7 +57,7 @@ export const defaultSessionsForEN: Session[] = [
         id: 'e22ab364-4681-4e24-aaba-461ed0fccfd3',
         name: 'Travel Guide (Example)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/travel.png',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/travel.png',
         messages: [
             {
                 id: 'a639e972-10b7-4a67-8f3d-bf46e1e94c68',
@@ -79,13 +79,13 @@ export const defaultSessionsForEN: Session[] = [
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:24',
+        copilotId: 'lumos-featured:24',
     },
     {
         id: '55d92e88-02af-4c3b-a378-aa0a1970abb1',
         name: 'Social Media Influencer (Example)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/twitter.png',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/twitter.png',
         messages: [
             {
                 id: 'f8f341f4-9a13-448d-becd-b8d07c31f8dd',
@@ -95,25 +95,25 @@ export const defaultSessionsForEN: Session[] = [
             },
             {
                 id: 'e99f80e0-b5a4-4a4d-954e-9ad20c8465e7',
-                content: 'Tweet out to let everyone know: The latest version of Chatbox has been released',
+                content: 'Tweet out to let everyone know: The latest version of Lumos has been released',
                 role: 'user',
             },
             {
                 id: 'eb6218ad-439d-4e15-847b-0382f844f96e',
                 content:
-                    '"Exciting news! The latest version of Chatbox has just been released. Get ready to experience amazing features and seamless AI conversations. Upgrade now and unleash your productivity potential! #Chatbox #MessagingApp #Upgrade"',
+                    '"Exciting news! The latest version of Lumos has just been released. Get ready to experience amazing features and seamless AI conversations. Upgrade now and unleash your productivity potential! #Lumos #MessagingApp #Upgrade"',
                 role: 'assistant',
                 model: 'unknown',
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:33',
+        copilotId: 'lumos-featured:33',
     },
     {
         id: '35df5a96-b612-406a-985b-3ab4d2c481ff',
         name: 'Software Developer (Example)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/programmer.png',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/programmer.png',
         messages: [
             {
                 id: 'a700be6c-cbdd-43a3-b572-49e7a921c059',
@@ -135,13 +135,13 @@ export const defaultSessionsForEN: Session[] = [
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:35',
+        copilotId: 'lumos-featured:35',
     },
     {
         id: '776eac23-7b4a-40da-91cd-f233bb4742ed',
         name: 'Translator (Example)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/translator.jpeg',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/translator.jpeg',
         messages: [
             {
                 id: '4f609d56-5e6a-40b7-8e32-7b3ba8a9a990',
@@ -198,7 +198,7 @@ export const defaultSessionsForEN: Session[] = [
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:56',
+        copilotId: 'lumos-featured:56',
     },
 ]
 
@@ -207,7 +207,7 @@ export const defaultSessionsForCN: Session[] = [
         id: '81cfc426-48b4-4a13-ad42-bfcfc4544299',
         name: '小红书文案生成器 (示例)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/xhs.webp',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/xhs.webp',
         messages: [
             {
                 id: '7a0de212-2790-49dd-a47a-b1cf67cfb581',
@@ -216,25 +216,25 @@ export const defaultSessionsForCN: Session[] = [
             },
             {
                 id: '49deeb2b-db25-462e-9886-ff94efca70d2',
-                content: 'Chatbox 最新版本发布啦',
+                content: 'Lumos 最新版本发布啦',
                 role: 'user',
             },
             {
                 id: '014f9bf6-a164-4866-87d9-558db3acbef9',
                 content:
-                    '小仙女们，Chatbox 又双叒叕更新啦！这次版本新增了好多好多小细节哦，让我们快来看看吧~✨✨✨\n\n首先，Chatbox 在此次更新中为大家加入了许多优化体验！让聊天变得更加愉快、更加流畅。而且还有一些小搭档的出现，帮助你更高效地完成工作🔥🔥🔥\n\n此外，Chatbox 为大家特别准备了一个新的 AI 服务：Chatbox AI，可以直接使用哦，再也不用折腾 API KEY 和技术术语啦💗💗💗💗\n\n最后，记得分享和转发这篇笔记让更多小伙伴们一起使用，分享快乐哦😁😁😁😁\n\n快来下载最新版的 Chatbox，开启与小伙伴们的新生活吧！\n💬 #Chatbox新版本 #AI神器 #人生苦短我用Chatbox#',
+                    '小仙女们，Lumos 又双叒叕更新啦！这次版本新增了好多好多小细节哦，让我们快来看看吧~✨✨✨\n\n首先，Lumos 在此次更新中为大家加入了许多优化体验！让聊天变得更加愉快、更加流畅。而且还有一些小搭档的出现，帮助你更高效地完成工作🔥🔥🔥\n\n此外，Lumos 为大家特别准备了一个新的 AI 服务：Lumos AI，可以直接使用哦，再也不用折腾 API KEY 和技术术语啦💗💗💗💗\n\n最后，记得分享和转发这篇笔记让更多小伙伴们一起使用，分享快乐哦😁😁😁😁\n\n快来下载最新版的 Lumos，开启与小伙伴们的新生活吧！\n💬 #Lumos新版本 #AI神器 #人生苦短我用Lumos#',
                 role: 'assistant',
                 model: 'unknown',
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:7',
+        copilotId: 'lumos-featured:7',
     },
     {
         id: '8732ec08-b23c-4b5e-8f65-d63d808f970f',
         name: '夸夸机 (示例)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/9fa8f1eb09e717d110d614d7474cbc591381206547520499117.gif',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/9fa8f1eb09e717d110d614d7474cbc591381206547520499117.gif',
         messages: [
             {
                 id: '2045db61-b350-43b1-b3f2-442d68d379aa',
@@ -256,13 +256,13 @@ export const defaultSessionsForCN: Session[] = [
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:23',
+        copilotId: 'lumos-featured:23',
     },
     {
         id: '3e091ac6-ebfa-42c9-b125-c67ac2d45ee1',
         name: '翻译助手 (示例)',
         type: 'chat',
-        picUrl: 'https://static.chatboxai.app/copilot-avatar/translator.jpeg',
+        picUrl: 'https://static.lumosai.app/copilot-avatar/translator.jpeg',
         messages: [
             {
                 id: 'ed9b9e74-1715-446e-b3c1-bed565c4878c',
@@ -283,7 +283,7 @@ export const defaultSessionsForCN: Session[] = [
                 generating: false,
             },
         ],
-        copilotId: 'chatbox-featured:21',
+        copilotId: 'lumos-featured:21',
     },
     ...defaultSessionsForEN,
 ]

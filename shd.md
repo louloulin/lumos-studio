@@ -182,7 +182,7 @@
 21. **StyledMenu 组件** - 将 MUI Menu 替换为 shadcn/ui DropdownMenu，改进了样式和交互方式
 22. **AI设置相关组件** - 将 OpenAISetting、ClaudeSetting、SiliconFlowSetting 和 PPIOSetting 从 MUI 迁移到 shadcn/ui 组件
 23. **LMStudioSetting 组件** - 将 LMStudioSetting 组件从 MUI 迁移到 shadcn/ui 组件，实现了更加现代化的表单布局
-24. **ChatboxAISetting 组件** - 将 ChatboxAISetting 组件从 MUI 迁移到 shadcn/ui 组件，添加了许可证详情卡片和激活功能
+24. **LumosAISetting 组件** - 将 LumosAISetting 组件从 MUI 迁移到 shadcn/ui 组件，添加了许可证详情卡片和激活功能
 25. **AdvancedSettingTab 组件** - 将 AdvancedSettingTab 组件从 MUI 迁移到 shadcn/ui 组件，采用了全新的手风琴布局
 26. **useAppTheme 钩子** - 将 MUI 的 createTheme 替换为了 shadcn/ui 的主题系统，简化了主题处理逻辑
 27. **Card 组件** - 创建了 shadcn/ui 风格的 Card 组件，用于许可证详情等信息展示

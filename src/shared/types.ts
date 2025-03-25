@@ -71,13 +71,14 @@ export function createMessage(role: MessageRole = MessageRoleEnum.User, content:
 }
 
 export enum ModelProvider {
-    ChatboxAI = 'chatbox-ai',
+    LumosAI = 'lumos-ai',
     OpenAI = 'openai',
     Claude = 'claude',
     Ollama = 'ollama',
     SiliconFlow = 'silicon-flow',
     LMStudio = 'lm-studio',
     PPIO = 'ppio',
+    Mastra = 'mastra',
 }
 
 export interface ModelSettings {
@@ -107,13 +108,13 @@ export interface ModelSettings {
     // chatglm-6b
     chatglm6bUrl: string
 
-    // chatbox-ai
+    // lumos-ai
     licenseKey?: string
-    chatboxAIModel?: ChatboxAIModel
+    lumosAIModel?: LumosAIModel
     licenseInstances?: {
         [key: string]: string
     }
-    licenseDetail?: ChatboxAILicenseDetail
+    licenseDetail?: LumosAILicenseDetail
 
     // ollama
     ollamaHost: string
@@ -128,6 +129,9 @@ export interface ModelSettings {
     ppioHost: string
     ppioKey: string
     ppioModel: string
+    
+    // mastra
+    mastraAgentName: string
 
     temperature: number
     topP: number
@@ -209,14 +213,14 @@ export enum Theme {
 }
 
 export interface RemoteConfig {
-    setting_chatboxai_first: boolean
+    setting_lumosai_first: boolean
     product_ids: number[]
 }
 
-export interface ChatboxAILicenseDetail {
-    type: ChatboxAIModel
+export interface LumosAILicenseDetail {
+    type: LumosAIModel
     name: string
-    defaultModel: ChatboxAIModel
+    defaultModel: LumosAIModel
     remaining_quota_35: number
     remaining_quota_4: number
     remaining_quota_image: number
@@ -226,4 +230,4 @@ export interface ChatboxAILicenseDetail {
     token_expire_time: string | null | undefined
 }
 
-export type ChatboxAIModel = 'chatboxai-3.5' | 'chatboxai-4'
+export type LumosAIModel = 'lumosai-3.5' | 'lumosai-4'

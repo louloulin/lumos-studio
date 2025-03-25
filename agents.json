@@ -1,0 +1,24 @@
+[
+  {
+    "name": "新建智能体312123",
+    "description": "这是一个新建的智能体，您可以根据需要自定义它的行为和功能。",
+    "instructions": "你是一个有用的AI助手，专注于提供准确和有帮助的回答。请始终保持友好和专业的态度。",
+    "model": "gpt-4-turbo",
+    "temperature": 0.7,
+    "max_tokens": 4000,
+    "id": "agent-1742800695010-gedr81smp",
+    "createdAt": 1742800695010,
+    "updatedAt": 1742800695010
+  },
+  {
+    "name": "新建智能体123123",
+    "description": "这是一个新建的智能体，您可以根据需要自定义它的行为和功能。",
+    "instructions": "你是一个有用的AI助手，专注于提供准确和有帮助的回答。请始终保持友好和专业的态度。",
+    "model": "gpt-4-turbo",
+    "temperature": 0.7,
+    "max_tokens": 4000,
+    "id": "agent-1742800753860-p8wrzcwzi",
+    "createdAt": 1742800753860,
+    "updatedAt": 1742800753860
+  }
+]

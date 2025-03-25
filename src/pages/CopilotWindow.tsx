@@ -134,7 +134,7 @@ export default function CopilotWindow(props: Props) {
                 <Tabs defaultValue="my" className="w-full">
                     <TabsList>
                         <TabsTrigger value="my">{t('My Copilots')}</TabsTrigger>
-                        <TabsTrigger value="featured">{t('Chatbox Featured')}</TabsTrigger>
+                        <TabsTrigger value="featured">{t('Lumos Featured')}</TabsTrigger>
                     </TabsList>
                     
                     <TabsContent value="my">
@@ -340,7 +340,7 @@ function CopilotForm(props: CopilotFormProps) {
                             checked={copilotEdit.shared}
                             onCheckedChange={(checked: boolean) => setCopilotEdit({ ...copilotEdit, shared: checked })}
                         />
-                        <Label htmlFor="share">{t('Share with Chatbox')}</Label>
+                        <Label htmlFor="share">{t('Share with Lumos')}</Label>
                     </div>
                     
                     <div className="flex gap-2">

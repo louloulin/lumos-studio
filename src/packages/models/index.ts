@@ -1,17 +1,18 @@
 import OpenAI from './openai'
 import { Settings, Config, ModelProvider, SessionType } from '@/shared/types'
-import ChatboxAI from './chatboxai'
+import LumosAI from './lumosai'
 import Ollama from './ollama'
 import SiliconFlow from './siliconflow'
 import LMStudio from './lmstudio'
 import Claude from './claude'
 import PPIO from './ppio'
+import Mastra from './mastra'
 
 
 export function getModel(setting: Settings, config: Config) {
     switch (setting.aiProvider) {
-        case ModelProvider.ChatboxAI:
-            return new ChatboxAI(setting, config)
+        case ModelProvider.LumosAI:
+            return new LumosAI(setting, config)
         case ModelProvider.OpenAI:
             return new OpenAI(setting)
         case ModelProvider.LMStudio:
@@ -24,6 +25,8 @@ export function getModel(setting: Settings, config: Config) {
             return new SiliconFlow(setting)
         case ModelProvider.PPIO:
             return new PPIO(setting)
+        case ModelProvider.Mastra:
+            return new Mastra(setting, config)
         default:
             throw new Error('Cannot find model with provider: ' + setting.aiProvider)
     }
@@ -32,17 +35,18 @@ export function getModel(setting: Settings, config: Config) {
 export const aiProviderNameHash = {
     [ModelProvider.OpenAI]: 'OpenAI API',
     [ModelProvider.Claude]: 'Claude API',
-    [ModelProvider.ChatboxAI]: 'Chatbox AI',
+    [ModelProvider.LumosAI]: 'Lumos AI',
     [ModelProvider.LMStudio]: 'LMStudio',
     [ModelProvider.Ollama]: 'Ollama',
     [ModelProvider.SiliconFlow]: 'SiliconCloud API',
     [ModelProvider.PPIO]: 'PPIO',
+    [ModelProvider.Mastra]: 'Mastra',
 }
 
 export const AIModelProviderMenuOptionList = [
     {
-        value: ModelProvider.ChatboxAI,
-        label: aiProviderNameHash[ModelProvider.ChatboxAI],
+        value: ModelProvider.LumosAI,
+        label: aiProviderNameHash[ModelProvider.LumosAI],
         featured: true,
         disabled: false,
     },
@@ -76,6 +80,11 @@ export const AIModelProviderMenuOptionList = [
         label: aiProviderNameHash[ModelProvider.PPIO],
         disabled: false,
     },
+    {
+        value: ModelProvider.Mastra,
+        label: aiProviderNameHash[ModelProvider.Mastra],
+        disabled: false,
+    },
 ]
 
 export function getModelDisplayName(settings: Settings, sessionType: SessionType): string {
@@ -94,9 +103,9 @@ export function getModelDisplayName(settings: Settings, sessionType: SessionType
             return settings.model || 'unknown'
         case ModelProvider.Claude:
             return settings.claudeModel || 'unknown'
-        case ModelProvider.ChatboxAI:
-            const model = settings.chatboxAIModel || 'chatboxai-3.5'
-            return model.replace('chatboxai-', 'Chatbox AI ')
+        case ModelProvider.LumosAI:
+            const model = settings.lumosAIModel || 'lumosai-3.5'
+            return model.replace('lumosai-', 'Lumos AI ')
         case ModelProvider.Ollama:
             return `Ollama (${settings.ollamaModel})`
         case ModelProvider.LMStudio:
@@ -105,6 +114,8 @@ export function getModelDisplayName(settings: Settings, sessionType: SessionType
             return `SiliconCloud (${settings.siliconCloudModel})`
         case ModelProvider.PPIO:
             return `PPIO (${settings.ppioModel})`
+        case ModelProvider.Mastra:
+            return `Mastra (${settings.mastraAgentName})`
         default:
             return 'unknown'
     }

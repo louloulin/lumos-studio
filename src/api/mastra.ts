@@ -103,12 +103,15 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具执行创建操作 - 简化参数传递
-      const result = await agentStorageTool.execute({
-        data: {
-          operation: 'create',
-          agent: agentParams
-        }
+      // 确保tools字段已经是字符串
+      if (agentParams.tools && typeof agentParams.tools !== 'string') {
+        agentParams.tools = JSON.stringify(agentParams.tools);
+      }
+      
+      // 使用类型断言修复类型错误
+      const result = await (agentStorageTool.execute as any)({
+        operation: 'create',
+        agent: agentParams
       });
       
       if (!result.success) {
@@ -128,12 +131,15 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具执行更新操作
-      const result = await agentStorageTool.execute({
-        data: {
-          operation: 'update',
-          agent: { id: agentId, ...agentParams }
-        }
+      // 确保tools字段已经是字符串
+      if (agentParams.tools && typeof agentParams.tools !== 'string') {
+        agentParams.tools = JSON.stringify(agentParams.tools);
+      }
+      
+      // 使用类型断言和直接参数传递
+      const result = await (agentStorageTool.execute as any)({
+        operation: 'update',
+        agent: { id: agentId, ...agentParams }
       });
       
       if (!result.success) {
@@ -153,12 +159,10 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具执行删除操作
-      const result = await agentStorageTool.execute({
-        data: {
-          operation: 'delete',
-          agentId
-        }
+      // 使用类型断言和直接参数传递
+      const result = await (agentStorageTool.execute as any)({
+        operation: 'delete',
+        agentId
       });
       
       if (!result.success) {
@@ -179,11 +183,9 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具获取所有智能体
-      const result = await agentStorageTool.execute({
-        data: {
-          operation: 'getAll'
-        }
+      // 使用类型断言和直接参数传递
+      const result = await (agentStorageTool.execute as any)({
+        operation: 'getAll'
       });
       
       if (!result.success) {
@@ -192,7 +194,7 @@ export const MastraAPI = {
       
       return result.data || [];
     } catch (error) {
-      console.error('Failed to get all agents:', error);
+      console.error('Failed to get agents:', error);
       return [];
     }
   },
@@ -204,12 +206,10 @@ export const MastraAPI = {
       // 获取agent-storage工具
       const agentStorageTool = client.getTool('agent-storage');
       
-      // 直接调用工具获取智能体详情
-      const result = await agentStorageTool.execute({
-        data: {
-          operation: 'get',
-          agentId
-        }
+      // 使用类型断言和直接参数传递
+      const result = await (agentStorageTool.execute as any)({
+        operation: 'get',
+        agentId
       });
       
       if (!result.success) {

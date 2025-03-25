@@ -1,8 +1,25 @@
 import { openai } from '@ai-sdk/openai';
-import { Agent } from '@mastra/core/agent';
-import { weatherTool, agentStorageTool, type AgentData } from '../tools';
+import { Agent as MastraAgent } from '@mastra/core/agent';
+import { weatherTool, agentStorageTool } from '../tools';
 import { createQwen } from 'qwen-ai-provider';
 import { Memory } from '@mastra/memory';
+import { z } from 'zod';
+import type { Agent as DbAgent, AgentLog } from '../db/schema';
+
+// 定义智能体数据类型
+export interface AgentData {
+  id: string;
+  name: string;
+  description?: string | null;
+  instructions?: string | null;
+  model?: string | null;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  tools?: string | null;
+  systemAgent?: number | null;
+  createdAt: number;
+  updatedAt: number;
+}
 
 // 创建不同模型提供商的实例
 const qwen = createQwen({
@@ -13,8 +30,8 @@ const qwen = createQwen({
 // 创建不同类型的智能体
 export const agents = {
   // 天气助手
-  weatherAssistant: new Agent({
-    name: 'WeatherAssistant',
+  weatherAssistant: new MastraAgent({
+    name: 'Agent',
     instructions: `
       You are a thoughtful weather assistant that provides accurate weather information with clear reasoning.
 
@@ -41,7 +58,7 @@ export const agents = {
   }),
 
   // 通用助手
-  generalAssistant: new Agent({
+  generalAssistant: new MastraAgent({
     name: 'GeneralAssistant',
     instructions: `
       You are a helpful, friendly, and versatile assistant capable of assisting with a wide range of tasks.
@@ -62,7 +79,7 @@ export const agents = {
   }),
 
   // 客户支持智能体
-  customerSupport: new Agent({
+  customerSupport: new MastraAgent({
     name: 'CustomerSupport',
     instructions: `
       You are a professional customer support agent for a software company.
@@ -87,7 +104,7 @@ export const agents = {
   }),
 
   // 创意写作助手
-  creativeWriter: new Agent({
+  creativeWriter: new MastraAgent({
     name: 'CreativeWriter',
     instructions: `
       You are a creative writing assistant with expertise in various writing styles and formats.
@@ -112,7 +129,7 @@ export const agents = {
   }),
 
   // 智能体管理助手
-  agentManager: new Agent({
+  agentManager: new MastraAgent({
     name: 'AgentManager',
     instructions: `
       你是一个智能体管理助手，专门负责创建、更新、查询和删除智能体配置。
@@ -150,8 +167,8 @@ export function getAgentNames(): string[] {
 }
 
 // 根据名称获取智能体
-export function getAgentByName(name: string): Agent | undefined {
-  return (agents as Record<string, Agent>)[name];
+export function getAgentByName(name: string): MastraAgent | undefined {
+  return (agents as Record<string, MastraAgent>)[name];
 }
 
 // 获取已安装的智能体列表
@@ -162,13 +179,11 @@ export async function getInstalledAgents(): Promise<AgentData[]> {
   }
 
   try {
-    const result = await agentStorageTool.execute({
-      context: {
-        operation: 'getAll'
-      }
-    });
+    const result = await (agentStorageTool.execute as any)({
+      operation: 'getAll'
+    }) as { success: boolean; data?: AgentData[]; error?: string };
 
-    if (result.success) {
+    if (result.success && result.data) {
       return result.data;
     } else {
       console.error('获取智能体列表失败:', result.error);
@@ -188,14 +203,12 @@ export async function getInstalledAgent(agentId: string): Promise<AgentData | nu
   }
 
   try {
-    const result = await agentStorageTool.execute({
-      context: {
-        operation: 'get',
-        agentId
-      }
-    });
+    const result = await (agentStorageTool.execute as any)({
+      operation: 'get',
+      agentId
+    }) as { success: boolean; data?: AgentData; error?: string };
 
-    if (result.success) {
+    if (result.success && result.data) {
       return result.data;
     } else {
       console.error('获取智能体失败:', result.error);

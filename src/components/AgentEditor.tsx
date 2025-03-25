@@ -101,21 +101,26 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
   };
 
   // 保存智能体
-  const saveAgent = async () => {
+  const handleSave = async () => {
+    if (!agent.name) {
+      setErrorMessage('智能体名称不能为空');
+      return;
+    }
+
     setLoading(true);
-    setErrorMessage(null);
-    
     try {
-      // 创建或更新智能体
-      let savedAgent: Agent | null;
+      // 打印保存前的智能体数据，用于调试
+      console.log('保存智能体数据:', JSON.stringify(agent, null, 2));
       
+      let savedAgent;
       if (agentId === 'new-agent' || !agentId) {
-        // 创建新智能体
         savedAgent = await agentService.createAgent(agent);
       } else {
-        // 更新现有智能体
         savedAgent = await agentService.updateAgent(agent);
       }
+      
+      // 打印保存后的结果
+      console.log('保存结果:', savedAgent);
       
       if (savedAgent) {
         setAgent(savedAgent);
@@ -152,7 +157,7 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
           </Button>
           <Button 
             size="sm" 
-            onClick={saveAgent} 
+            onClick={handleSave} 
             disabled={!isDirty || loading}
           >
             {loading ? (

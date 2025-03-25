@@ -118,12 +118,36 @@ export class AgentService {
    */
   async getAllAgents(): Promise<Agent[]> {
     try {
-      // 获取本地存储的智能体
-      const localAgents = await this.getLocalAgents();
-      // 获取系统智能体
-      const mastraAgents = await this.getMastraAgents();
-      // 合并并返回
-      return [...localAgents, ...mastraAgents];
+      // 从API获取所有智能体
+      const response = await MastraAPI.getAllAgents();
+      
+      if (!response || !Array.isArray(response)) {
+        return [];
+      }
+      
+      // 处理每个智能体，确保tools字段被正确解析
+      return response.map(agent => {
+        let tools = [];
+        if (agent.tools && typeof agent.tools === 'string') {
+          try {
+            tools = JSON.parse(agent.tools);
+          } catch (e) {
+            console.warn(`解析智能体ID ${agent.id} 的工具字符串失败`, e);
+          }
+        }
+        
+        return {
+          id: agent.id,
+          name: agent.name,
+          description: agent.description || '',
+          instructions: agent.instructions || '',
+          model: agent.model || 'gpt-4o',
+          temperature: agent.temperature || 0.7,
+          maxTokens: agent.maxTokens || 4000,
+          tools,
+          systemAgent: agent.systemAgent || false
+        };
+      });
     } catch (error) {
       console.error('获取所有智能体失败:', error);
       return [];
@@ -153,22 +177,35 @@ export class AgentService {
    */
   async getAgent(id: string): Promise<Agent | null> {
     try {
-      // 首先尝试获取本地智能体
-      try {
-        const agent = await MastraAPI.getAgent(id);
-        if (agent) {
-          return {
-            ...agent,
-            systemAgent: agent.systemAgent || false
-          };
-        }
-      } catch (localError) {
-        console.warn(`从本地获取智能体 ${id} 失败:`, localError);
+      // 从Mastra API获取智能体
+      const response = await MastraAPI.getAgent(id);
+      
+      if (!response) {
+        return null;
       }
       
-      // 如果本地获取失败，尝试获取系统智能体
-      const mastraAgents = await this.getMastraAgents();
-      return mastraAgents.find(agent => agent.id === id) || null;
+      // 解析tools字段
+      let tools = [];
+      if (response.tools && typeof response.tools === 'string') {
+        try {
+          tools = JSON.parse(response.tools);
+        } catch (e) {
+          console.warn(`解析智能体ID ${id} 的工具字符串失败`, e);
+        }
+      }
+      
+      // 构建智能体对象
+      return {
+        id: response.id,
+        name: response.name,
+        description: response.description || '',
+        instructions: response.instructions || '',
+        model: response.model || 'gpt-4o',
+        temperature: response.temperature || 0.7,
+        maxTokens: response.maxTokens || 4000,
+        tools,
+        systemAgent: response.systemAgent || false
+      };
     } catch (error) {
       console.error(`获取智能体 ${id} 失败:`, error);
       return null;
@@ -188,17 +225,28 @@ export class AgentService {
         model: agent.model || 'gpt-4o',
         temperature: agent.temperature || 0.7,
         maxTokens: agent.maxTokens || 4000,
-        tools: agent.tools || [],
+        tools: JSON.stringify(agent.tools || []),  // 确保工具数组转换为JSON字符串
         systemAgent: false
       };
       
       // 调用Mastra API创建智能体
       const response = await MastraAPI.createAgent(createParams);
       
+      // 确保返回的数据中tools是数组格式
+      let tools = agent.tools || [];
+      if (response.tools && typeof response.tools === 'string') {
+        try {
+          tools = JSON.parse(response.tools);
+        } catch (e) {
+          console.warn('解析工具字符串失败，使用原始工具数组', e);
+        }
+      }
+      
       // 返回创建的智能体
       return {
         ...agent,
         id: response.id || this.generateUniqueId(),
+        tools,
         systemAgent: false
       };
     } catch (error) {
@@ -227,16 +275,28 @@ export class AgentService {
         model: agent.model || 'gpt-4o',
         temperature: agent.temperature || 0.7,
         maxTokens: agent.maxTokens || 4000,
-        tools: agent.tools || [],
-        systemAgent: false
+        tools: JSON.stringify(agent.tools || []),  // 确保工具数组转换为JSON字符串
       };
       
-      // 调用Mastra API更新智能体
-      await MastraAPI.updateAgent(agent.id, updateParams);
+      // 调用API更新智能体
+      const response = await MastraAPI.updateAgent(agent.id, updateParams);
       
-      return agent;
+      // 解析返回数据中的tools字段
+      let tools = agent.tools || [];
+      if (response && response.tools && typeof response.tools === 'string') {
+        try {
+          tools = JSON.parse(response.tools);
+        } catch (e) {
+          console.warn(`解析更新后的智能体工具字符串失败`, e);
+        }
+      }
+      
+      return {
+        ...agent,
+        tools
+      };
     } catch (error) {
-      console.error(`更新智能体 ${agent.id} 失败:`, error);
+      console.error('更新智能体失败:', error);
       return null;
     }
   }

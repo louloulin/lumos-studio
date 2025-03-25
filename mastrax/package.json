@@ -13,7 +13,8 @@
     "studio": "drizzle-kit studio",
     "migrate": "tsx src/mastra/db/migrate.ts",
     "test:db": "tsx src/mastra/db/test.ts",
-    "test:logs": "tsx src/mastra/logging/test.ts"
+    "test:logs": "tsx src/mastra/logging/test.ts",
+    "test:agents": "tsx src/mastra/agents/test.ts"
   },
   "keywords": [],
   "author": "",

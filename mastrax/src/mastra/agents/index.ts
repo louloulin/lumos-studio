@@ -30,8 +30,8 @@ const qwen = createQwen({
 // 创建不同类型的智能体
 export const agents = {
   // 天气助手
-  weatherAssistant: new MastraAgent({
-    name: 'Agent',
+  agent: new MastraAgent({
+    name: 'agent',
     instructions: `
       You are a thoughtful weather assistant that provides accurate weather information with clear reasoning.
 
@@ -158,8 +158,6 @@ export const agents = {
   }),
 };
 
-// 默认导出的agent（保持向后兼容）
-export const agent = agents.weatherAssistant;
 
 // 辅助函数，用于获取所有智能体名称
 export function getAgentNames(): string[] {

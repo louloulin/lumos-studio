@@ -19,7 +19,29 @@ import { textToSpeech, speakWithWebSpeech } from './speech';
 // Get the Mastra service URL from the Tauri backend
 async function getMastraUrl(): Promise<string> {
   try {
-    return await invoke('get_mastra_url');
+    // 添加重试机制
+    let retries = 0;
+    const maxRetries = 3;
+    let lastError: any = null;
+    
+    while (retries < maxRetries) {
+      try {
+        const url = await invoke('get_mastra_url');
+        return url;
+      } catch (error) {
+        lastError = error;
+        console.warn(`Failed to get Mastra service URL (attempt ${retries + 1}/${maxRetries}):`, error);
+        retries++;
+        // 等待一小段时间后重试
+        if (retries < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+        }
+      }
+    }
+    
+    // 所有重试都失败了
+    console.error('All attempts to get Mastra service URL failed:', lastError);
+    return 'http://localhost:4112'; // 修改默认端口为4112
   } catch (error) {
     console.error('Failed to get Mastra service URL:', error);
     return 'http://localhost:4112'; // 修改默认端口为4112
@@ -226,10 +248,33 @@ export const MastraAPI = {
   // 检查Mastra服务是否运行
   async isRunning(): Promise<boolean> {
     try {
-      const client = await getClient();
-      // 简单调用获取智能体列表API判断服务是否可用
-      await client.getAgents();
-      return true;
+      // 添加重试机制
+      let retries = 0;
+      const maxRetries = 2;
+      let lastError: any = null;
+      
+      while (retries <= maxRetries) {
+        try {
+          const client = await getClient();
+          // 简单调用获取智能体列表API判断服务是否可用
+          await client.getAgents();
+          console.log('Successfully connected to Mastra service');
+          return true;
+        } catch (error) {
+          lastError = error;
+          console.warn(`Failed to connect to Mastra service (attempt ${retries + 1}/${maxRetries + 1}):`, error);
+          retries++;
+          
+          // 最后一次尝试前等待一小段时间
+          if (retries <= maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          }
+        }
+      }
+      
+      // 如果所有尝试都失败
+      console.error('All attempts to connect to Mastra service failed:', lastError);
+      return false;
     } catch (error) {
       console.error('Mastra service check failed:', error);
       return false;

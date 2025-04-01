@@ -813,7 +813,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       </div>
       
         {/* 消息列表 */}
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 p-4 h-[calc(100%-7rem)] overflow-y-auto">
           <div className="space-y-4">
               {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500">

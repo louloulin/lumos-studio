@@ -1,7 +1,7 @@
 import { WorkflowService, Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType } from './WorkflowService';
 import { agentService } from './AgentService';
 import { toolService } from './ToolService';
-import { MastraAPI } from './MastraService';
+import { MastraAPI, Agent } from './MastraService';
 
 // 工作流执行状态
 export enum WorkflowExecutionStatus {
@@ -68,6 +68,8 @@ export class WorkflowExecutor {
   private executionPromise: Promise<WorkflowExecutionState> | null = null;
   private shouldPause: boolean = false;
   private shouldStop: boolean = false;
+  private nodeExecutionCount: Record<string, number> = {}; // 节点执行次数计数器
+  private maxNodeExecutions: number = 100; // 单个节点最大执行次数，防止无限循环
 
   constructor(workflow: Workflow, callbacks: WorkflowExecutorCallbacks = {}) {
     this.workflow = workflow;
@@ -205,6 +207,9 @@ export class WorkflowExecutor {
    * 工作流执行的主逻辑
    */
   private async _executeWorkflow(): Promise<WorkflowExecutionState> {
+    // 重置节点执行计数器
+    this.nodeExecutionCount = {};
+  
     // 找到起始节点
     const startNode = this.workflow.nodes.find(node => node.type === WorkflowNodeType.START);
     
@@ -220,6 +225,17 @@ export class WorkflowExecutor {
       // 检查是否应该暂停或停止
       if (this.shouldStop) {
         break;
+      }
+      
+      // 检查节点执行次数，防止无限循环
+      if (!this.nodeExecutionCount[currentNodeId]) {
+        this.nodeExecutionCount[currentNodeId] = 0;
+      }
+      
+      this.nodeExecutionCount[currentNodeId]++;
+      
+      if (this.nodeExecutionCount[currentNodeId] > this.maxNodeExecutions) {
+        throw new Error(`检测到可能的无限循环: 节点 ${currentNodeId} 已执行超过 ${this.maxNodeExecutions} 次`);
       }
       
       if (this.shouldPause) {
@@ -379,20 +395,40 @@ export class WorkflowExecutor {
     }
     
     const agentId = node.config.agentId;
-    const agent = agentService.getAgent(agentId);
-    
-    if (!agent) {
-      throw new Error(`找不到智能体: ${agentId}`);
-    }
     
     try {
+      // 获取智能体对象
+      const agent = await agentService.getAgent(agentId);
+      
+      if (!agent) {
+        throw new Error(`找不到智能体: ${agentId}`);
+      }
+      
+      // 创建一个符合MastraAPI接口的Agent对象
+      const mastraAgent: Agent = {
+        id: agent.id,
+        name: agent.name,
+        description: agent.description || '',
+        model: agent.model || 'gpt-4o',
+        systemPrompt: agent.instructions || '',
+        tools: agent.tools || []
+      };
+      
       // 调用智能体处理输入
       const message = typeof input === 'string' ? input : JSON.stringify(input);
       
-      const result = await this.mastraAPI.generateWithAgent(agent, {
-        message,
-        stream: false
+      // 添加超时保护
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('智能体执行超时')), 30000); // 30秒超时
       });
+      
+      const result = await Promise.race([
+        this.mastraAPI.generateWithAgent(mastraAgent, {
+          message,
+          stream: false
+        }),
+        timeoutPromise
+      ]);
       
       return result.output;
     } catch (error) {

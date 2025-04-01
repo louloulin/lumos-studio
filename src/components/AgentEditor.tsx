@@ -64,14 +64,16 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
     const initialize = async () => {
       setLoading(true);
       try {
-        // 加载本地工具
-        const localTools = toolService.getAllTools();
-        
-        // 加载Mastra工具
-        const remoteMastraTools = await toolService.getMastraTools();
+        // 加载本地工具和Mastra工具
+        const localTools = await toolService.getAllTools();
         
         setAvailableTools(localTools);
-        setMastraTools(remoteMastraTools);
+        
+        // 设置Mastra工具ID数组
+        const mastraToolIds = localTools
+          .filter(tool => tool.isMastraTool)
+          .map(tool => tool.id);
+        setMastraTools(mastraToolIds);
         
         // 加载智能体
         if (agentId && agentId !== 'new-agent') {
@@ -84,14 +86,14 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
             });
           }
         } else {
-          // 为新智能体设置默认工具集
+          // 为新智能体设置默认工具集 - 前两个内置工具
+          const builtinTools = localTools.filter(tool => tool.isBuiltin).slice(0, 2);
           setAgent(prev => ({
             ...prev,
-            tools: localTools.slice(0, 2).map(tool => ({
+            tools: builtinTools.map(tool => ({
               id: tool.id,
               name: tool.name,
               description: tool.description,
-              icon: tool.icon,
               parameters: tool.parameters,
               enabled: false
             }))
@@ -147,7 +149,6 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
             id: tool.id,
             name: tool.name,
             description: tool.description,
-            icon: tool.icon,
             parameters: tool.parameters,
             enabled: true
           }
@@ -400,13 +401,12 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
                         <SelectValue placeholder="选择要添加的工具" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="" disabled>选择工具</SelectItem>
+                        <SelectItem value="select-placeholder" disabled>选择工具</SelectItem>
                         {availableTools.length > 0 && (
                           <>
                             <SelectItem value="local-tools-header" disabled>-- 本地工具 --</SelectItem>
                             {availableTools.map(tool => (
                               <SelectItem key={tool.id} value={tool.id}>
-                                {tool.icon && <span className="mr-2">{tool.icon}</span>}
                                 {tool.name}
                               </SelectItem>
                             ))}
@@ -426,7 +426,13 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
                     </Select>
                     <Button 
                       variant="outline" 
-                      onClick={() => toolService.refreshMastraTools().then(setMastraTools)}
+                      onClick={() => {
+                        toolService.refreshMastraTools().then(tools => {
+                          // 提取工具ID
+                          const toolIds = tools.map(tool => tool.id);
+                          setMastraTools(toolIds);
+                        });
+                      }}
                       title="刷新工具列表"
                     >
                       刷新
@@ -452,7 +458,6 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
                               htmlFor={`tool-${tool.id}`}
                               className="text-base font-medium cursor-pointer"
                             >
-                              {tool.icon && <span className="mr-2">{tool.icon}</span>}
                               {tool.name}
                             </Label>
                             <Button 

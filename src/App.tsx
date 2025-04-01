@@ -26,9 +26,11 @@ import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
 import ChatPage from './pages/ChatPage'
 import AgentsPage from './pages/AgentsPage'
-import WorkflowPage from './pages/WorkflowPage'
+import WorkflowListPage from './pages/WorkflowListPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
 import WorkflowRunPage from './pages/WorkflowRunPage'
+import ToolsPage from './pages/ToolsPage'
+import ToolEditorPage from './pages/ToolEditorPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -229,9 +231,13 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
-                            <Route path="/workflow" element={<Main />} />
-                            <Route path="/workflow/editor/:id" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow" element={<WorkflowListPage />} />
+                            <Route path="/workflow/new" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
                             <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
+                            <Route path="/tools" element={<ToolsPage />} />
+                            <Route path="/tools/new" element={<ToolEditorPage />} />
+                            <Route path="/tools/:id" element={<ToolEditorPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

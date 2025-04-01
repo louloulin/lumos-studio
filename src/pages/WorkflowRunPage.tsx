@@ -6,11 +6,15 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Play, Pause, RotateCcw, ArrowLeft, Info, AlertTriangle, AlertCircle, 
-  CheckCircle, Clock, ArrowRight
+  CheckCircle, Clock, ArrowRight, Settings
 } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactFlow, { Node, Edge, Background, Controls, MiniMap } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 import { workflowService, Workflow, WorkflowNodeType } from '@/api/WorkflowService';
 import { 
@@ -91,6 +95,8 @@ export default function WorkflowRunPage() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [selectedNodeResult, setSelectedNodeResult] = useState<NodeExecutionResult | null>(null);
   const [executor, setExecutor] = useState<WorkflowExecutor | null>(null);
+  const [inputParams, setInputParams] = useState<Record<string, any>>({});
+  const [showInputDialog, setShowInputDialog] = useState(false);
   
   // 加载工作流
   useEffect(() => {
@@ -131,12 +137,13 @@ export default function WorkflowRunPage() {
     
     // 创建执行器
     const newExecutor = new WorkflowExecutor(workflowData, {
-      onNodeStart: (nodeId) => {
-        console.log(`节点开始执行: ${nodeId}`);
+      onNodeStart: (nodeId, context) => {
+        console.log(`节点开始执行: ${nodeId}`, context);
       },
-      onNodeComplete: (result) => {
-        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`);
-        setExecutionState(prev => executor?.getState() || prev);
+      onNodeComplete: (result, context) => {
+        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`, context);
+        // 使用函数式更新确保状态同步
+        setExecutionState(newExecutor.getState());
       },
       onWorkflowComplete: (state) => {
         console.log('工作流执行完成', state);
@@ -147,9 +154,9 @@ export default function WorkflowRunPage() {
         setError(error.message);
         setExecutionState(state);
       },
-      onStatusChange: (status) => {
-        console.log(`工作流状态变更为: ${status}`);
-        setExecutionState(prev => executor?.getState() || prev);
+      onStatusChange: (status, state) => {
+        console.log(`工作流状态变更为: ${status}`, state);
+        setExecutionState(state);
       }
     });
     
@@ -224,7 +231,7 @@ export default function WorkflowRunPage() {
     
     try {
       // 开始执行
-      executor.execute().catch(err => {
+      executor.execute({ initial: inputParams.input || '' }).catch(err => {
         console.error('执行工作流失败:', err);
       });
       
@@ -258,12 +265,13 @@ export default function WorkflowRunPage() {
     
     // 重新创建执行器
     const newExecutor = new WorkflowExecutor(workflow, {
-      onNodeStart: (nodeId) => {
-        console.log(`节点开始执行: ${nodeId}`);
+      onNodeStart: (nodeId, context) => {
+        console.log(`节点开始执行: ${nodeId}`, context);
       },
-      onNodeComplete: (result) => {
-        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`);
-        setExecutionState(prev => executor?.getState() || prev);
+      onNodeComplete: (result, context) => {
+        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`, context);
+        // 使用函数式更新确保状态同步
+        setExecutionState(newExecutor.getState());
       },
       onWorkflowComplete: (state) => {
         console.log('工作流执行完成', state);
@@ -274,9 +282,9 @@ export default function WorkflowRunPage() {
         setError(error.message);
         setExecutionState(state);
       },
-      onStatusChange: (status) => {
-        console.log(`工作流状态变更为: ${status}`);
-        setExecutionState(prev => executor?.getState() || prev);
+      onStatusChange: (status, state) => {
+        console.log(`工作流状态变更为: ${status}`, state);
+        setExecutionState(state);
       }
     });
     
@@ -293,6 +301,14 @@ export default function WorkflowRunPage() {
     } else {
       setSelectedNodeResult(null);
     }
+  };
+  
+  // 处理输入参数变更
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputParams({
+      ...inputParams,
+      input: e.target.value
+    });
   };
   
   // 渲染工作流状态标志
@@ -420,6 +436,47 @@ export default function WorkflowRunPage() {
     );
   };
   
+  // 渲染输入参数对话框
+  const renderInputDialog = () => {
+    return (
+      <Dialog open={showInputDialog} onOpenChange={setShowInputDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>设置工作流输入参数</DialogTitle>
+            <DialogDescription>
+              请输入工作流的初始参数，将作为起始节点的输入。
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="workflowInput">输入文本</Label>
+              <Textarea
+                id="workflowInput"
+                placeholder="请输入工作流处理的文本..."
+                value={inputParams.input || ''}
+                onChange={handleInputChange}
+                rows={5}
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowInputDialog(false)}>
+              取消
+            </Button>
+            <Button onClick={() => {
+              setShowInputDialog(false);
+              handleRunWorkflow();
+            }}>
+              开始执行
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+  
   return (
     <div className="h-screen flex flex-col">
       {/* 顶部工具栏 */}
@@ -446,10 +503,16 @@ export default function WorkflowRunPage() {
               executionState.status === WorkflowExecutionStatus.IDLE || 
               executionState.status === WorkflowExecutionStatus.FAILED || 
               executionState.status === WorkflowExecutionStatus.COMPLETED) && (
-              <Button onClick={handleRunWorkflow}>
-                <Play className="h-4 w-4 mr-2" />
-                运行
-              </Button>
+              <>
+                <Button onClick={() => setShowInputDialog(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  设置输入
+                </Button>
+                <Button onClick={handleRunWorkflow}>
+                  <Play className="h-4 w-4 mr-2" />
+                  运行
+                </Button>
+              </>
             )}
             
             {executionState && executionState.status === WorkflowExecutionStatus.RUNNING && (
@@ -579,6 +642,9 @@ export default function WorkflowRunPage() {
           </Card>
         </div>
       </div>
+      
+      {/* 输入参数对话框 */}
+      {renderInputDialog()}
     </div>
   );
 }

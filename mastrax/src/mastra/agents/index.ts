@@ -5,6 +5,7 @@ import { createQwen } from 'qwen-ai-provider';
 import { Memory } from '@mastra/memory';
 import { z } from 'zod';
 import type { Agent as DbAgent, AgentLog } from '../db/schema';
+import { ollama } from './ollama-model';
 
 // 定义智能体数据类型
 export interface AgentData {
@@ -217,3 +218,8 @@ export async function getInstalledAgent(agentId: string): Promise<AgentData | nu
     return null;
   }
 }
+
+// 导出智能体功能
+export {
+  ollama
+};

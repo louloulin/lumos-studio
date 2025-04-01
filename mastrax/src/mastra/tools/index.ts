@@ -4,6 +4,7 @@ import { eq, and, sql, type InferModel } from 'drizzle-orm';
 import { db } from '../db';
 import { agents, agentLogs } from '../db/schema';
 import type { Agent, AgentLog } from '../db/schema';
+import { ollamaHealthTool, ollamaModelsTool } from './ollama-tools';
 
 interface GeocodingResponse {
   results: {
@@ -396,3 +397,6 @@ export const agentLogsTool = createTool({
     }
   },
 }) as Tool;
+
+// 导出 Ollama 工具
+export { ollamaHealthTool, ollamaModelsTool };

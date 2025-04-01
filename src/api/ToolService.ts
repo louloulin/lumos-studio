@@ -426,12 +426,14 @@ export class ToolService {
       const client = await MastraAPI.getClient();
       
       // 获取工具ID列表
-      const toolIds = await client.getTools(); // 使用正确的方法名
+      const toolIds = await MastraAPI.getTools(); // 使用正确的方法名
       
-      if (!toolIds || !Array.isArray(toolIds)) {
-        console.error('获取Mastra工具ID失败');
+      if (!toolIds || !Array.isArray(toolIds) || toolIds.length === 0) {
+        console.log('未获取到Mastra工具，或返回空数组');
         return [];
       }
+      
+      console.log("获取到Mastra工具IDs:", toolIds);
       
       // 创建工具对象数组
       const tools: Tool[] = toolIds.map(toolId => ({
@@ -443,14 +445,20 @@ export class ToolService {
           try {
             // 使用MastraAPI调用工具
             const client = await MastraAPI.getClient();
-            // 模拟执行工具，因为MastraClient接口可能不一致
+            // 获取对应的工具
+            const tool = client.getTool(toolId);
+            if (!tool) {
+              throw new Error(`找不到Mastra工具: ${toolId}`);
+            }
+            
+            // 调用工具
             console.log(`执行Mastra工具: ${toolId}`, params.data);
+            const result = await tool.execute(params.data);
             
-            // 模拟API调用延迟
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            
-            // 模拟返回结果
-            return `Mastra工具 ${toolId} 处理结果: 已处理输入数据 ${JSON.stringify(params.data)}`;
+            // 返回结果
+            return typeof result === 'string' 
+              ? result 
+              : JSON.stringify(result, null, 2);
           } catch (error) {
             console.error(`执行Mastra工具 ${toolId} 失败:`, error);
             throw new Error(`Mastra工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`);

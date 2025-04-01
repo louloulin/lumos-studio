@@ -394,7 +394,17 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
               </CardHeader>
               <CardContent>
                 <div className="mb-4">
-                  <Label className="mb-2 block">添加工具</Label>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>添加工具</Label>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => window.open('/tools', '_blank')}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      管理工具
+                    </Button>
+                  </div>
                   <div className="flex gap-2">
                     <Select onValueChange={addToolToAgent}>
                       <SelectTrigger className="w-64">

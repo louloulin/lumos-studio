@@ -9,6 +9,7 @@ import * as atoms from './stores/atoms'
 import { trackingEvent } from './packages/event'
 import { cn } from './lib/utils'
 import { Button } from './components/ui/button'
+import { Link } from 'react-router-dom'
 import { 
     Menu, 
     Settings, 
@@ -19,7 +20,11 @@ import {
     ImageIcon,
     Github as GithubIcon,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Home,
+    MessageSquare,
+    Workflow,
+    Wrench,
 } from 'lucide-react'
 import platform from './packages/platform'
 import { useAtom } from "jotai"
@@ -99,6 +104,30 @@ export default function Sidebar(props: Props) {
                     </div>
                     <div className="flex-grow mt-4 overflow-hidden">
                         <div className="flex flex-col flex-1 h-full overflow-auto hide-scrollbar" ref={sessionListRef}>
+                            <div className="mb-4 px-2">
+                                <div className="text-xs font-semibold text-muted-foreground mb-2 uppercase">导航</div>
+                                <div className="space-y-1">
+                                    <Link to="/" className={`flex items-center rounded-md p-2 text-sm hover:bg-accent ${props.currentPage === 'home' ? 'bg-accent' : ''}`}>
+                                        <Home className="h-4 w-4 mr-2" />
+                                        首页
+                                    </Link>
+                                    <Link to="/chat" className={`flex items-center rounded-md p-2 text-sm hover:bg-accent ${props.currentPage === 'chat' ? 'bg-accent' : ''}`}>
+                                        <MessageSquare className="h-4 w-4 mr-2" />
+                                        聊天
+                                    </Link>
+                                    <Link to="/workflow" className={`flex items-center rounded-md p-2 text-sm hover:bg-accent ${props.currentPage === 'workflow' ? 'bg-accent' : ''}`}>
+                                        <Workflow className="h-4 w-4 mr-2" />
+                                        工作流
+                                    </Link>
+                                    <Link 
+                                        to="/tools" 
+                                        className={`flex items-center rounded-md p-2 text-sm hover:bg-accent ${props.currentPage === 'tools' ? 'bg-accent' : ''}`}
+                                    >
+                                        <Wrench className="h-4 w-4 mr-2" />
+                                        工具管理
+                                    </Link>
+                                </div>
+                            </div>
                             <SessionList sessionListRef={sessionListRef} />
                         </div>
                     </div>

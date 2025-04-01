@@ -31,6 +31,7 @@ import WorkflowEditorPage from './pages/WorkflowEditorPage'
 import WorkflowRunPage from './pages/WorkflowRunPage'
 import ToolsPage from './pages/ToolsPage'
 import ToolEditorPage from './pages/ToolEditorPage'
+import ToolTestPage from './pages/ToolTestPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -49,6 +50,7 @@ function Main() {
         if (path.includes('/agents')) return 'agents';
         if (path.includes('/whiteboard')) return 'whiteboard';
         if (path.includes('/workflow')) return 'workflow';
+        if (path.includes('/tools')) return 'tools';
         return 'home';
     });
     
@@ -60,6 +62,7 @@ function Main() {
             else if (path.includes('/agents')) setCurrentPage('agents');
             else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
             else if (path.includes('/workflow')) setCurrentPage('workflow');
+            else if (path.includes('/tools')) setCurrentPage('tools');
             else setCurrentPage('home');
         };
         
@@ -231,13 +234,14 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
-                            <Route path="/workflow" element={<WorkflowListPage />} />
-                            <Route path="/workflow/new" element={<WorkflowEditorPage />} />
-                            <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
-                            <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
                             <Route path="/tools" element={<ToolsPage />} />
                             <Route path="/tools/new" element={<ToolEditorPage />} />
+                            <Route path="/tools/test/:id" element={<ToolTestPage />} />
                             <Route path="/tools/:id" element={<ToolEditorPage />} />
+                            <Route path="/workflow" element={<WorkflowListPage />} />
+                            <Route path="/workflow/new" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
+                            <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

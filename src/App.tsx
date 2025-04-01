@@ -234,10 +234,34 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
-                            <Route path="/tools" element={<ToolsPage />} />
-                            <Route path="/tools/new" element={<ToolEditorPage />} />
-                            <Route path="/tools/test/:id" element={<ToolTestPage />} />
-                            <Route path="/tools/:id" element={<ToolEditorPage />} />
+                            <Route path="/tools" element={
+                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                                    <div className="w-full h-full overflow-hidden tauri-window-container">
+                                        <ToolsPage />
+                                    </div>
+                                </ThemeProvider>
+                            } />
+                            <Route path="/tools/new" element={
+                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                                    <div className="w-full h-full overflow-hidden tauri-window-container">
+                                        <ToolEditorPage />
+                                    </div>
+                                </ThemeProvider>
+                            } />
+                            <Route path="/tools/test/:id" element={
+                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                                    <div className="w-full h-full overflow-hidden tauri-window-container">
+                                        <ToolTestPage />
+                                    </div>
+                                </ThemeProvider>
+                            } />
+                            <Route path="/tools/:id" element={
+                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                                    <div className="w-full h-full overflow-hidden tauri-window-container">
+                                        <ToolEditorPage />
+                                    </div>
+                                </ThemeProvider>
+                            } />
                             <Route path="/workflow" element={<WorkflowListPage />} />
                             <Route path="/workflow/new" element={<WorkflowEditorPage />} />
                             <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />

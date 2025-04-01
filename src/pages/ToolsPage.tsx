@@ -22,8 +22,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tool, toolService } from '@/api/ToolService';
 
+// 检测是否在Tauri环境中运行
+const isTauriApp = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+
 export default function ToolsPage() {
-  console.log("工具页面已加载 - 简化版");
+  console.log("工具页面已加载 - 检测Tauri环境:", isTauriApp ? "是" : "否");
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('all');
   const [tools, setTools] = useState<Tool[]>([]);
@@ -32,23 +35,41 @@ export default function ToolsPage() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [newToolName, setNewToolName] = useState('');
   const [newToolDescription, setNewToolDescription] = useState('');
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   // 加载工具列表
   useEffect(() => {
-    console.log("开始加载工具 - 简化版");
+    console.log("开始加载工具");
     loadTools();
+    
+    // 监听导航事件
+    const handleNavigation = () => {
+      console.log("导航变化检测 - 当前路径:", window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handleNavigation);
+    return () => {
+      window.removeEventListener('popstate', handleNavigation);
+    };
   }, []);
   
   // 加载工具
   const loadTools = async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
-      console.log("正在从工具服务获取工具 - 简化版");
+      console.log("正在从工具服务获取工具");
+      // 添加延迟确保Tauri环境有足够时间初始化
+      if (isTauriApp) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
       const allTools = await toolService.getAllTools();
       console.log("获取到工具数量:", allTools.length);
       setTools(allTools);
     } catch (error) {
       console.error('加载工具失败:', error);
+      setLoadError(error instanceof Error ? error.message : '未知错误');
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +160,14 @@ export default function ToolsPage() {
   
   // 返回首页
   const handleGoBack = () => {
+    console.log("返回首页");
     navigate('/');
+  };
+  
+  // 重试加载
+  const handleRetry = () => {
+    console.log("重试加载工具");
+    loadTools();
   };
   
   return (
@@ -166,6 +194,17 @@ export default function ToolsPage() {
               创建工具
             </Button>
           </div>
+          
+          {loadError && (
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-md p-4 mb-4">
+              <div className="flex items-center">
+                <div className="flex-1">加载工具时出错: {loadError}</div>
+                <Button variant="outline" size="sm" onClick={handleRetry}>
+                  重试
+                </Button>
+              </div>
+            </div>
+          )}
           
           <div className="flex items-center justify-between">
             <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -119,13 +119,35 @@ export default function Sidebar(props: Props) {
                                         <Workflow className="h-4 w-4 mr-2" />
                                         工作流
                                     </Link>
-                                    <Link 
-                                        to="/tools" 
-                                        className={`flex items-center rounded-md p-2 text-sm hover:bg-accent ${props.currentPage === 'tools' ? 'bg-accent' : ''}`}
+                                    <Button
+                                        variant="link"
+                                        className={`flex items-center rounded-md p-2 text-sm hover:bg-accent justify-start h-auto font-normal ${props.currentPage === 'tools' ? 'bg-accent' : ''}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            console.log('点击工具管理按钮');
+                                            
+                                            // 检测是否在Tauri环境中运行
+                                            const isTauriApp = typeof window !== 'undefined' && window.__TAURI__ !== undefined;
+                                            console.log('Tauri环境:', isTauriApp ? '是' : '否');
+                                            
+                                            // 打开工具管理页面
+                                            try {
+                                                if (isTauriApp) {
+                                                    // Tauri环境下使用窗口的location对象直接变更URL
+                                                    window.location.href = '/tools';
+                                                } else {
+                                                    // 浏览器环境下使用普通导航
+                                                    window.location.href = '/tools';
+                                                }
+                                            } catch (error) {
+                                                console.error('导航到工具页面失败:', error);
+                                                alert('无法打开工具管理页面，请重试');
+                                            }
+                                        }}
                                     >
                                         <Wrench className="h-4 w-4 mr-2" />
                                         工具管理
-                                    </Link>
+                                    </Button>
                                 </div>
                             </div>
                             <SessionList sessionListRef={sessionListRef} />

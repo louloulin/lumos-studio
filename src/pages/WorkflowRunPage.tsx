@@ -1,297 +1,581 @@
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Workflow, workflowService } from '@/api/WorkflowService';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, ArrowLeft, Play, Circle, CheckCircle } from 'lucide-react';
+import { 
+  Play, Pause, RotateCcw, ArrowLeft, Info, AlertTriangle, AlertCircle, 
+  CheckCircle, Clock, ArrowRight
+} from 'lucide-react';
+import { format } from 'date-fns';
+import ReactFlow, { Node, Edge, Background, Controls, MiniMap } from 'reactflow';
+import 'reactflow/dist/style.css';
+
+import { workflowService, Workflow, WorkflowNodeType } from '@/api/WorkflowService';
+import { 
+  WorkflowExecutor, 
+  WorkflowExecutionStatus, 
+  NodeExecutionStatus,
+  NodeExecutionResult, 
+  WorkflowExecutionState 
+} from '@/api/WorkflowExecutor';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+
+// 工作流节点类型
+const nodeTypes = {
+  // 之后可以引入自定义节点类型
+};
+
+// 状态类型颜色映射
+const workflowStatusColors = {
+  [WorkflowExecutionStatus.IDLE]: 'bg-gray-400',
+  [WorkflowExecutionStatus.RUNNING]: 'bg-blue-500',
+  [WorkflowExecutionStatus.COMPLETED]: 'bg-green-500',
+  [WorkflowExecutionStatus.FAILED]: 'bg-red-500',
+  [WorkflowExecutionStatus.PAUSED]: 'bg-amber-500',
+};
+
+const nodeStatusColors = {
+  [NodeExecutionStatus.PENDING]: 'bg-gray-400',
+  [NodeExecutionStatus.RUNNING]: 'bg-blue-500',
+  [NodeExecutionStatus.COMPLETED]: 'bg-green-500',
+  [NodeExecutionStatus.FAILED]: 'bg-red-500',
+  [NodeExecutionStatus.SKIPPED]: 'bg-purple-500'
+};
+
+// 状态标签映射
+const workflowStatusLabels = {
+  [WorkflowExecutionStatus.IDLE]: '空闲',
+  [WorkflowExecutionStatus.RUNNING]: '运行中',
+  [WorkflowExecutionStatus.COMPLETED]: '已完成',
+  [WorkflowExecutionStatus.FAILED]: '失败',
+  [WorkflowExecutionStatus.PAUSED]: '已暂停',
+};
+
+const nodeStatusLabels = {
+  [NodeExecutionStatus.PENDING]: '等待中',
+  [NodeExecutionStatus.RUNNING]: '运行中',
+  [NodeExecutionStatus.COMPLETED]: '已完成',
+  [NodeExecutionStatus.FAILED]: '失败',
+  [NodeExecutionStatus.SKIPPED]: '已跳过'
+};
+
+// 状态图标映射
+const workflowStatusIcons = {
+  [WorkflowExecutionStatus.IDLE]: <Clock className="h-4 w-4" />,
+  [WorkflowExecutionStatus.RUNNING]: <Play className="h-4 w-4" />,
+  [WorkflowExecutionStatus.COMPLETED]: <CheckCircle className="h-4 w-4" />,
+  [WorkflowExecutionStatus.FAILED]: <AlertCircle className="h-4 w-4" />,
+  [WorkflowExecutionStatus.PAUSED]: <Pause className="h-4 w-4" />,
+};
+
+const nodeStatusIcons = {
+  [NodeExecutionStatus.PENDING]: <Clock className="h-4 w-4" />,
+  [NodeExecutionStatus.RUNNING]: <Play className="h-4 w-4" />,
+  [NodeExecutionStatus.COMPLETED]: <CheckCircle className="h-4 w-4" />,
+  [NodeExecutionStatus.FAILED]: <AlertCircle className="h-4 w-4" />,
+  [NodeExecutionStatus.SKIPPED]: <ArrowRight className="h-4 w-4" />
+};
 
 export default function WorkflowRunPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
-  const [input, setInput] = useState('');
-  const [output, setOutput] = useState('');
-  const [isRunning, setIsRunning] = useState(false);
+  const [executionState, setExecutionState] = useState<WorkflowExecutionState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
+  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [selectedNodeResult, setSelectedNodeResult] = useState<NodeExecutionResult | null>(null);
+  const [executor, setExecutor] = useState<WorkflowExecutor | null>(null);
   
   // 加载工作流
   useEffect(() => {
-    if (id) {
-      const loadedWorkflow = workflowService.getWorkflow(id);
-      if (loadedWorkflow) {
-        setWorkflow(loadedWorkflow);
-      } else {
-        setError('找不到指定的工作流');
-      }
+    if (!id) return;
+    
+    const workflowData = workflowService.getWorkflow(id);
+    if (!workflowData) {
+      setError('找不到工作流');
+      return;
     }
+    
+    setWorkflow(workflowData);
+    
+    // 转换节点和边为ReactFlow格式
+    const flowNodes = workflowData.nodes.map(node => ({
+      id: node.id,
+      type: node.type.toLowerCase(),
+      data: {
+        label: node.label,
+        ...node.config
+      },
+      position: { x: node.x, y: node.y },
+      className: 'bg-background border-2 border-muted rounded-md shadow-sm'
+    }));
+    
+    const flowEdges = workflowData.edges.map(edge => ({
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label: edge.label || '',
+      data: {
+        condition: edge.condition
+      }
+    }));
+    
+    setNodes(flowNodes);
+    setEdges(flowEdges);
+    
+    // 创建执行器
+    const newExecutor = new WorkflowExecutor(workflowData, {
+      onNodeStart: (nodeId) => {
+        console.log(`节点开始执行: ${nodeId}`);
+      },
+      onNodeComplete: (result) => {
+        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`);
+        setExecutionState(prev => executor?.getState() || prev);
+      },
+      onWorkflowComplete: (state) => {
+        console.log('工作流执行完成', state);
+        setExecutionState(state);
+      },
+      onWorkflowError: (error, state) => {
+        console.error('工作流执行失败', error);
+        setError(error.message);
+        setExecutionState(state);
+      },
+      onStatusChange: (status) => {
+        console.log(`工作流状态变更为: ${status}`);
+        setExecutionState(prev => executor?.getState() || prev);
+      }
+    });
+    
+    setExecutor(newExecutor);
+    setExecutionState(newExecutor.getState());
   }, [id]);
   
-  // 执行工作流
-  const handleRunWorkflow = async () => {
-    if (!workflow) return;
+  // 当节点执行状态更新时，更新节点外观
+  useEffect(() => {
+    if (!executionState || !workflow) return;
     
-    setIsRunning(true);
+    // 更新节点外观
+    const updatedNodes = nodes.map(node => {
+      const nodeResult = executionState.nodeResults[node.id];
+      
+      // 计算节点状态对应的样式
+      let className = 'bg-background border-2 rounded-md shadow-sm ';
+      
+      if (!nodeResult) {
+        className += 'border-muted';
+      } else {
+        switch (nodeResult.status) {
+          case NodeExecutionStatus.PENDING:
+            className += 'border-gray-400';
+            break;
+          case NodeExecutionStatus.RUNNING:
+            className += 'border-blue-500 animate-pulse';
+            break;
+          case NodeExecutionStatus.COMPLETED:
+            className += 'border-green-500';
+            break;
+          case NodeExecutionStatus.FAILED:
+            className += 'border-red-500';
+            break;
+          case NodeExecutionStatus.SKIPPED:
+            className += 'border-purple-500';
+            break;
+          default:
+            className += 'border-muted';
+        }
+      }
+      
+      // 当前选中的节点
+      if (node.id === selectedNode) {
+        className += ' border-primary border-2';
+      }
+      
+      // 当前正在执行的节点
+      if (node.id === executionState.currentNodeId) {
+        className += ' bg-blue-50 dark:bg-blue-950';
+      }
+      
+      return {
+        ...node,
+        className
+      };
+    });
+    
+    setNodes(updatedNodes);
+    
+    // 如果有选中的节点，更新选中节点的结果
+    if (selectedNode && executionState.nodeResults[selectedNode]) {
+      setSelectedNodeResult(executionState.nodeResults[selectedNode]);
+    }
+  }, [executionState, selectedNode, workflow]);
+  
+  // 开始执行工作流
+  const handleRunWorkflow = async () => {
+    if (!executor) return;
+    
     setError(null);
-    setOutput('');
-    setLogs([`开始执行工作流: ${workflow.name}`]);
     
     try {
-      // 模拟工作流执行过程
-      setLogs(prev => [...prev, '初始化工作流执行环境...']);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // 开始执行
+      executor.execute().catch(err => {
+        console.error('执行工作流失败:', err);
+      });
       
-      // 遍历节点并模拟执行
-      const startNode = workflow.nodes.find(node => node.type === 'start');
-      if (!startNode) {
-        throw new Error('工作流缺少开始节点');
-      }
-      
-      setLogs(prev => [...prev, `执行节点: ${startNode.label}`]);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // 模拟节点执行过程
-      let currentNodeId = startNode.id;
-      let currentInput = input;
-      
-      while (currentNodeId) {
-        // 查找当前节点
-        const currentNode = workflow.nodes.find(node => node.id === currentNodeId);
-        if (!currentNode) break;
-        
-        // 如果是结束节点，完成执行
-        if (currentNode.type === 'end') {
-          setLogs(prev => [...prev, `执行节点: ${currentNode.label} (结束)`]);
-          setOutput(currentInput);
-          break;
-        }
-        
-        // 记录节点执行
-        setLogs(prev => [...prev, `执行节点: ${currentNode.label} (${currentNode.type})`]);
-        
-        // 模拟节点执行逻辑
-        switch (currentNode.type) {
-          case 'agent':
-            setLogs(prev => [...prev, `  调用智能体: ${currentNode.config?.agentId || '未指定'}`]);
-            await new Promise(resolve => setTimeout(resolve, 1500));
-            currentInput = `智能体回复: 已处理输入 "${currentInput}"`;
-            break;
-            
-          case 'tool':
-            setLogs(prev => [...prev, '  执行工具操作']);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            currentInput = `工具处理结果: ${currentInput}`;
-            break;
-            
-          case 'condition':
-            setLogs(prev => [...prev, '  评估条件']);
-            await new Promise(resolve => setTimeout(resolve, 800));
-            // 随机决定条件结果
-            const conditionResult = Math.random() > 0.5;
-            setLogs(prev => [...prev, `  条件结果: ${conditionResult ? '为真' : '为假'}`]);
-            break;
-            
-          default:
-            await new Promise(resolve => setTimeout(resolve, 500));
-        }
-        
-        // 查找下一个节点（这里简化为找到第一个以当前节点为源的边）
-        const nextEdge = workflow.edges.find(edge => edge.source === currentNodeId);
-        currentNodeId = nextEdge?.target || '';
-        
-        // 随机延迟模拟执行时间
-        await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
-      }
-      
-      setLogs(prev => [...prev, '工作流执行完成']);
-      
-      // 实际执行时，使用 workflowService.executeWorkflow
-      // const result = await workflowService.executeWorkflow(workflow.id, input);
-      // setOutput(result.result);
-      
+      // 立即更新状态
+      setExecutionState(executor.getState());
     } catch (err) {
-      console.error('执行工作流失败:', err);
-      setError(err instanceof Error ? err.message : '执行工作流时发生错误');
-      setLogs(prev => [...prev, `错误: ${err instanceof Error ? err.message : '未知错误'}`]);
-    } finally {
-      setIsRunning(false);
+      console.error('启动工作流执行失败:', err);
+      setError(err instanceof Error ? err.message : String(err));
     }
   };
   
-  if (!workflow && !error) {
-    return (
-      <div className="container mx-auto py-8 flex justify-center">
-        <Card className="w-full max-w-3xl">
-          <CardContent className="pt-6">
-            <div className="flex justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-            <p className="text-center mt-4">加载工作流...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // 暂停工作流
+  const handlePauseWorkflow = () => {
+    if (!executor) return;
+    
+    executor.pause();
+    setExecutionState(executor.getState());
+  };
   
-  return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center mb-6">
-        <Button variant="ghost" onClick={() => navigate('/workflow')} className="mr-4">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          返回
-        </Button>
-        <h1 className="text-3xl font-bold">{workflow?.name || '工作流执行'}</h1>
-      </div>
-      
-      {error && (
-        <Alert variant="destructive" className="mb-6">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle>错误</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>工作流信息</CardTitle>
-              {workflow && (
-                <CardDescription>
-                  {workflow.description || '无描述'}
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent>
-              {workflow && (
-                <div className="space-y-2">
-                  <p>节点数量: {workflow.nodes.length}</p>
-                  <p>连接数量: {workflow.edges.length}</p>
-                  <p>创建时间: {new Date(workflow.createdAt).toLocaleString()}</p>
-                  <p>更新时间: {new Date(workflow.updatedAt).toLocaleString()}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>输入</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Label htmlFor="workflowInput">输入文本</Label>
-                <Textarea
-                  id="workflowInput"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="输入工作流处理的文本..."
-                  rows={5}
-                  disabled={isRunning}
-                />
-              </div>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={handleRunWorkflow} 
-                disabled={isRunning || !input.trim()}
-                className="w-full"
-              >
-                {isRunning ? (
-                  <>
-                    <Circle className="mr-2 h-4 w-4 animate-pulse" />
-                    执行中...
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    执行工作流
-                  </>
-                )}
-              </Button>
-            </CardFooter>
-          </Card>
+  // 恢复工作流
+  const handleResumeWorkflow = () => {
+    if (!executor) return;
+    
+    executor.resume();
+    setExecutionState(executor.getState());
+  };
+  
+  // 重置工作流
+  const handleResetWorkflow = () => {
+    if (!workflow) return;
+    
+    // 重新创建执行器
+    const newExecutor = new WorkflowExecutor(workflow, {
+      onNodeStart: (nodeId) => {
+        console.log(`节点开始执行: ${nodeId}`);
+      },
+      onNodeComplete: (result) => {
+        console.log(`节点执行完成: ${result.nodeId}, 状态: ${result.status}`);
+        setExecutionState(prev => executor?.getState() || prev);
+      },
+      onWorkflowComplete: (state) => {
+        console.log('工作流执行完成', state);
+        setExecutionState(state);
+      },
+      onWorkflowError: (error, state) => {
+        console.error('工作流执行失败', error);
+        setError(error.message);
+        setExecutionState(state);
+      },
+      onStatusChange: (status) => {
+        console.log(`工作流状态变更为: ${status}`);
+        setExecutionState(prev => executor?.getState() || prev);
+      }
+    });
+    
+    setExecutor(newExecutor);
+    setExecutionState(newExecutor.getState());
+    setError(null);
+  };
+  
+  // 处理节点点击
+  const handleNodeClick = (event: React.MouseEvent, node: Node) => {
+    setSelectedNode(node.id);
+    if (executionState && executionState.nodeResults[node.id]) {
+      setSelectedNodeResult(executionState.nodeResults[node.id]);
+    } else {
+      setSelectedNodeResult(null);
+    }
+  };
+  
+  // 渲染工作流状态标志
+  const renderStatusBadge = (status: WorkflowExecutionStatus | NodeExecutionStatus) => {
+    let color, icon, label;
+    
+    if (Object.values(WorkflowExecutionStatus).includes(status as WorkflowExecutionStatus)) {
+      color = workflowStatusColors[status as WorkflowExecutionStatus];
+      icon = workflowStatusIcons[status as WorkflowExecutionStatus];
+      label = workflowStatusLabels[status as WorkflowExecutionStatus];
+    } else {
+      color = nodeStatusColors[status as NodeExecutionStatus];
+      icon = nodeStatusIcons[status as NodeExecutionStatus];
+      label = nodeStatusLabels[status as NodeExecutionStatus];
+    }
+    
+    return (
+      <Badge 
+        className={`${color} text-white flex gap-1 items-center`}
+        variant="outline"
+      >
+        {icon}
+        {label}
+      </Badge>
+    );
+  };
+  
+  // 渲染选中节点的详情
+  const renderNodeDetails = () => {
+    if (!selectedNode || !selectedNodeResult) return null;
+    
+    const node = workflow?.nodes.find(n => n.id === selectedNode);
+    if (!node) return null;
+    
+    return (
+      <div className="p-4 border rounded-md space-y-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-lg font-medium">{node.label || node.id}</h3>
+            <p className="text-sm text-muted-foreground">{renderNodeTypeLabel(node.type)}</p>
+          </div>
+          {renderStatusBadge(selectedNodeResult.status)}
         </div>
         
-        <div>
-          <Card>
-            <CardHeader>
-              <CardTitle>输出</CardTitle>
+        {selectedNodeResult.status === NodeExecutionStatus.FAILED && selectedNodeResult.error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>执行错误</AlertTitle>
+            <AlertDescription>{selectedNodeResult.error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {selectedNodeResult.startTime && (
+          <div className="text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">开始时间:</span> 
+              <span>{format(selectedNodeResult.startTime, 'yyyy-MM-dd HH:mm:ss')}</span>
+            </div>
+            {selectedNodeResult.endTime && (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">完成时间:</span>
+                  <span>{format(selectedNodeResult.endTime, 'yyyy-MM-dd HH:mm:ss')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">执行时长:</span>
+                  <span>{(selectedNodeResult.duration || 0) / 1000} 秒</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+        
+        {selectedNodeResult.output && (
+          <div>
+            <h4 className="text-sm font-medium mb-1">输出结果:</h4>
+            <pre className="text-xs bg-muted p-2 rounded-md overflow-auto max-h-40">
+              {typeof selectedNodeResult.output === 'string' 
+                ? selectedNodeResult.output 
+                : JSON.stringify(selectedNodeResult.output, null, 2)}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  };
+  
+  // 渲染节点类型标签
+  const renderNodeTypeLabel = (type: string) => {
+    const typeMap: Record<string, string> = {
+      [WorkflowNodeType.START]: '开始节点',
+      [WorkflowNodeType.END]: '结束节点',
+      [WorkflowNodeType.AGENT]: '智能体节点',
+      [WorkflowNodeType.TOOL]: '工具节点',
+      [WorkflowNodeType.CONDITION]: '条件节点',
+      [WorkflowNodeType.INPUT]: '输入节点',
+      [WorkflowNodeType.OUTPUT]: '输出节点',
+      [WorkflowNodeType.LOOP]: '循环节点'
+    };
+    
+    return typeMap[type] || type;
+  };
+  
+  // 渲染工作流进度
+  const renderProgress = () => {
+    if (!executionState || !workflow) return null;
+    
+    const totalNodes = workflow.nodes.length;
+    const completedNodes = Object.values(executionState.nodeResults)
+      .filter(result => 
+        result.status === NodeExecutionStatus.COMPLETED || 
+        result.status === NodeExecutionStatus.SKIPPED
+      ).length;
+    
+    const progress = totalNodes > 0 ? (completedNodes / totalNodes) * 100 : 0;
+    
+    return (
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span>执行进度</span>
+          <span>{Math.round(progress)}% ({completedNodes}/{totalNodes})</span>
+        </div>
+        <Progress value={progress} className="h-2" />
+      </div>
+    );
+  };
+  
+  return (
+    <div className="h-screen flex flex-col">
+      {/* 顶部工具栏 */}
+      <div className="border-b p-4 flex justify-between items-center">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => navigate('/workflow')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-lg font-semibold">
+              {workflow ? `执行工作流: ${workflow.name}` : '工作流运行'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {workflow?.description || ''}
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {executionState && executionState.status && renderStatusBadge(executionState.status)}
+          
+          <div className="flex gap-2">
+            {(!executionState || 
+              executionState.status === WorkflowExecutionStatus.IDLE || 
+              executionState.status === WorkflowExecutionStatus.FAILED || 
+              executionState.status === WorkflowExecutionStatus.COMPLETED) && (
+              <Button onClick={handleRunWorkflow}>
+                <Play className="h-4 w-4 mr-2" />
+                运行
+              </Button>
+            )}
+            
+            {executionState && executionState.status === WorkflowExecutionStatus.RUNNING && (
+              <Button onClick={handlePauseWorkflow} variant="outline">
+                <Pause className="h-4 w-4 mr-2" />
+                暂停
+              </Button>
+            )}
+            
+            {executionState && executionState.status === WorkflowExecutionStatus.PAUSED && (
+              <Button onClick={handleResumeWorkflow} variant="outline">
+                <Play className="h-4 w-4 mr-2" />
+                继续
+              </Button>
+            )}
+            
+            <Button 
+              onClick={handleResetWorkflow}
+              variant="outline"
+              disabled={executionState?.status === WorkflowExecutionStatus.RUNNING}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              重置
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* 主内容区 */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* 工作流图区域 */}
+        <div className="flex-1">
+          {error && (
+            <Alert variant="destructive" className="m-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>错误</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {/* 工作流图 */}
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            fitView
+            onNodeClick={handleNodeClick}
+            nodeTypes={nodeTypes}
+            className="bg-slate-50 dark:bg-slate-900"
+          >
+            <Controls />
+            <MiniMap />
+            <Background />
+          </ReactFlow>
+        </div>
+        
+        {/* 右侧信息面板 */}
+        <div className="w-80 border-l overflow-y-auto flex flex-col">
+          <Card className="border-0 shadow-none rounded-none flex-1">
+            <CardHeader className="px-4 py-3 border-b space-y-1">
+              <CardTitle className="text-base">执行信息</CardTitle>
+              <CardDescription>查看执行状态和节点详情</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <Label htmlFor="workflowOutput">输出结果</Label>
-                <div
-                  id="workflowOutput"
-                  className="border rounded-md p-3 min-h-[120px] bg-gray-50"
-                >
-                  {output ? (
-                    <p>{output}</p>
-                  ) : (
-                    <p className="text-gray-400">
-                      {isRunning ? '处理中...' : '执行工作流后将显示结果'}
-                    </p>
+            <CardContent className="p-4 space-y-6">
+              {/* 执行状态 */}
+              {executionState && (
+                <div className="space-y-4">
+                  {renderProgress()}
+                  
+                  {executionState.startTime && (
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">开始时间:</span>
+                        <span>{format(executionState.startTime, 'yyyy-MM-dd HH:mm:ss')}</span>
+                      </div>
+                      
+                      {executionState.endTime && (
+                        <>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">结束时间:</span>
+                            <span>{format(executionState.endTime, 'yyyy-MM-dd HH:mm:ss')}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">总执行时间:</span>
+                            <span>{(executionState.duration || 0) / 1000} 秒</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  
+                  {executionState.error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>工作流错误</AlertTitle>
+                      <AlertDescription>{executionState.error}</AlertDescription>
+                    </Alert>
                   )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>执行日志</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="border rounded-md p-3 bg-black text-white font-mono text-sm h-64 overflow-auto">
-                {logs.length > 0 ? (
-                  <div className="space-y-1">
-                    {logs.map((log, index) => (
-                      <div key={index} className="flex">
-                        <span className="text-gray-500 mr-2">[{index + 1}]</span>
-                        <span>{log}</span>
-                      </div>
-                    ))}
-                    {isRunning && (
-                      <div className="animate-pulse text-green-400">
-                        ▶ 执行中...
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-gray-500">
-                    执行工作流后将显示日志
+              )}
+              
+              {/* 选中节点的详情 */}
+              <div>
+                <h3 className="text-sm font-medium mb-2">节点详情</h3>
+                {selectedNode ? renderNodeDetails() : (
+                  <div className="text-center p-4 border rounded-md border-dashed">
+                    <p className="text-sm text-muted-foreground">
+                      点击工作流图中的节点查看详情
+                    </p>
                   </div>
                 )}
               </div>
+              
+              {/* 最终输出结果 */}
+              {executionState?.status === WorkflowExecutionStatus.COMPLETED && (
+                <div>
+                  <h3 className="text-sm font-medium mb-2">最终输出结果</h3>
+                  <pre className="text-xs bg-muted p-2 rounded-md overflow-auto max-h-40">
+                    {executionState.outputs.final 
+                      ? (typeof executionState.outputs.final === 'string'
+                        ? executionState.outputs.final
+                        : JSON.stringify(executionState.outputs.final, null, 2))
+                      : '无输出结果'}
+                  </pre>
+                </div>
+              )}
             </CardContent>
-            <CardFooter className="justify-between">
-              <div>
-                {isRunning ? (
-                  <span className="text-blue-500 flex items-center">
-                    <Circle className="animate-pulse mr-2 h-4 w-4" />
-                    执行中...
-                  </span>
-                ) : logs.length > 0 ? (
-                  <span className="text-green-500 flex items-center">
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    完成
-                  </span>
-                ) : null}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLogs([])}
-                disabled={logs.length === 0 || isRunning}
-              >
-                清除日志
-              </Button>
-            </CardFooter>
           </Card>
         </div>
       </div>

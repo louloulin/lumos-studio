@@ -1,72 +1,9 @@
 import { MastraAPI } from './mastra';
 import { Agent, AgentTool } from './types';
+import { toolService } from './ToolService';
 
 // 本地存储键
 const LOCAL_AGENTS_KEY = 'lumos_studio_agents';
-
-/**
- * 获取所有内置工具
- */
-export const getBuiltinTools = (): AgentTool[] => {
-  return [
-    {
-      id: 'web-search',
-      name: '网络搜索',
-      description: '从互联网搜索最新信息',
-      icon: '🔍',
-      parameters: [
-        {
-          name: 'query',
-          type: 'string',
-          description: '搜索查询',
-          required: true
-        }
-      ]
-    },
-    {
-      id: 'weather',
-      name: '天气查询',
-      description: '获取指定地点的天气信息',
-      icon: '🌤️',
-      parameters: [
-        {
-          name: 'location',
-          type: 'string',
-          description: '位置名称',
-          required: true
-        }
-      ]
-    },
-    {
-      id: 'calculator',
-      name: '计算器',
-      description: '执行数学计算',
-      icon: '🧮',
-      parameters: [
-        {
-          name: 'expression',
-          type: 'string',
-          description: '数学表达式',
-          required: true
-        }
-      ]
-    },
-    {
-      id: 'image-gen',
-      name: '图像生成',
-      description: '根据描述生成图像',
-      icon: '🖼️',
-      parameters: [
-        {
-          name: 'prompt',
-          type: 'string',
-          description: '图像描述',
-          required: true
-        }
-      ]
-    }
-  ];
-};
 
 /**
  * 智能体服务类
@@ -207,51 +144,52 @@ export class AgentService {
         systemAgent: response.systemAgent || false
       };
     } catch (error) {
-      console.error(`获取智能体 ${id} 失败:`, error);
+      console.error(`获取智能体ID ${id} 失败:`, error);
       return null;
     }
   }
 
   /**
-   * 创建新智能体 - 通过Mastra API
+   * 创建智能体
    */
   async createAgent(agent: Omit<Agent, 'id'>): Promise<Agent> {
     try {
-      // 准备创建智能体的参数
-      const createParams = {
-        name: agent.name,
-        description: agent.description,
-        instructions: agent.instructions || '',
-        model: agent.model || 'gpt-4o',
-        temperature: agent.temperature || 0.7,
-        maxTokens: agent.maxTokens || 4000,
-        tools: JSON.stringify(agent.tools || []),  // 确保工具数组转换为JSON字符串
-        systemAgent: false
+      // 序列化工具列表
+      let toolsString = '[]';
+      if (agent.tools && Array.isArray(agent.tools)) {
+        toolsString = JSON.stringify(agent.tools);
+      }
+      
+      // 准备参数
+      const agentParams = {
+        ...agent,
+        tools: toolsString
       };
       
       // 调用Mastra API创建智能体
-      const response = await MastraAPI.createAgent(createParams);
+      const result = await MastraAPI.createAgent(agentParams);
       
-      // 确保返回的数据中tools是数组格式
-      let tools = agent.tools || [];
-      if (response.tools && typeof response.tools === 'string') {
+      if (!result) {
+        throw new Error('创建智能体失败，API返回为空');
+      }
+      
+      // 解析工具
+      let tools = [];
+      if (result.tools && typeof result.tools === 'string') {
         try {
-          tools = JSON.parse(response.tools);
+          tools = JSON.parse(result.tools);
         } catch (e) {
-          console.warn('解析工具字符串失败，使用原始工具数组', e);
+          console.warn('解析创建的智能体工具失败:', e);
         }
       }
       
-      // 返回创建的智能体
       return {
-        ...agent,
-        id: response.id || this.generateUniqueId(),
-        tools,
-        systemAgent: false
+        ...result,
+        tools
       };
     } catch (error) {
       console.error('创建智能体失败:', error);
-      throw error;
+      throw new Error(`创建智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 
@@ -260,44 +198,42 @@ export class AgentService {
    */
   async updateAgent(agent: Agent): Promise<Agent | null> {
     try {
-      // 如果是系统智能体，则不允许更新
-      if (agent.systemAgent) {
-        console.warn('不能更新系统智能体');
-        return null;
+      // 序列化工具列表
+      let toolsString = '[]';
+      if (agent.tools && Array.isArray(agent.tools)) {
+        toolsString = JSON.stringify(agent.tools);
       }
-
-      // 准备更新参数
-      const updateParams = {
-        id: agent.id,
-        name: agent.name,
-        description: agent.description,
-        instructions: agent.instructions || '',
-        model: agent.model || 'gpt-4o',
-        temperature: agent.temperature || 0.7,
-        maxTokens: agent.maxTokens || 4000,
-        tools: JSON.stringify(agent.tools || []),  // 确保工具数组转换为JSON字符串
+      
+      // 准备参数
+      const agentParams = {
+        ...agent,
+        tools: toolsString
       };
       
-      // 调用API更新智能体
-      const response = await MastraAPI.updateAgent(agent.id, updateParams);
+      // 调用Mastra API更新智能体
+      const result = await MastraAPI.updateAgent(agent.id, agentParams);
       
-      // 解析返回数据中的tools字段
-      let tools = agent.tools || [];
-      if (response && response.tools && typeof response.tools === 'string') {
+      if (!result) {
+        throw new Error(`更新智能体ID ${agent.id} 失败，API返回为空`);
+      }
+      
+      // 解析工具
+      let tools = [];
+      if (result.tools && typeof result.tools === 'string') {
         try {
-          tools = JSON.parse(response.tools);
+          tools = JSON.parse(result.tools);
         } catch (e) {
-          console.warn(`解析更新后的智能体工具字符串失败`, e);
+          console.warn(`解析更新后的智能体ID ${agent.id} 工具失败:`, e);
         }
       }
       
       return {
-        ...agent,
+        ...result,
         tools
       };
     } catch (error) {
-      console.error('更新智能体失败:', error);
-      return null;
+      console.error(`更新智能体ID ${agent.id} 失败:`, error);
+      throw new Error(`更新智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 
@@ -306,23 +242,12 @@ export class AgentService {
    */
   async deleteAgent(id: string): Promise<boolean> {
     try {
-      // 先验证智能体是否存在
-      const agent = await this.getAgent(id);
-      if (!agent) {
-        return false;
-      }
-      
-      // 验证是否为系统智能体
-      if (agent.systemAgent) {
-        console.warn('不能删除系统智能体');
-        return false;
-      }
-      
       // 调用Mastra API删除智能体
-      return await MastraAPI.deleteAgent(id);
+      const result = await MastraAPI.deleteAgent(id);
+      return result;
     } catch (error) {
-      console.error(`删除智能体 ${id} 失败:`, error);
-      return false;
+      console.error(`删除智能体ID ${id} 失败:`, error);
+      throw new Error(`删除智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 
@@ -330,17 +255,12 @@ export class AgentService {
    * 导出智能体为JSON
    */
   async exportAgent(id: string): Promise<string | null> {
-    try {
-      const agent = await this.getAgent(id);
-      if (!agent) {
-        return null;
-      }
-
-      return JSON.stringify(agent, null, 2);
-    } catch (error) {
-      console.error(`导出智能体 ${id} 失败:`, error);
+    const agent = await this.getAgent(id);
+    if (!agent) {
       return null;
     }
+    
+    return JSON.stringify(agent, null, 2);
   }
 
   /**
@@ -348,36 +268,25 @@ export class AgentService {
    */
   async importAgent(agentData: string): Promise<Agent | null> {
     try {
-      // 解析智能体数据
-      const agent = JSON.parse(agentData) as Agent;
+      const parsedAgent = JSON.parse(agentData) as Agent;
       
-      // 确保智能体不是系统智能体
-      agent.systemAgent = false;
+      // 验证必要字段
+      if (!parsedAgent.name) {
+        throw new Error('无效的智能体数据：缺少名称字段');
+      }
       
-      // 准备创建智能体的参数
-      const createParams = {
-        name: agent.name,
-        description: agent.description,
-        instructions: agent.instructions || '',
-        model: agent.model || 'gpt-4o',
-        temperature: agent.temperature || 0.7,
-        maxTokens: agent.maxTokens || 4000,
-        tools: agent.tools || [],
+      // 创建新智能体，确保生成新ID
+      const { id, ...agentWithoutId } = parsedAgent;
+      
+      // 创建新智能体
+      return await this.createAgent({
+        ...agentWithoutId,
+        name: `${parsedAgent.name} (导入)`,
         systemAgent: false
-      };
-      
-      // 调用Mastra API创建智能体
-      const response = await MastraAPI.createAgent(createParams);
-      
-      // 返回创建的智能体
-      return {
-        ...agent,
-        id: response.id,
-        systemAgent: false
-      };
+      });
     } catch (error) {
-      console.error('导入智能体失败:', error);
-      return null;
+      console.error('导入智能体数据失败:', error);
+      throw new Error(`导入智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   }
 
@@ -385,9 +294,12 @@ export class AgentService {
    * 生成唯一ID
    */
   private generateUniqueId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2, 15);
+    return `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
   }
 }
 
-// 导出单例实例
-export const agentService = new AgentService(); 
+// 创建单例实例
+export const agentService = new AgentService();
+
+// 导出单例
+export default agentService; 

@@ -54,7 +54,8 @@ export interface Workflow {
 const LOCAL_WORKFLOWS_KEY = 'lumos_studio_workflows';
 
 export class WorkflowService {
-  private workflows: Workflow[] = [];
+  private workflows: Map<string, Workflow> = new Map();
+  private executors: Map<string, any> = new Map(); // 工作流执行器缓存
   
   constructor() {
     this.loadWorkflows();
@@ -67,11 +68,14 @@ export class WorkflowService {
     try {
       const storedWorkflows = localStorage.getItem(LOCAL_WORKFLOWS_KEY);
       if (storedWorkflows) {
-        this.workflows = JSON.parse(storedWorkflows);
+        const workflows = JSON.parse(storedWorkflows);
+        workflows.forEach((workflow: Workflow) => {
+          this.workflows.set(workflow.id, workflow);
+        });
       }
     } catch (error) {
       console.error('加载工作流失败:', error);
-      this.workflows = [];
+      this.workflows = new Map();
     }
   }
   
@@ -80,7 +84,8 @@ export class WorkflowService {
    */
   private saveWorkflows(): void {
     try {
-      localStorage.setItem(LOCAL_WORKFLOWS_KEY, JSON.stringify(this.workflows));
+      const workflows = Array.from(this.workflows.values());
+      localStorage.setItem(LOCAL_WORKFLOWS_KEY, JSON.stringify(workflows));
     } catch (error) {
       console.error('保存工作流失败:', error);
     }
@@ -90,14 +95,19 @@ export class WorkflowService {
    * 获取所有工作流
    */
   getWorkflows(): Workflow[] {
-    return [...this.workflows];
+    return Array.from(this.workflows.values());
   }
   
   /**
    * 根据ID获取工作流
    */
   getWorkflow(id: string): Workflow | null {
-    return this.workflows.find(workflow => workflow.id === id) || null;
+    const workflow = this.workflows.get(id);
+    if (!workflow) {
+      console.error(`工作流不存在: ${id}`);
+      return null;
+    }
+    return workflow;
   }
   
   /**
@@ -112,7 +122,7 @@ export class WorkflowService {
       updatedAt: now
     };
     
-    this.workflows.push(newWorkflow);
+    this.workflows.set(newWorkflow.id, newWorkflow);
     this.saveWorkflows();
     return newWorkflow;
   }
@@ -120,19 +130,21 @@ export class WorkflowService {
   /**
    * 更新工作流
    */
-  updateWorkflow(workflow: Workflow): Workflow | null {
-    const index = this.workflows.findIndex(w => w.id === workflow.id);
-    if (index === -1) {
-      console.error(`工作流 ${workflow.id} 不存在`);
+  updateWorkflow(id: string, updates: Partial<Workflow>): Workflow | null {
+    const workflow = this.getWorkflow(id);
+    if (!workflow) {
       return null;
     }
     
-    const updatedWorkflow = {
+    const now = Date.now();
+    
+    const updatedWorkflow: Workflow = {
       ...workflow,
-      updatedAt: Date.now()
+      ...updates,
+      updatedAt: now
     };
     
-    this.workflows[index] = updatedWorkflow;
+    this.workflows.set(updatedWorkflow.id, updatedWorkflow);
     this.saveWorkflows();
     return updatedWorkflow;
   }
@@ -141,10 +153,10 @@ export class WorkflowService {
    * 删除工作流
    */
   deleteWorkflow(id: string): boolean {
-    const initialLength = this.workflows.length;
-    this.workflows = this.workflows.filter(workflow => workflow.id !== id);
+    const initialLength = this.workflows.size;
+    this.workflows.delete(id);
     
-    if (this.workflows.length !== initialLength) {
+    if (this.workflows.size !== initialLength) {
       this.saveWorkflows();
       return true;
     }
@@ -156,7 +168,7 @@ export class WorkflowService {
    * 导出工作流为JSON
    */
   exportWorkflow(id: string): string | null {
-    const workflow = this.workflows.find(w => w.id === id);
+    const workflow = this.workflows.get(id);
     if (!workflow) {
       return null;
     }
@@ -180,7 +192,7 @@ export class WorkflowService {
       workflow.createdAt = now;
       workflow.updatedAt = now;
       
-      this.workflows.push(workflow);
+      this.workflows.set(workflow.id, workflow);
       this.saveWorkflows();
       return workflow;
     } catch (error) {
@@ -331,11 +343,55 @@ export { ${workflow.name.replace(/\s+/g, '')} };
   /**
    * 执行工作流
    */
-  async executeWorkflow(id: string, input: any): Promise<any> {
-    // 执行工作流的实际实现
-    // 这里将来需要与Mastra API集成
-    console.log(`执行工作流 ${id} 暂未实现，输入:`, input);
-    return { result: '工作流执行功能尚未实现' };
+  async executeWorkflow(id: string, input: any = {}): Promise<any> {
+    try {
+      const workflow = this.getWorkflow(id);
+      if (!workflow) {
+        throw new Error(`找不到工作流: ${id}`);
+      }
+      
+      // 动态导入工作流执行器以避免循环依赖
+      const { WorkflowExecutor } = await import('./WorkflowExecutor');
+      
+      // 创建执行器
+      const executor = new WorkflowExecutor(workflow, {
+        onNodeComplete: (result) => {
+          console.log(`节点执行完成: ${result.nodeId}`, result);
+        },
+        onWorkflowComplete: (state) => {
+          console.log('工作流执行完成', state);
+        },
+        onWorkflowError: (error, state) => {
+          console.error('工作流执行失败', error, state);
+        }
+      });
+      
+      // 缓存执行器
+      this.executors.set(id, executor);
+      
+      // 执行工作流并返回结果
+      const result = await executor.execute({ initial: input });
+      return result.outputs.final;
+    } catch (error) {
+      console.error(`执行工作流失败: ${id}`, error);
+      throw new Error(`执行工作流失败: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * 获取工作流执行器
+   */
+  getWorkflowExecutor(id: string): any {
+    return this.executors.get(id) || null;
+  }
+  
+  /**
+   * 清理工作流执行器缓存
+   */
+  clearExecutor(id: string): void {
+    if (this.executors.has(id)) {
+      this.executors.delete(id);
+    }
   }
   
   /**

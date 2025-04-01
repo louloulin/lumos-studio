@@ -12,12 +12,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Separator } from './ui/separator';
 import { 
   Save, ArrowLeft, Trash2, Wrench, MessageSquare, Brain, Database, 
-  Upload, Image, Info, Settings, AlertCircle 
+  Upload, Image, Info, Settings, AlertCircle, Plus, X 
 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Agent, AgentTool } from '@/api/types';
-import { agentService, getBuiltinTools } from '@/api/AgentService';
+import { agentService } from '@/api/AgentService';
+import { toolService, Tool, ToolParameter } from '@/api/ToolService';
 
 // 模拟大型语言模型选项
 const modelOptions = [
@@ -39,7 +40,7 @@ const defaultAgent: Agent = {
   model: 'gpt-4-turbo',
   temperature: 0.7,
   maxTokens: 4000,
-  tools: getBuiltinTools(),
+  tools: [],
   systemAgent: false
 };
 
@@ -54,13 +55,26 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
   const [loading, setLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [availableTools, setAvailableTools] = useState<Tool[]>([]);
+  const [mastraTools, setMastraTools] = useState<string[]>([]);
+  const [selectedTab, setSelectedTab] = useState('basic'); // 'basic', 'model', 'tools'
 
-  // 加载智能体数据
+  // 加载智能体数据和可用工具
   useEffect(() => {
-    const fetchAgent = async () => {
-      if (agentId && agentId !== 'new-agent') {
-        setLoading(true);
-        try {
+    const initialize = async () => {
+      setLoading(true);
+      try {
+        // 加载本地工具
+        const localTools = toolService.getAllTools();
+        
+        // 加载Mastra工具
+        const remoteMastraTools = await toolService.getMastraTools();
+        
+        setAvailableTools(localTools);
+        setMastraTools(remoteMastraTools);
+        
+        // 加载智能体
+        if (agentId && agentId !== 'new-agent') {
           const loadedAgent = await agentService.getAgent(agentId);
           if (loadedAgent) {
             // 确保Agent有所有必要字段
@@ -69,16 +83,29 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
               ...loadedAgent,
             });
           }
-        } catch (error) {
-          console.error('Failed to load agent:', error);
-          setErrorMessage('加载智能体数据时出错，请重试。');
-        } finally {
-          setLoading(false);
+        } else {
+          // 为新智能体设置默认工具集
+          setAgent(prev => ({
+            ...prev,
+            tools: localTools.slice(0, 2).map(tool => ({
+              id: tool.id,
+              name: tool.name,
+              description: tool.description,
+              icon: tool.icon,
+              parameters: tool.parameters,
+              enabled: false
+            }))
+          }));
         }
+      } catch (error) {
+        console.error('初始化智能体编辑器失败:', error);
+        setErrorMessage('加载数据时出错，请重试。');
+      } finally {
+        setLoading(false);
       }
     };
     
-    fetchAgent();
+    initialize();
   }, [agentId]);
 
   // 更新基本信息
@@ -97,6 +124,62 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
         tool.id === toolId ? { ...tool, enabled } : tool
       )
     }));
+    setIsDirty(true);
+  };
+
+  // 添加工具到智能体
+  const addToolToAgent = (toolId: string) => {
+    // 检查工具是否已存在
+    if (agent.tools?.some(tool => tool.id === toolId)) {
+      return;
+    }
+    
+    // 查找工具
+    const tool = availableTools.find(t => t.id === toolId);
+    
+    if (tool) {
+      // 添加本地工具
+      setAgent(prev => ({
+        ...prev,
+        tools: [
+          ...(prev.tools || []),
+          {
+            id: tool.id,
+            name: tool.name,
+            description: tool.description,
+            icon: tool.icon,
+            parameters: tool.parameters,
+            enabled: true
+          }
+        ]
+      }));
+    } else if (mastraTools.includes(toolId)) {
+      // 添加Mastra工具
+      setAgent(prev => ({
+        ...prev,
+        tools: [
+          ...(prev.tools || []),
+          {
+            id: toolId,
+            name: toolId,
+            description: `Mastra工具: ${toolId}`,
+            parameters: [],
+            enabled: true
+          }
+        ]
+      }));
+    }
+    
+    setIsDirty(true);
+  };
+
+  // 从智能体移除工具
+  const removeToolFromAgent = (toolId: string) => {
+    setAgent(prev => ({
+      ...prev,
+      tools: prev.tools?.filter(tool => tool.id !== toolId) || []
+    }));
+    
     setIsDirty(true);
   };
 
@@ -182,144 +265,236 @@ const AgentEditor: React.FC<AgentEditorProps> = ({ agentId, onSave, onCancel }) 
           </Alert>
         )}
 
-        {/* 基本信息区 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>基本信息</CardTitle>
-            <CardDescription>配置智能体的基本信息和外观</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-16 w-16">
-                {agent.avatar ? (
-                  <AvatarImage src={agent.avatar} alt={agent.name} />
-                ) : null}
-                <AvatarFallback className="text-lg">
-                  {agent.name.slice(0, 2)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-2">
-                <div className="grid gap-2">
-                  <Label htmlFor="agent-name">名称</Label>
-                  <Input
-                    id="agent-name"
-                    value={agent.name}
-                    onChange={(e) => updateBasicInfo('name', e.target.value)}
-                    placeholder="输入智能体名称"
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="agent-description">描述</Label>
-                  <Textarea
-                    id="agent-description"
-                    value={agent.description}
-                    onChange={(e) => updateBasicInfo('description', e.target.value)}
-                    placeholder="简要描述此智能体的功能和用途"
-                    rows={3}
-                  />
-                </div>
-                {/* 头像上传功能可以在这里添加 */}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* 标签页导航 */}
+        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="basic">基本信息</TabsTrigger>
+            <TabsTrigger value="model">模型设置</TabsTrigger>
+            <TabsTrigger value="tools">工具集成</TabsTrigger>
+          </TabsList>
 
-        {/* 模型和参数配置 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>模型和参数</CardTitle>
-            <CardDescription>选择语言模型和生成参数</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid gap-2">
-              <Label htmlFor="agent-model">模型</Label>
-              <Select
-                value={agent.model}
-                onValueChange={(value) => updateBasicInfo('model', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="选择语言模型" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modelOptions.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-sm text-muted-foreground">
-                选择底层语言模型将决定智能体的能力和成本
-              </p>
-            </div>
-
-            <div>
-              <Label className="mb-2 block">温度 ({agent.temperature})</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-sm">0.0</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={agent.temperature}
-                  onChange={(e) => updateBasicInfo('temperature', parseFloat(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-sm">1.0</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                较低的值使输出更确定，较高的值使输出更多样化
-              </p>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="agent-instructions">系统指令</Label>
-              <Textarea
-                id="agent-instructions"
-                value={agent.instructions || ''}
-                onChange={(e) => updateBasicInfo('instructions', e.target.value)}
-                placeholder="给智能体的详细指令..."
-                rows={6}
-              />
-              <p className="text-sm text-muted-foreground">
-                系统指令定义智能体的行为、能力和限制
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 工具集成 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>工具集成</CardTitle>
-            <CardDescription>启用智能体可以使用的工具</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {agent.tools && agent.tools.map(tool => (
-                <div key={tool.id} className="flex items-start space-x-3 p-3 border rounded-md">
-                  <Checkbox
-                    id={`tool-${tool.id}`}
-                    checked={!!tool.enabled}
-                    onCheckedChange={(checked) => updateToolStatus(tool.id, !!checked)}
-                  />
-                  <div className="flex-1">
-                    <Label
-                      htmlFor={`tool-${tool.id}`}
-                      className="text-base font-medium cursor-pointer"
-                    >
-                      {tool.name}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {tool.description}
-                    </p>
+          {/* 基本信息标签页 */}
+          <TabsContent value="basic" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>基本信息</CardTitle>
+                <CardDescription>配置智能体的基本信息和外观</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <Avatar className="h-16 w-16">
+                    {agent.avatar ? (
+                      <AvatarImage src={agent.avatar} alt={agent.name} />
+                    ) : null}
+                    <AvatarFallback className="text-lg">
+                      {agent.name.slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="agent-name">名称</Label>
+                      <Input
+                        id="agent-name"
+                        value={agent.name}
+                        onChange={(e) => updateBasicInfo('name', e.target.value)}
+                        placeholder="输入智能体名称"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="agent-description">描述</Label>
+                      <Textarea
+                        id="agent-description"
+                        value={agent.description}
+                        onChange={(e) => updateBasicInfo('description', e.target.value)}
+                        placeholder="简要描述此智能体的功能和用途"
+                        rows={3}
+                      />
+                    </div>
+                    {/* 头像上传功能可以在这里添加 */}
                   </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* 模型设置标签页 */}
+          <TabsContent value="model" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>模型和参数</CardTitle>
+                <CardDescription>选择语言模型和生成参数</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="agent-model">模型</Label>
+                  <Select
+                    value={agent.model}
+                    onValueChange={(value) => updateBasicInfo('model', value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择语言模型" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-muted-foreground">
+                    选择底层语言模型将决定智能体的能力和成本
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="mb-2 block">温度 ({agent.temperature})</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">0.0</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={agent.temperature}
+                      onChange={(e) => updateBasicInfo('temperature', parseFloat(e.target.value))}
+                      className="flex-1"
+                    />
+                    <span className="text-sm">1.0</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    较低的值使输出更确定，较高的值使输出更多样化
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="agent-instructions">系统指令</Label>
+                  <Textarea
+                    id="agent-instructions"
+                    value={agent.instructions || ''}
+                    onChange={(e) => updateBasicInfo('instructions', e.target.value)}
+                    placeholder="给智能体的详细指令..."
+                    rows={6}
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    系统指令定义智能体的行为、能力和限制
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* 工具集成标签页 */}
+          <TabsContent value="tools" className="space-y-4 mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>工具集成</CardTitle>
+                <CardDescription>启用智能体可以使用的工具</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <Label className="mb-2 block">添加工具</Label>
+                  <div className="flex gap-2">
+                    <Select onValueChange={addToolToAgent}>
+                      <SelectTrigger className="w-64">
+                        <SelectValue placeholder="选择要添加的工具" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="" disabled>选择工具</SelectItem>
+                        {availableTools.length > 0 && (
+                          <>
+                            <SelectItem value="local-tools-header" disabled>-- 本地工具 --</SelectItem>
+                            {availableTools.map(tool => (
+                              <SelectItem key={tool.id} value={tool.id}>
+                                {tool.icon && <span className="mr-2">{tool.icon}</span>}
+                                {tool.name}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                        {mastraTools.length > 0 && (
+                          <>
+                            <SelectItem value="mastra-tools-header" disabled>-- Mastra工具 --</SelectItem>
+                            {mastraTools.map(toolId => (
+                              <SelectItem key={toolId} value={toolId}>
+                                {toolId}
+                              </SelectItem>
+                            ))}
+                          </>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => toolService.refreshMastraTools().then(setMastraTools)}
+                      title="刷新工具列表"
+                    >
+                      刷新
+                    </Button>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <Label className="mb-2 block">已配置的工具</Label>
+                <div className="space-y-4">
+                  {agent.tools && agent.tools.length > 0 ? (
+                    agent.tools.map(tool => (
+                      <div key={tool.id} className="flex items-start space-x-3 p-3 border rounded-md">
+                        <Checkbox
+                          id={`tool-${tool.id}`}
+                          checked={!!tool.enabled}
+                          onCheckedChange={(checked) => updateToolStatus(tool.id, !!checked)}
+                        />
+                        <div className="flex-1">
+                          <div className="flex justify-between items-center">
+                            <Label
+                              htmlFor={`tool-${tool.id}`}
+                              className="text-base font-medium cursor-pointer"
+                            >
+                              {tool.icon && <span className="mr-2">{tool.icon}</span>}
+                              {tool.name}
+                            </Label>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={() => removeToolFromAgent(tool.id)}
+                              title="移除工具"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {tool.description}
+                          </p>
+                          {tool.parameters && tool.parameters.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-xs text-muted-foreground mb-1">参数:</p>
+                              <div className="text-xs">
+                                {tool.parameters.map(param => (
+                                  <Badge key={param.name} variant="outline" className="mr-1 mb-1">
+                                    {param.name}{param.required ? '*' : ''}: {param.type}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center p-4 border rounded-md border-dashed">
+                      <p className="text-muted-foreground">尚未添加任何工具</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        从上方下拉菜单中选择工具添加到智能体
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

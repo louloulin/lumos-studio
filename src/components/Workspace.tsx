@@ -727,6 +727,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
                 ? '智能体市场'
                 : activeView === 'editor'
                 ? '智能体编辑器'
+                : activeView === 'workflow'
+                ? '工作流构建器'
+                : activeView === 'agent-manager'
+                ? '智能体管理'
                 : '设置'}
             </h1>
             
@@ -734,7 +738,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           </header>
         )}
         
-        {/* 非移动设备顶部栏 - 添加返回旧界面按钮 */}
+        {/* 非移动设备顶部栏 */}
         {!isMobile && (
           <header className="flex items-center justify-between p-3 border-b border-border">
             <h1 className="text-lg font-semibold">
@@ -750,36 +754,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
                 ? '智能体管理'
                 : '设置'}
             </h1>
-            
-            <Button 
-              variant="secondary" 
-              className="text-sm flex items-center" 
-              onClick={() => {
-                // 切换回旧界面 - 使用更强硬的方式
-                try {
-                  // 先设置localStorage
-                  localStorage.setItem('force_new_ui', 'false');
-                  console.log("切换到旧界面 - localStorage已设置");
-                  
-                  // 清除hash
-                  if (window.location.hash) {
-                    history.pushState("", document.title, window.location.pathname + window.location.search);
-                    console.log("切换到旧界面 - hash已清除");
-                  }
-                  
-                  // 强制添加一个查询参数，保证会刷新且使用旧UI
-                  const newUrl = window.location.pathname + "?legacy=true&t=" + Date.now();
-                  console.log("切换到旧界面 - 即将跳转到:", newUrl);
-                  window.location.href = newUrl;
-                } catch (e) {
-                  console.error("切换界面出错:", e);
-                  alert("切换界面失败，请刷新页面重试");
-                }
-              }}
-            >
-              <ChevronLeft className="mr-1 h-4 w-4" />
-              返回旧界面
-            </Button>
           </header>
         )}
         

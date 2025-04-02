@@ -44,7 +44,7 @@ async function getMastraUrl(): Promise<string> {
     await loadTauriAPI().catch(() => {});
 
     // 默认端口，如果所有尝试都失败
-    const DEFAULT_PORT = 4112;
+    const DEFAULT_PORT = 4111;
     
     while (retries < maxRetries) {
       try {
@@ -86,7 +86,7 @@ async function getMastraUrl(): Promise<string> {
     return `http://localhost:${DEFAULT_PORT}`; // 使用默认端口
   } catch (error) {
     console.error('Failed to get Mastra service URL:', error);
-    return 'http://localhost:4112'; // 修改默认端口为4112
+    return 'http://localhost:4111'; // 修改默认端口为4111
   }
 }
 

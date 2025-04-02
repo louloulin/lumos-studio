@@ -29,6 +29,7 @@ import AgentEditor from './AgentEditor';
 import SettingsPage from './SettingsPage';
 import WorkflowBuilder from './WorkflowBuilder';
 import AgentsPage from "../pages/AgentsPage";
+import PluginMarketPage from "../pages/PluginMarketPage";
 import { useNavigate } from 'react-router-dom';
 
 // 定义会话类型
@@ -92,6 +93,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const navigateTo = (view: ViewType, id?: string) => {
     setActiveView(view);
     
+    // 对于插件视图，只更新状态，不进行路由导航
+    if (view === 'plugins') {
+      // 不需要导航，直接在 renderMainContent 中渲染组件
+      return;
+    }
+    
     // 根据视图类型设置URL，统一使用 React Router 导航
     switch (view) {
       case 'chat':
@@ -120,9 +127,6 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
         break;
       case 'settings':
         navigate('/settings');
-        break;
-      case 'plugins':
-        navigate('/plugins/market');
         break;
       default:
         navigate('/');
@@ -255,7 +259,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     }
   };
 
-  // 渲染主内容
+  // 修改 renderMainContent 方法，直接渲染插件市场页面
   const renderMainContent = () => {
     // 如果currentPage属性被提供，我们用它来决定显示哪个页面
     if (currentPage) {
@@ -268,8 +272,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           // 使用工作流组件代替不存在的Whiteboard组件
           return <WorkflowBuilder />;
         case 'plugins':
-          // 这种情况会直接通过路由处理，不需要在这里渲染内容
-          return null;
+          // 直接在这里渲染插件市场页面
+          return <PluginMarketPage />;
         case 'chat':
           // 如果是聊天页面，使用现有逻辑
           break;
@@ -304,8 +308,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     } else if (activeView === 'workflow') {
       return <WorkflowBuilder />;
     } else if (activeView === 'plugins') {
-      // 这种情况会直接通过路由处理，不需要在这里渲染内容
-      return null;
+      // 直接渲染插件市场页面，而不是返回 null
+      return <PluginMarketPage />;
     } else {
       return <div className="flex items-center justify-center h-full">请选择一个会话或功能</div>;
     }
@@ -700,6 +704,27 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
       
       {/* 主内容 */}
       <main className="flex-1 flex flex-col h-full">
+        {/* 非移动设备顶部栏 */}
+        {!isMobile && (
+          <header className="flex items-center justify-between p-3 border-b border-border">
+            <h1 className="text-lg font-semibold">
+              {activeView === 'chat' && currentSession 
+                ? currentSession.name 
+                : activeView === 'market'
+                ? '模型市场'
+                : activeView === 'editor'
+                ? '模型编辑器'
+                : activeView === 'workflow'
+                ? '工作流构建器'
+                : activeView === 'agent-manager'
+                ? '模型管理'
+                : activeView === 'plugins'
+                ? '插件市场'
+                : '设置'}
+            </h1>
+          </header>
+        )}
+        
         {/* 仅在移动视图显示的顶部栏 */}
         {isMobile && (
           <header className="flex items-center justify-between p-3 border-b border-border">
@@ -722,29 +747,12 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
                 ? '工作流构建器'
                 : activeView === 'agent-manager'
                 ? '模型管理'
+                : activeView === 'plugins'
+                ? '插件市场'
                 : '设置'}
             </h1>
             
             <div className="w-8" /> {/* 占位元素，保持标题居中 */}
-          </header>
-        )}
-        
-        {/* 非移动设备顶部栏 */}
-        {!isMobile && (
-          <header className="flex items-center justify-between p-3 border-b border-border">
-            <h1 className="text-lg font-semibold">
-              {activeView === 'chat' && currentSession 
-                ? currentSession.name 
-                : activeView === 'market'
-                ? '模型市场'
-                : activeView === 'editor'
-                ? '模型编辑器'
-                : activeView === 'workflow'
-                ? '工作流构建器'
-                : activeView === 'agent-manager'
-                ? '模型管理'
-                : '设置'}
-            </h1>
           </header>
         )}
         

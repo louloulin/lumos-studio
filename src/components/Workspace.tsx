@@ -93,47 +93,22 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const navigateTo = (view: ViewType, id?: string) => {
     setActiveView(view);
     
-    // 对于插件视图，只更新状态，不进行路由导航
-    if (view === 'plugins') {
-      // 不需要导航，直接在 renderMainContent 中渲染组件
+    // 对于所有视图，只更新状态，不进行路由导航
+    // 保持菜单功能，所有页面都作为子标签页显示
+    if (['plugins', 'market', 'workflow', 'editor', 'agent-manager'].includes(view)) {
+      // 如果是编辑器视图且有ID，保存ID到状态
+      if (view === 'editor' && id) {
+        setEditingAgentId(id);
+      }
       return;
     }
     
-    // 根据视图类型设置URL，统一使用 React Router 导航
-    switch (view) {
-      case 'chat':
-        if (id) {
-          navigate(`/chat/${id}`);
-          setSelectedSessionId(id);
-        } else {
-          navigate('/chat');
-        }
-        break;
-      case 'market':
-        navigate('/agents/market');
-        break;
-      case 'editor':
-        if (id) {
-          navigate(`/editor/${id}`);
-        } else {
-          navigate('/editor');
-        }
-        break;
-      case 'workflow':
-        navigate('/workflow');
-        break;
-      case 'agent-manager':
-        navigate('/agents');
-        break;
-      case 'settings':
-        navigate('/settings');
-        break;
-      default:
-        navigate('/');
-        break;
+    // 对于聊天视图，更新选中的会话ID
+    if (view === 'chat' && id) {
+      setSelectedSessionId(id);
     }
     
-    // 如果在聊天视图，确保currentSession正确反映选择的会话
+    // 强制重新渲染内容区域
     setTimeout(() => {
       if (view === 'chat' && id) {
         const session = sessions.find(s => s.id === id);
@@ -190,14 +165,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     ];
     
     setSessions(demoSessions);
-    setSelectedSessionId('1');
-    // 使用setTimeout避免在状态更新过程中修改URL
-    setTimeout(() => {
-      if (currentPage === 'chat' || !currentPage) {
-        navigateTo('chat', '1');
-      }
-    }, 0);
-  }, [navigate, currentPage]);
+    
+    // 如果当前页面是聊天或未指定，设置为聊天视图
+    if (currentPage === 'chat' || !currentPage) {
+      setSelectedSessionId('1');
+      setActiveView('chat');
+    }
+  }, [currentPage]);
 
   // 创建新会话
   const createNewSession = (agentId: string, name: string) => {
@@ -211,7 +185,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     setSessions(prev => [newSession, ...prev]);
     setSelectedSessionId(newSession.id);
     setShowNewSessionDialog(false);
-    navigateTo('chat', newSession.id);
+    setActiveView('chat');
   };
 
   // 获取当前会话

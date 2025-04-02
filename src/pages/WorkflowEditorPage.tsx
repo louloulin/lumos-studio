@@ -5,9 +5,17 @@ import { Workflow, workflowService } from '@/api/WorkflowService';
 import { ReactFlowProvider } from 'reactflow';
 import { Loader2 } from 'lucide-react';
 
-export default function WorkflowEditorPage() {
-  const { id } = useParams<{ id: string }>();
+interface WorkflowEditorPageProps {
+  id?: string | null;
+  onBack?: () => void;
+}
+
+export default function WorkflowEditorPage({ id: propId, onBack: propOnBack }: WorkflowEditorPageProps) {
+  // 支持通过props或路由参数获取id
+  const params = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const id = propId || params.id;
+  
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,7 +61,13 @@ export default function WorkflowEditorPage() {
 
   // 返回工作流列表
   const handleBack = () => {
-    navigate('/workflow');
+    if (propOnBack) {
+      // 如果提供了回调函数，使用回调函数
+      propOnBack();
+    } else {
+      // 否则使用路由导航
+      navigate('/workflow');
+    }
   };
 
   if (loading) {

@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/card';
 import { Workflow, workflowService } from '@/api/WorkflowService';
 import { Plus, PlusCircle, Edit, Play, Trash } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { 
   Dialog, 
   DialogContent, 
@@ -21,8 +20,33 @@ import {
 } from '@/components/ui/dialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Separator } from './ui/separator';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
+import { 
+  Download, 
+  MoreVertical, 
+  Trash2, 
+  Share2,
+  AlertCircle
+} from 'lucide-react';
 
-const WorkflowBuilder = () => {
+// 在应用内打开工作流编辑器和运行页面
+interface WorkflowBuilderProps {
+  onOpenEditor?: (id: string) => void;
+  onOpenRunner?: (id: string) => void;
+}
+
+const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onOpenEditor, onOpenRunner }) => {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +54,9 @@ const WorkflowBuilder = () => {
   const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importJson, setImportJson] = useState('');
-  const navigate = useNavigate();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [newWorkflowName, setNewWorkflowName] = useState('');
+  const [newWorkflowDescription, setNewWorkflowDescription] = useState('');
   
   // 初始化时加载工作流列表
   useEffect(() => {
@@ -55,115 +81,130 @@ const WorkflowBuilder = () => {
   
   // 创建新工作流
   const handleCreateWorkflow = () => {
-    navigate('/workflow/editor/new');
+    setCreateDialogOpen(true);
+  };
+  
+  // 确认创建新工作流
+  const confirmCreateWorkflow = () => {
+    if (!newWorkflowName.trim()) return;
+    
+    const newWorkflow = workflowService.createWorkflow({
+      name: newWorkflowName,
+      description: newWorkflowDescription,
+      nodes: [],
+      edges: []
+    });
+    
+    setWorkflows(prev => [newWorkflow, ...prev]);
+    setCreateDialogOpen(false);
+    setNewWorkflowName('');
+    setNewWorkflowDescription('');
+    
+    // 如果提供了编辑器打开回调函数，则调用它
+    if (onOpenEditor) {
+      onOpenEditor(newWorkflow.id);
+    }
   };
   
   // 编辑工作流
   const handleEditWorkflow = (id: string) => {
-    navigate(`/workflow/editor/${id}`);
+    if (onOpenEditor) {
+      onOpenEditor(id);
+    } else {
+      // 如果没有提供回调，则使用默认行为
+      console.log('工作流编辑器打开回调未提供');
+    }
   };
   
   // 运行工作流
   const handleRunWorkflow = (id: string) => {
-    navigate(`/workflow/run/${id}`);
+    if (onOpenRunner) {
+      onOpenRunner(id);
+    } else {
+      // 如果没有提供回调，则使用默认行为
+      console.log('工作流运行器打开回调未提供');
+    }
   };
   
-  // 删除工作流确认
-  const confirmDelete = (id: string) => {
+  // 删除工作流
+  const handleDeleteWorkflow = (id: string) => {
     setWorkflowToDelete(id);
     setDeleteDialogOpen(true);
   };
   
-  // 执行删除工作流
-  const handleDeleteWorkflow = () => {
+  // 确认删除工作流
+  const confirmDeleteWorkflow = () => {
     if (workflowToDelete) {
-      const success = workflowService.deleteWorkflow(workflowToDelete);
-      
-      if (success) {
-        setWorkflows(prevWorkflows => 
-          prevWorkflows.filter(wf => wf.id !== workflowToDelete)
-        );
-      } else {
-        setError('删除工作流失败');
-      }
-      
+      workflowService.deleteWorkflow(workflowToDelete);
+      setWorkflows(prev => prev.filter(w => w.id !== workflowToDelete));
       setDeleteDialogOpen(false);
       setWorkflowToDelete(null);
     }
   };
   
   // 导入工作流
-  const handleImport = () => {
-    if (!importJson.trim()) {
-      return;
-    }
-    
+  const handleImportWorkflow = () => {
+    setImportDialogOpen(true);
+  };
+  
+  // 确认导入工作流
+  const confirmImportWorkflow = () => {
     try {
-      const imported = workflowService.importWorkflow(importJson);
-      
-      if (imported) {
-        loadWorkflows();
+      const importedWorkflow = workflowService.importWorkflow(importJson);
+      if (importedWorkflow) {
+        setWorkflows(prev => [importedWorkflow, ...prev]);
         setImportDialogOpen(false);
         setImportJson('');
       } else {
-        setError('导入工作流失败');
+        throw new Error('导入失败');
       }
     } catch (err) {
       console.error('导入工作流失败:', err);
-      setError('工作流格式无效');
+      setError('导入工作流失败，请检查JSON格式是否正确');
     }
   };
   
   // 导出工作流
-  const handleExport = (id: string) => {
-    const jsonData = workflowService.exportWorkflow(id);
-    
-    if (jsonData) {
+  const handleExportWorkflow = (id: string) => {
+    const exportedJson = workflowService.exportWorkflow(id);
+    if (exportedJson) {
       // 创建下载链接
-      const blob = new Blob([jsonData], { type: 'application/json' });
+      const blob = new Blob([exportedJson], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      
       const workflow = workflows.find(w => w.id === id);
-      const filename = workflow ? 
-        `${workflow.name.replace(/\s+/g, '_')}_workflow.json` : 
-        'workflow.json';
-      
       a.href = url;
-      a.download = filename;
+      a.download = `${workflow?.name || 'workflow'}.json`;
       document.body.appendChild(a);
       a.click();
-      
-      // 清理
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }, 0);
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   };
-
+  
   return (
-    <div className="container p-4 h-full overflow-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6 py-4">
+      {/* 顶部按钮和标题 */}
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold mb-1">工作流管理</h1>
-          <p className="text-muted-foreground">创建和管理自动化工作流</p>
+          <h1 className="text-2xl font-semibold">工作流管理</h1>
+          <p className="text-muted-foreground">创建和管理自动化工作流程</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setImportDialogOpen(true)} variant="outline">
-            导入工作流
-          </Button>
           <Button onClick={handleCreateWorkflow}>
-            <Plus className="mr-2 h-4 w-4" />
-            新建工作流
+            <Plus className="w-4 h-4 mr-2" />
+            创建工作流
+          </Button>
+          <Button variant="outline" onClick={handleImportWorkflow}>
+            <Share2 className="w-4 h-4 mr-2" />
+            导入工作流
           </Button>
         </div>
       </div>
       
-      <Separator className="mb-6" />
-      
       {error && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
           <AlertTitle>错误</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
@@ -203,57 +244,54 @@ const WorkflowBuilder = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {workflows.map(workflow => (
-                <Card key={workflow.id} className="overflow-hidden">
+                <Card key={workflow.id}>
                   <CardHeader>
                     <CardTitle>{workflow.name}</CardTitle>
                     <CardDescription>
-                      {workflow.description || '无描述'}
+                      创建于 {new Date(workflow.createdAt).toLocaleDateString()}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>节点: {workflow.nodes.length}</span>
-                      <span>•</span>
-                      <span>连接: {workflow.edges.length}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-2">
-                      创建于: {new Date(workflow.createdAt).toLocaleString()}
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {workflow.description || '无描述'}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {workflow.tags?.map(tag => (
+                        <Badge key={tag} variant="outline">
+                          {tag}
+                        </Badge>
+                      ))}
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
+                    <Button variant="outline" size="sm" onClick={() => handleRunWorkflow(workflow.id)}>
+                      <Play className="mr-2 h-4 w-4" />
+                      运行
+                    </Button>
                     <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => handleRunWorkflow(workflow.id)}
-                        title="执行工作流"
-                      >
-                        <Play className="h-4 w-4" />
+                      <Button variant="outline" size="sm" onClick={() => handleEditWorkflow(workflow.id)}>
+                        <Edit className="mr-1 h-4 w-4" />
+                        编辑
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="icon"
-                        onClick={() => handleEditWorkflow(workflow.id)}
-                        title="编辑工作流"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => handleExport(workflow.id)}
-                      >
-                        导出
-                      </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="icon"
-                        onClick={() => confirmDelete(workflow.id)}
-                        title="删除工作流"
-                      >
-                        <Trash className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>操作</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => handleExportWorkflow(workflow.id)}>
+                            <Download className="mr-2 h-4 w-4" />
+                            导出
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteWorkflow(workflow.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            删除
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </CardFooter>
                 </Card>
@@ -269,44 +307,72 @@ const WorkflowBuilder = () => {
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              您确定要删除此工作流吗？此操作无法撤销。
+              您确定要删除这个工作流吗？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
-              取消
-            </Button>
-            <Button variant="destructive" onClick={handleDeleteWorkflow}>
-              删除
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>取消</Button>
+            <Button variant="destructive" onClick={confirmDeleteWorkflow}>删除</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
-      {/* 导入对话框 */}
+      {/* 导入工作流对话框 */}
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>导入工作流</DialogTitle>
             <DialogDescription>
-              粘贴工作流的JSON数据以导入
+              粘贴工作流JSON定义以导入。
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
-            <textarea
-              className="w-full h-40 p-2 border rounded"
-              placeholder='{"name": "工作流名称", "nodes": [...], "edges": [...]}'
+          <div className="my-4">
+            <Textarea 
+              placeholder="在此粘贴JSON..." 
+              className="min-h-[200px]" 
               value={importJson}
               onChange={(e) => setImportJson(e.target.value)}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>
-              取消
-            </Button>
-            <Button onClick={handleImport}>
-              导入
-            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)}>取消</Button>
+            <Button onClick={confirmImportWorkflow}>导入</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* 创建工作流对话框 */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>创建新工作流</DialogTitle>
+            <DialogDescription>
+              给您的新工作流起个名字和描述。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="my-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="workflow-name">名称</Label>
+              <Input 
+                id="workflow-name" 
+                placeholder="工作流名称" 
+                value={newWorkflowName}
+                onChange={(e) => setNewWorkflowName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="workflow-description">描述 (可选)</Label>
+              <Textarea 
+                id="workflow-description" 
+                placeholder="描述此工作流的用途和功能..." 
+                value={newWorkflowDescription}
+                onChange={(e) => setNewWorkflowDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>取消</Button>
+            <Button onClick={confirmCreateWorkflow}>创建</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

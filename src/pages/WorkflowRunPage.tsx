@@ -83,9 +83,16 @@ const nodeStatusIcons = {
   [NodeExecutionStatus.SKIPPED]: <ArrowRight className="h-4 w-4" />
 };
 
-export default function WorkflowRunPage() {
-  const { id } = useParams<{ id: string }>();
+interface WorkflowRunPageProps {
+  id?: string | null;
+  onBack?: () => void;
+}
+
+export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: WorkflowRunPageProps) {
+  // 支持通过props或路由参数获取id
+  const params = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const id = propId || params.id;
   
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
   const [executionState, setExecutionState] = useState<WorkflowExecutionState | null>(null);
@@ -115,10 +122,10 @@ export default function WorkflowRunPage() {
       id: node.id,
       type: node.type.toLowerCase(),
       data: {
-        label: node.label,
-        ...node.config
+        ...node,
+        name: node.name
       },
-      position: { x: node.x, y: node.y },
+      position: node.position || { x: 0, y: 0 },
       className: 'bg-background border-2 border-muted rounded-md shadow-sm'
     }));
     
@@ -128,7 +135,7 @@ export default function WorkflowRunPage() {
       target: edge.target,
       label: edge.label || '',
       data: {
-        condition: edge.condition
+        ...edge
       }
     }));
     
@@ -477,12 +484,23 @@ export default function WorkflowRunPage() {
     );
   };
   
+  // 返回工作流列表
+  const handleBack = () => {
+    if (propOnBack) {
+      // 如果提供了回调函数，使用回调函数
+      propOnBack();
+    } else {
+      // 否则使用路由导航
+      navigate('/workflow');
+    }
+  };
+  
   return (
     <div className="h-screen flex flex-col">
       {/* 顶部工具栏 */}
       <div className="border-b p-4 flex justify-between items-center">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigate('/workflow')}>
+          <Button variant="outline" size="icon" onClick={handleBack}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>

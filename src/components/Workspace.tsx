@@ -30,6 +30,8 @@ import SettingsPage from './SettingsPage';
 import WorkflowBuilder from './WorkflowBuilder';
 import AgentsPage from "../pages/AgentsPage";
 import PluginMarketPage from "../pages/PluginMarketPage";
+import WorkflowEditorPage from '../pages/WorkflowEditorPage';
+import WorkflowRunPage from '../pages/WorkflowRunPage';
 import { useNavigate } from 'react-router-dom';
 
 // 定义会话类型
@@ -63,6 +65,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const [isMobile, setIsMobile] = useState(false);
   const initializedRef = useRef(false);
   const navigate = useNavigate();
+  
+  // 工作流相关状态
+  const [editingWorkflowId, setEditingWorkflowId] = useState<string | null>(null);
+  const [runningWorkflowId, setRunningWorkflowId] = useState<string | null>(null);
+  const [workflowView, setWorkflowView] = useState<'list' | 'editor' | 'run'>('list');
   
   // 从URL获取初始视图
   useEffect(() => {
@@ -233,59 +240,82 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     }
   };
 
-  // 修改 renderMainContent 方法，直接渲染插件市场页面
-  const renderMainContent = () => {
-    // 如果currentPage属性被提供，我们用它来决定显示哪个页面
-    if (currentPage) {
-      switch (currentPage) {
-        case 'agents':
-          return <AgentsPage />;
-        case 'workflow':
-          return <WorkflowBuilder />;
-        case 'whiteboard':
-          // 使用工作流组件代替不存在的Whiteboard组件
-          return <WorkflowBuilder />;
-        case 'plugins':
-          // 直接在这里渲染插件市场页面
-          return <PluginMarketPage />;
-        case 'chat':
-          // 如果是聊天页面，使用现有逻辑
-          break;
-        default:
-          // 如果没有匹配的页面，继续使用现有逻辑
-          break;
-      }
+  // 工作流相关处理函数
+  const handleOpenWorkflowEditor = (id: string) => {
+    setEditingWorkflowId(id);
+    setWorkflowView('editor');
+  };
+  
+  const handleOpenWorkflowRunner = (id: string) => {
+    setRunningWorkflowId(id);
+    setWorkflowView('run');
+  };
+  
+  const handleBackToWorkflowList = () => {
+    setWorkflowView('list');
+    setEditingWorkflowId(null);
+    setRunningWorkflowId(null);
+  };
+  
+  // 渲染工作流内容
+  const renderWorkflowContent = () => {
+    switch (workflowView) {
+      case 'editor':
+        return (
+          <WorkflowEditorPage 
+            id={editingWorkflowId} 
+            onBack={handleBackToWorkflowList} 
+          />
+        );
+      case 'run':
+        return (
+          <WorkflowRunPage 
+            id={runningWorkflowId} 
+            onBack={handleBackToWorkflowList} 
+          />
+        );
+      case 'list':
+      default:
+        return (
+          <WorkflowBuilder 
+            onOpenEditor={handleOpenWorkflowEditor}
+            onOpenRunner={handleOpenWorkflowRunner}
+          />
+        );
     }
-    
-    // 使用现有的activeView逻辑作为后备
-    if (activeView === 'chat' && currentSession) {
-      return <MastraChat sessionId={currentSession.id} agentId={currentSession.agentId} />;
-    } else if (activeView === 'market') {
-      return <AgentMarket onSelectAgent={(agentId: string, agentName: string) => {
-        createNewSession(agentId, agentName);
-      }} mode="explore" />;
-    } else if (activeView === 'agent-manager') {
-      return <AgentMarket onSelectAgent={(agentId: string, agentName: string) => {
-        setEditingAgentId(agentId);
-        navigateTo('editor', agentId);
-      }} mode="manage" />;
-    } else if (activeView === 'editor') {
-      return <AgentEditor agentId={editingAgentId || undefined} onSave={() => {
-        if (editingAgentId) {
-          navigateTo('agent-manager');
-        } else {
-          navigateTo('market');
-        }
-      }} />;
-    } else if (activeView === 'settings') {
-      return <SettingsPage />;
-    } else if (activeView === 'workflow') {
-      return <WorkflowBuilder />;
-    } else if (activeView === 'plugins') {
-      // 直接渲染插件市场页面，而不是返回 null
-      return <PluginMarketPage />;
-    } else {
-      return <div className="flex items-center justify-center h-full">请选择一个会话或功能</div>;
+  };
+
+  // 渲染主内容区域
+  const renderMainContent = () => {
+    switch (activeView) {
+      case 'plugins':
+        return <PluginMarketPage />;
+      case 'market':
+        return <AgentMarket />;
+      case 'editor':
+        return <AgentEditor agentId={editingAgentId || undefined} onSave={() => setActiveView('chat')} />;
+      case 'settings':
+        return <SettingsPage />;
+      case 'workflow':
+        return <div className="flex-1 h-screen overflow-auto">{renderWorkflowContent()}</div>;
+      case 'agent-manager':
+        return <AgentsPage />;
+      case 'chat':
+      default:
+        return selectedSessionId && currentSession ? (
+          <MastraChat sessionId={currentSession.id} agentId={currentSession.agentId} />
+        ) : (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold">没有选择会话</h2>
+              <p className="text-muted-foreground">请从左侧选择一个会话或创建新会话</p>
+              <Button onClick={() => setShowNewSessionDialog(true)}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                创建新会话
+              </Button>
+            </div>
+          </div>
+        );
     }
   };
 

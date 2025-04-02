@@ -211,8 +211,10 @@ export const MastraAPI = {
       
       // 使用类型断言修复类型错误
       const result = await (agentStorageTool.execute as any)({
-        operation: 'create',
-        agent: agentParams
+        data: {
+          operation: 'create',
+          agent: agentParams
+        }
       });
       
       if (!result.success) {
@@ -239,8 +241,10 @@ export const MastraAPI = {
       
       // 使用类型断言和直接参数传递
       const result = await (agentStorageTool.execute as any)({
-        operation: 'update',
-        agent: { id: agentId, ...agentParams }
+        data: {
+          operation: 'update',
+          agent: { id: agentId, ...agentParams }
+        }
       });
       
       if (!result.success) {
@@ -262,8 +266,10 @@ export const MastraAPI = {
       
       // 使用类型断言和直接参数传递
       const result = await (agentStorageTool.execute as any)({
-        operation: 'delete',
-        agentId
+        data: {
+          operation: 'delete',
+          agentId
+        }
       });
       
       if (!result.success) {
@@ -286,7 +292,9 @@ export const MastraAPI = {
       
       // 使用类型断言和直接参数传递
       const result = await (agentStorageTool.execute as any)({
-        operation: 'getAll'
+        data: {
+          operation: 'getAll'
+        }
       });
       
       if (!result.success) {
@@ -309,8 +317,10 @@ export const MastraAPI = {
       
       // 使用类型断言和直接参数传递
       const result = await (agentStorageTool.execute as any)({
-        operation: 'get',
-        agentId
+        data: {
+          operation: 'get',
+          agentId
+        }
       });
       
       if (!result.success) {

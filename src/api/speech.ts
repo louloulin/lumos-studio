@@ -1,14 +1,30 @@
 // Import Tauri API with a dynamic require to avoid TypeScript errors
-let invoke: any;
-try {
-  // Use dynamic import approach
-  const tauri = require('@tauri-apps/api/tauri');
-  invoke = tauri.invoke;
-} catch (e) {
-  // Fallback for when the module isn't available (e.g., in a development environment)
-  console.warn('Tauri API not available, using mock implementation');
-  invoke = async () => null;
-}
+let invoke: any = async () => {
+  console.warn('Default Tauri invoke is being used, this should be replaced');
+  return null;
+};
+
+// 尝试异步导入Tauri API
+const loadTauriAPI = async () => {
+  try {
+    // 使用动态导入以避免类型错误
+    const tauri = await import('@tauri-apps/api/core');
+    if (tauri && typeof tauri.invoke === 'function') {
+      invoke = tauri.invoke;
+      return true;
+    }
+    throw new Error('Tauri API loaded but invoke is not a function');
+  } catch (e) {
+    console.warn('Failed to import tauri API:', e);
+    // Fallback for when the module isn't available
+    return false;
+  }
+};
+
+// 初始化加载
+loadTauriAPI().catch(e => {
+  console.error('Failed to initialize Tauri API:', e);
+});
 
 /**
  * 使用浏览器内置Web Speech API进行语音识别
@@ -69,6 +85,9 @@ export async function transcribeAudioWithWebSpeech(language = 'zh-CN'): Promise<
  */
 export async function transcribeAudioWithWhisper(audioBlob: Blob): Promise<string> {
   try {
+    // 确保Tauri API已加载
+    await loadTauriAPI().catch(() => {});
+    
     // 调用Tauri后端的转录函数
     const result = await invoke('transcribe_audio', { 
       audio: await blobToBase64(audioBlob)
@@ -191,6 +210,9 @@ export function speakWithWebSpeech(text: string, language = 'zh-CN', voice?: str
  */
 export async function speakWithMastra(text: string, voice?: string): Promise<string> {
   try {
+    // 确保Tauri API已加载
+    await loadTauriAPI().catch(() => {});
+    
     // 调用Tauri后端的TTS函数
     const result = await invoke('text_to_speech', { 
       text,

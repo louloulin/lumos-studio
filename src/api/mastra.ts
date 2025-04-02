@@ -1,14 +1,30 @@
 // Import Tauri API with a dynamic require to avoid TypeScript errors
-let invoke: any;
-try {
-  // Use dynamic import approach
-  const tauri = require('@tauri-apps/api/tauri');
-  invoke = tauri.invoke;
-} catch (e) {
-  // Fallback for when the module isn't available (e.g., in a development environment)
-  console.warn('Tauri API not available, using mock implementation');
-  invoke = async () => 'http://localhost:4111';
-}
+let invoke: any = async () => {
+  console.warn('Default Tauri invoke is being used, this should be replaced');
+  return 'http://localhost:4111';
+};
+
+// 尝试异步导入Tauri API
+const loadTauriAPI = async () => {
+  try {
+    // 使用动态导入以避免类型错误
+    const tauri = await import('@tauri-apps/api/core');
+    if (tauri && typeof tauri.invoke === 'function') {
+      invoke = tauri.invoke;
+      return true;
+    }
+    throw new Error('Tauri API loaded but invoke is not a function');
+  } catch (e) {
+    console.warn('Failed to import tauri API:', e);
+    // Fallback for when the module isn't available
+    return false;
+  }
+};
+
+// 初始化加载
+loadTauriAPI().catch(e => {
+  console.error('Failed to initialize Tauri API:', e);
+});
 
 import { MastraClient } from '@mastra/client-js';
 import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse, Tool, ToolExecuteResult } from './types';
@@ -24,9 +40,35 @@ async function getMastraUrl(): Promise<string> {
     const maxRetries = 3;
     let lastError: any = null;
     
+    // 先检查Tauri API是否已加载
+    await loadTauriAPI().catch(() => {});
+
+    // 默认端口，如果所有尝试都失败
+    const DEFAULT_PORT = 4112;
+    
     while (retries < maxRetries) {
       try {
-        const url = await invoke('get_mastra_url');
+        // 先检查 invoke 是否已准备好
+        if (typeof invoke !== 'function') {
+          throw new Error('Tauri invoke function not initialized yet');
+        }
+        
+        // 使用Promise包装invoke调用，设置超时
+        const invokeWithTimeout = (fn: any, ...args: any[]) => {
+          return Promise.race([
+            fn(...args),
+            new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Invoke timeout')), 2000);
+            })
+          ]);
+        };
+        
+        const url = await invokeWithTimeout(invoke, 'get_mastra_url');
+        
+        if (!url || typeof url !== 'string') {
+          throw new Error('Invalid URL returned from Tauri backend');
+        }
+        
         return url;
       } catch (error) {
         lastError = error;
@@ -41,7 +83,7 @@ async function getMastraUrl(): Promise<string> {
     
     // 所有重试都失败了
     console.error('All attempts to get Mastra service URL failed:', lastError);
-    return 'http://localhost:4112'; // 修改默认端口为4112
+    return `http://localhost:${DEFAULT_PORT}`; // 使用默认端口
   } catch (error) {
     console.error('Failed to get Mastra service URL:', error);
     return 'http://localhost:4112'; // 修改默认端口为4112

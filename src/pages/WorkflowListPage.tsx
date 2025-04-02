@@ -54,7 +54,23 @@ export default function WorkflowListPage() {
   
   // 创建新工作流
   const handleCreateWorkflow = () => {
-    navigate('/workflow/new');
+    console.log('点击创建工作流按钮');
+    
+    try {
+      // 直接硬编码导航到指定路径
+      console.log('准备导航到: /workflow/new');
+      
+      // 使用window.location直接导航，避免React Router可能的问题
+      window.location.href = '#/workflow/new';
+      
+      // 额外方案：如果上面的方法失败，可以尝试setTimeout
+      setTimeout(() => {
+        console.log('使用setTimeout尝试导航到: /workflow/new');
+        navigate('/workflow/new');
+      }, 100);
+    } catch (error) {
+      console.error('导航过程中发生错误:', error);
+    }
   };
   
   // 编辑工作流

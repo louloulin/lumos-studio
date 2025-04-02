@@ -422,11 +422,46 @@ export class ToolService {
     }
     
     try {
-      // 获取MastraAPI客户端
-      const client = await MastraAPI.getClient();
+      // 尝试获取MastraAPI客户端
+      const client = await MastraAPI.getClient().catch(err => {
+        console.warn('Failed to get Mastra client:', err);
+        return null;
+      });
+      
+      if (!client) {
+        console.warn('Mastra client not available, using mock tools');
+        // 返回模拟的工具数据
+        const mockTools: Tool[] = [
+          {
+            id: 'mastra-mock-search',
+            name: 'Mastra搜索(模拟)',
+            description: '模拟的Mastra搜索工具',
+            parameters: [
+              {
+                name: 'query',
+                type: 'string',
+                description: '搜索查询',
+                required: true
+              }
+            ],
+            execute: async (params) => {
+              console.log('执行模拟Mastra搜索工具:', params.data.query);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              return `模拟搜索结果: ${params.data.query}`;
+            },
+            isMastraTool: true
+          }
+        ];
+        
+        this.mastraToolsCache = mockTools;
+        return mockTools;
+      }
       
       // 获取工具ID列表
-      const toolIds = await MastraAPI.getTools(); // 使用正确的方法名
+      const toolIds = await MastraAPI.getTools().catch(err => {
+        console.warn('Failed to get Mastra tools:', err);
+        return [];
+      });
       
       if (!toolIds || !Array.isArray(toolIds) || toolIds.length === 0) {
         console.log('未获取到Mastra工具，或返回空数组');

@@ -21,7 +21,7 @@ import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
 import { TauriAPI } from './shared/tauri-types'
-import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
 import ChatPage from './pages/ChatPage'
@@ -154,6 +154,19 @@ function Main() {
     )
 }
 
+// 创建一个单独的组件来处理路由重定向
+function WorkflowNewRedirect() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    console.log('WorkflowNewRedirect: 重定向到工作流编辑器页面');
+    // 直接重定向到工作流编辑器页面
+    navigate('/workflow/editor/new', { replace: true });
+  }, [navigate]);
+  
+  return <div>正在跳转到工作流编辑器...</div>;
+}
+
 export default function App() {
     useI18nEffect()
     premiumActions.useAutoValidate()
@@ -181,8 +194,10 @@ export default function App() {
                 }
                 
                 try {
-                    // 运行函数但不使用返回值
-                    initializeTauriEvents();
+                    // 使用非阻塞方式初始化Tauri事件，即使失败也继续执行后续步骤
+                    initializeTauriEvents().catch(error => {
+                        console.error('Failed to initialize Tauri events (non-blocking):', error);
+                    });
                 } catch (error) {
                     console.error('Failed to initialize Tauri events:', error);
                 }
@@ -263,7 +278,20 @@ export default function App() {
                                 </ThemeProvider>
                             } />
                             <Route path="/workflow" element={<WorkflowListPage />} />
-                            <Route path="/workflow/new" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/new" element={
+                              <div className="w-full h-full overflow-hidden">
+                                <div className="h-screen">
+                                  <WorkflowEditorPage />
+                                </div>
+                              </div>
+                            } />
+                            <Route path="/workflow/editor/new" element={
+                              <div className="w-full h-full overflow-hidden">
+                                <div className="h-screen">
+                                  <WorkflowEditorPage />
+                                </div>
+                              </div>
+                            } />
                             <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
                             <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />

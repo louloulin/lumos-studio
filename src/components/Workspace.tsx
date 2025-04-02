@@ -77,94 +77,60 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
         case 'whiteboard':
           setActiveView('workflow');
           break;
+        case 'plugins':
+          setActiveView('plugins');
+          break;
         case 'home':
         default:
           setActiveView('chat');
           break;
       }
     }
-    
-    const handleRouteChange = () => {
-      const hash = window.location.hash.substring(1);
-      if (hash) {
-        const [view, params] = hash.split('/');
-        console.log(`Route change: view=${view}, params=${params}, sessions=${sessions.length}`);
-        switch (view) {
-          case 'chat':
-            setActiveView('chat');
-            if (params && sessions.some(s => s.id === params)) {
-              setSelectedSessionId(params);
-            } else if (params) {
-              console.log(`Warning: Attempted to navigate to session ${params} which doesn't exist`);
-              // If the session doesn't exist but we have other sessions, select the first one
-              if (sessions.length > 0) {
-                setSelectedSessionId(sessions[0].id);
-                navigateTo('chat', sessions[0].id);
-              }
-            }
-            break;
-          case 'market':
-            setActiveView('market');
-            break;
-          case 'editor':
-            setActiveView('editor');
-            if (params) {
-              setEditingAgentId(params);
-            }
-            break;
-          case 'settings':
-            setActiveView('settings');
-            break;
-          case 'workflow':
-            setActiveView('workflow');
-            break;
-          case 'agent-manager':
-            setActiveView('agent-manager');
-            break;
-          case 'plugins':
-            navigate('/plugins/market');
-            break;
-          default:
-            setActiveView('chat');
-        }
-      }
-    };
-
-    // 初始路由处理
-    handleRouteChange();
-
-    // 监听hash变化
-    window.addEventListener('hashchange', handleRouteChange);
-    return () => {
-      window.removeEventListener('hashchange', handleRouteChange);
-    };
-  }, [sessions, selectedSessionId, editingAgentId, currentPage, navigate]);
+  }, [currentPage]);
 
   // 更新路由导航逻辑
   const navigateTo = (view: ViewType, id?: string) => {
     setActiveView(view);
     
-    // 根据视图类型设置URL
-    if (view === 'plugins') {
-      navigate('/plugins/market');
-      return;
+    // 根据视图类型设置URL，统一使用 React Router 导航
+    switch (view) {
+      case 'chat':
+        if (id) {
+          navigate(`/chat/${id}`);
+          setSelectedSessionId(id);
+        } else {
+          navigate('/chat');
+        }
+        break;
+      case 'market':
+        navigate('/agents/market');
+        break;
+      case 'editor':
+        if (id) {
+          navigate(`/editor/${id}`);
+        } else {
+          navigate('/editor');
+        }
+        break;
+      case 'workflow':
+        navigate('/workflow');
+        break;
+      case 'agent-manager':
+        navigate('/agents');
+        break;
+      case 'settings':
+        navigate('/settings');
+        break;
+      case 'plugins':
+        navigate('/plugins/market');
+        break;
+      default:
+        navigate('/');
+        break;
     }
     
-    // 对于其他视图，保持现有的hash-based路由逻辑
-    let url = `#/${view}`;
-    if (view === 'chat' && id) {
-      url = `#/chat/${id}`;
-      setSelectedSessionId(id);
-    } else if (view === 'editor' && id) {
-      url = `#/editor/${id}`;
-    }
-    
-    // 更新URL
-    window.location.hash = url;
-    
-    // 强制重新渲染内容区域
+    // 如果在聊天视图，确保currentSession正确反映选择的会话
     setTimeout(() => {
-      // 如果在聊天视图，确保currentSession正确反映选择的会话
       if (view === 'chat' && id) {
         const session = sessions.find(s => s.id === id);
         if (session) {
@@ -223,11 +189,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     setSelectedSessionId('1');
     // 使用setTimeout避免在状态更新过程中修改URL
     setTimeout(() => {
-      if (!window.location.hash) {
+      if (currentPage === 'chat' || !currentPage) {
         navigateTo('chat', '1');
       }
     }, 0);
-  }, [navigate]);
+  }, [navigate, currentPage]);
 
   // 创建新会话
   const createNewSession = (agentId: string, name: string) => {

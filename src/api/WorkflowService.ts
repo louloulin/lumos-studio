@@ -1008,7 +1008,7 @@ module.exports = {
 }
 
 // 创建单例实例供组件直接使用
-export const workflowService = new WorkflowService();
+export const workflowService = new WorkflowService(); 
 
 /**
  * 创建一个新的工作流节点

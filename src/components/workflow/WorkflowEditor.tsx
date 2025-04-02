@@ -27,7 +27,7 @@ import {
   createWorkflowNode,
 } from '@/api/WorkflowService';
 
-import WorkflowNodePanel from './WorkflowNodePanel';
+import { WorkflowNodePanel } from './WorkflowNodePanel';
 import {
   CircleNode,
   DefaultNode,

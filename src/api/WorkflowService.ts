@@ -273,7 +273,19 @@ export class WorkflowService {
   /**
    * 更新工作流
    */
-  updateWorkflow(id: string, updates: Partial<Workflow>): Workflow | null {
+  updateWorkflow(idOrWorkflow: string | Workflow, updates?: Partial<Workflow>): Workflow | null {
+    let id: string;
+    let workflowUpdates: Partial<Workflow>;
+    
+    if (typeof idOrWorkflow === 'string') {
+      id = idOrWorkflow;
+      workflowUpdates = updates || {};
+    } else {
+      // 如果第一个参数是Workflow对象，则直接使用它的id和整个对象作为更新
+      id = idOrWorkflow.id;
+      workflowUpdates = idOrWorkflow;
+    }
+    
     const workflow = this.getWorkflow(id);
     if (!workflow) {
       return null;
@@ -283,7 +295,7 @@ export class WorkflowService {
     
     const updatedWorkflow: Workflow = {
       ...workflow,
-      ...updates,
+      ...workflowUpdates,
       updatedAt: now
     };
     

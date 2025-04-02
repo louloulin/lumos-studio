@@ -75,17 +75,18 @@ const nodeTypes = {
 interface WorkflowEditorProps {
   workflow: Workflow;
   onSave: (workflow: Workflow) => void;
+  onBack: () => void;
 }
 
-export default function WorkflowEditorProvider({ workflow, onSave }: WorkflowEditorProps) {
+export default function WorkflowEditorProvider({ workflow, onSave, onBack }: WorkflowEditorProps) {
   return (
     <ReactFlowProvider>
-      <WorkflowEditor workflow={workflow} onSave={onSave} />
+      <WorkflowEditor workflow={workflow} onSave={onSave} onBack={onBack} />
     </ReactFlowProvider>
   );
 }
 
-function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
+function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -104,6 +105,9 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const workflowService = new WorkflowService();
+
+  const [hasChanges, setHasChanges] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
 
   useEffect(() => {
     if (workflow) {
@@ -330,6 +334,34 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
     }
   };
 
+  // 添加节点变更监听
+  const handleNodesChange = useCallback((changes: NodeChange[]) => {
+    onNodesChange(changes);
+    setHasChanges(true);
+  }, [onNodesChange]);
+
+  // 添加边变更监听
+  const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
+    onEdgesChange(changes);
+    setHasChanges(true);
+  }, [onEdgesChange]);
+
+  // 处理返回操作
+  const handleBack = () => {
+    if (hasChanges) {
+      setShowUnsavedDialog(true);
+    } else {
+      onBack();
+    }
+  };
+
+  // 保存工作流并返回
+  const handleSaveAndBack = () => {
+    handleSaveWorkflow();
+    onBack();
+  };
+
+  // 处理保存操作（更新）
   const handleSaveWorkflow = () => {
     // 将ReactFlow数据转换回工作流数据结构
     const workflowNodes = nodes.map((node) => ({
@@ -360,6 +392,7 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
     };
 
     onSave(updatedWorkflow);
+    setHasChanges(false); // 重置更改状态
     toast({
       title: '保存成功',
       description: '工作流已保存',
@@ -412,8 +445,8 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
         <ReactFlow
           nodes={nodes}
           edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          onNodesChange={handleNodesChange}
+          onEdgesChange={handleEdgesChange}
           onConnect={onConnect}
           onInit={setReactFlowInstance}
           nodeTypes={nodeTypes}
@@ -421,6 +454,29 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
         >
           <Background variant={BackgroundVariant.Dots} />
           <Controls />
+          <Panel position="top-left" className="space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleBack}
+            >
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="16" 
+                height="16" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className="h-4 w-4 mr-1"
+              >
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+              返回
+            </Button>
+          </Panel>
           <Panel position="top-right" className="space-x-2">
             <Button 
               variant="outline" 
@@ -434,6 +490,7 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
               variant="outline" 
               size="sm" 
               onClick={handleSaveWorkflow}
+              disabled={isExecuting}
             >
               <Save className="h-4 w-4 mr-1" />
               保存
@@ -451,6 +508,32 @@ function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
         </ReactFlow>
       </div>
 
+      {/* 未保存更改对话框 */}
+      <AlertDialog open={showUnsavedDialog} onOpenChange={setShowUnsavedDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>未保存的更改</AlertDialogTitle>
+            <AlertDialogDescription>
+              你有未保存的更改。离开前是否要保存它们？
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowUnsavedDialog(false)}>
+              取消
+            </AlertDialogCancel>
+            <Button variant="outline" onClick={() => {
+              setShowUnsavedDialog(false);
+              onBack();
+            }}>
+              不保存
+            </Button>
+            <AlertDialogAction onClick={handleSaveAndBack}>
+              保存并返回
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       {/* 工作流设置对话框 */}
       <AlertDialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
         <AlertDialogContent>

@@ -86,7 +86,7 @@ const AgentsPage: React.FC = () => {
 
   // 创建新智能体
   const createNewAgent = () => {
-    navigate('/agent-editor?id=new');
+    navigate('/agents/create');
   };
 
   // 确认删除智能体
@@ -106,16 +106,46 @@ const AgentsPage: React.FC = () => {
   };
 
   // 导出智能体配置
-  const exportAgent = (id: string) => {
-    const agentConfig = agentService.exportAgent(id);
-    if (agentConfig) {
-      const blob = new Blob([agentConfig], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `agent-${id}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+  const exportAgent = async (id: string) => {
+    try {
+      const agentConfig = await agentService.exportAgent(id);
+      if (agentConfig) {
+        const blob = new Blob([agentConfig], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `agent-${id}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('导出智能体失败:', error);
+      setError(`导出失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  };
+
+  // 添加导入智能体函数
+  const importAgent = async (file: File) => {
+    try {
+      const content = await file.text();
+      const agentData = JSON.parse(content);
+      
+      // 验证导入数据
+      if (!agentData.name || !agentData.id) {
+        throw new Error('导入的智能体数据无效');
+      }
+      
+      // 生成新ID避免冲突
+      agentData.id = `imported-${Date.now()}`;
+      
+      // 保存导入的智能体
+      await agentService.createAgent(agentData);
+      
+      // 刷新列表
+      fetchAgents();
+    } catch (err) {
+      console.error('导入智能体失败:', err);
+      setError(`导入失败: ${err instanceof Error ? err.message : '未知错误'}`);
     }
   };
 
@@ -139,10 +169,44 @@ const AgentsPage: React.FC = () => {
           <h1 className="text-3xl font-bold tracking-tight">智能体</h1>
           <p className="text-muted-foreground">管理和使用自定义智能体</p>
         </div>
-        <Button onClick={createNewAgent}>
-          <Plus className="mr-2 h-4 w-4" />
-          创建智能体
-        </Button>
+        <div className="flex gap-2">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                导入
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>导入智能体</DialogTitle>
+                <DialogDescription>
+                  上传智能体配置文件 (.json)
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <Input 
+                  type="file" 
+                  accept=".json" 
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      importAgent(e.target.files[0]);
+                    }
+                  }}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {}}>
+                  取消
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Button onClick={createNewAgent}>
+            <Plus className="mr-2 h-4 w-4" />
+            创建智能体
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -230,27 +294,6 @@ const AgentsPage: React.FC = () => {
             <Button variant="destructive" onClick={deleteAgent}>
               删除
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 导入智能体对话框 */}
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="hidden">导入</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>导入智能体</DialogTitle>
-            <DialogDescription>
-              上传智能体配置文件
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <Input type="file" accept=".json" />
-          </div>
-          <DialogFooter>
-            <Button type="submit">导入</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -22,6 +22,8 @@ import WorkflowRunPage from './pages/WorkflowRunPage'
 import ToolsPage from './pages/ToolsPage'
 import ToolEditorPage from './pages/ToolEditorPage'
 import ToolTestPage from './pages/ToolTestPage'
+import WorkflowPage from './pages/WorkflowPage'
+import AgentCreationPage from './pages/AgentCreationPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -159,6 +161,7 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
+                            <Route path="/agents/create" element={<AgentCreationPage />} />
                             <Route path="/tools" element={<ToolsPage />} />
                             <Route path="/tools/new" element={<ToolEditorPage />} />
                             <Route path="/tools/test/:id" element={<ToolTestPage />} />

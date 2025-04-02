@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { getAutoGenerateTitle } from '@/stores/settingActions'
 import { Button } from './ui/button'
 import { Layout } from 'lucide-react'
+import { ThemeToggle } from './ui/theme-toggle'
 
 interface Props { 
     onSwitchToNewUI?: () => void;
@@ -64,10 +65,11 @@ export default function Header(props: Props) {
                         {currentSession.name}
                     </h2>
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center gap-2">
+                    <ThemeToggle />
                     <Button 
                         variant="outline" 
-                        className="mr-2 text-sm flex items-center" 
+                        className="text-sm flex items-center" 
                         onClick={handleSwitchToNewUI}
                     >
                         <Layout className="mr-1 h-4 w-4" />

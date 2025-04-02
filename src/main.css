@@ -40,6 +40,40 @@
 /* 处理iOS和MacOS Safari的视口高度问题 */
 :root {
   --vh: 1vh;
+
+  /* 基础颜色 */
+  --primary: #1f6feb;
+  --primary-hover: #388bfd;
+  --primary-focus: #0d419d;
+  --secondary: #6c757d;
+  --success: #28a745;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --info: #17a2b8;
+
+  /* 明亮模式 */
+  --background: #ffffff;
+  --foreground: #1f2328;
+  --muted: #6e7781;
+  --card: #f6f8fa;
+  --card-foreground: #1f2328;
+  --border: #d0d7de;
+  --input: #f6f8fa;
+  --ring: rgba(31, 111, 235, 0.2);
+  --sidebar-bg: #f6f8fa;
+  --sidebar-foreground: #1f2328;
+  --sidebar-hover: #e6ebf0;
+  --message-user-bg: #f6f8fa;
+  --message-bot-bg: #f0f4ff;
+  --code-bg: #f6f8fa;
+  --code-foreground: #1f2328;
+  --shadow: rgba(0, 0, 0, 0.1);
+
+  /* 交互元素 */
+  --button-bg: #f6f8fa;
+  --button-foreground: #1f2328;
+  --button-border: #d0d7de;
+  --button-hover: #e6ebf0;
 }
 
 @supports (-webkit-touch-callout: none) {
@@ -61,4 +95,107 @@
 /* 修复触摸设备上可能的点击延迟问题 */
 a, button, [role="button"] {
   touch-action: manipulation;
+}
+
+/* 暗黑模式 */
+.dark {
+  --background: #0d1117;
+  --foreground: #e6edf3;
+  --muted: #8b949e;
+  --card: #161b22;
+  --card-foreground: #e6edf3;
+  --border: #30363d;
+  --input: #161b22;
+  --ring: rgba(56, 139, 253, 0.3);
+  --sidebar-bg: #161b22;
+  --sidebar-foreground: #e6edf3;
+  --sidebar-hover: #21262d;
+  --message-user-bg: #21262d;
+  --message-bot-bg: #0d419d;
+  --code-bg: #21262d;
+  --code-foreground: #e6edf3;
+  --shadow: rgba(0, 0, 0, 0.3);
+
+  /* 交互元素 */
+  --button-bg: #21262d;
+  --button-foreground: #e6edf3;
+  --button-border: #30363d;
+  --button-hover: #30363d;
+}
+
+/* 全局样式 */
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 16px;
+  line-height: 1.5;
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* 主题切换组件样式 */
+.theme-toggle {
+  position: relative;
+}
+
+.theme-toggle-button {
+  background-color: var(--button-bg);
+  color: var(--button-foreground);
+  border: 1px solid var(--button-border);
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.theme-toggle-button:hover {
+  background-color: var(--button-hover);
+}
+
+/* 主题切换菜单样式 */
+.theme-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+}
+
+.theme-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  cursor: pointer;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--foreground);
+  border: none;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.theme-option:hover {
+  background-color: var(--button-hover);
+}
+
+.theme-option.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  :root {
+    --sidebar-width: 0;
+  }
+  
+  body {
+    font-size: 14px;
+  }
 } 

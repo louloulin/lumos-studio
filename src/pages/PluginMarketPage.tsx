@@ -1,45 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  Container,
-  Divider,
-  Grid,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Paper,
-  Tab,
-  Tabs,
-  TextField,
-  Typography,
-  useMediaQuery,
-  useTheme,
+import { 
+  Search,
+  RefreshCw,
+  Download,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  Info
+} from 'lucide-react';
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { 
   Dialog,
-  DialogActions,
   DialogContent,
-  DialogContentText,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
-  Chip,
-  Avatar,
-  Rating
-} from '@mui/material';
+} from "@/components/ui/dialog";
 import {
-  Search as SearchIcon,
-  Refresh as RefreshIcon,
-  FilterList as FilterListIcon,
-  CloudDownload as CloudDownloadIcon,
-  Delete as DeleteIcon,
-  Check as CheckIcon,
-  Clear as ClearIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+
 import { pluginManager } from '../plugins/PluginManager';
-import { Plugin, PluginStatus } from '../api/types/plugin';
+import { Plugin, PluginStatus, PluginDefinition } from '../api/types/plugin';
+import { 
+  fileSystemPluginDefinition, 
+  networkPluginDefinition,
+  databasePluginDefinition,
+  toolPluginDefinition
+} from '../plugins';
 
 // 模拟插件数据
 const mockPlugins = [
@@ -111,7 +116,7 @@ const mockPlugins = [
     author: '开源社区',
     rating: 4.2,
     downloads: 720,
-    status: PluginStatus.NotInstalled,
+    status: PluginStatus.Installed,
     isInstalled: false,
     category: '开发工具',
     icon: '💻',
@@ -126,7 +131,7 @@ const mockPlugins = [
     author: 'AI创新实验室',
     rating: 4.9,
     downloads: 1500,
-    status: PluginStatus.NotInstalled,
+    status: PluginStatus.Installed,
     isInstalled: false,
     category: '创意工具',
     icon: '🎨',
@@ -141,7 +146,7 @@ const mockPlugins = [
     author: '文档处理团队',
     rating: 4.3,
     downloads: 950,
-    status: PluginStatus.NotInstalled,
+    status: PluginStatus.Installed,
     isInstalled: false,
     category: '文档处理',
     icon: '📄',
@@ -156,7 +161,7 @@ const mockPlugins = [
     author: '语言学习中心',
     rating: 4.6,
     downloads: 1350,
-    status: PluginStatus.NotInstalled,
+    status: PluginStatus.Installed,
     isInstalled: false,
     category: '语言工具',
     icon: '🌍',
@@ -166,7 +171,14 @@ const mockPlugins = [
 ];
 
 // 插件详情组件
-const PluginDetail: React.FC<{ plugin: any, onClose: () => void, onInstall: () => void, onUninstall: () => void, onEnable: () => void, onDisable: () => void }> = ({ 
+const PluginDetail: React.FC<{ 
+  plugin: any, 
+  onClose: () => void, 
+  onInstall: () => void, 
+  onUninstall: () => void, 
+  onEnable: () => void, 
+  onDisable: () => void 
+}> = ({ 
   plugin, 
   onClose, 
   onInstall, 
@@ -174,191 +186,145 @@ const PluginDetail: React.FC<{ plugin: any, onClose: () => void, onInstall: () =
   onEnable, 
   onDisable 
 }) => {
-  const theme = useTheme();
   
   const getActionButton = () => {
     if (!plugin.isInstalled) {
       return (
         <Button 
-          variant="contained" 
-          color="primary" 
-          startIcon={<CloudDownloadIcon />}
           onClick={onInstall}
+          className="ml-auto"
         >
-          安装
+          <Download className="mr-2 h-4 w-4" /> 安装
         </Button>
       );
     } else if (plugin.status === PluginStatus.Active) {
       return (
         <Button 
-          variant="outlined" 
-          color="warning" 
-          startIcon={<ClearIcon />}
+          variant="outline" 
           onClick={onDisable}
+          className="ml-auto"
         >
-          禁用
+          <XCircle className="mr-2 h-4 w-4" /> 禁用
         </Button>
       );
     } else {
       return (
         <Button 
-          variant="outlined" 
-          color="success" 
-          startIcon={<CheckIcon />}
+          variant="outline" 
           onClick={onEnable}
+          className="ml-auto"
         >
-          启用
+          <CheckCircle2 className="mr-2 h-4 w-4" /> 启用
         </Button>
       );
     }
   };
   
   return (
-    <Dialog open={true} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
-        <Box display="flex" alignItems="center">
-          <Typography variant="h6" component="span" sx={{ mr: 1 }}>
-            {plugin.icon} {plugin.name} 
-          </Typography>
-          <Chip 
-            label={plugin.version} 
-            size="small" 
-            variant="outlined"
-            sx={{ ml: 1 }}
-          />
+    <Dialog open={true} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center">
+            <span className="mr-2">{plugin.icon}</span> {plugin.name}
+            <Badge variant="outline" className="ml-2">v{plugin.version}</Badge>
+            {plugin.isInstalled && (
+              <Badge 
+                variant={plugin.status === PluginStatus.Active ? "default" : "secondary"}
+                className={`ml-2 ${plugin.status === PluginStatus.Active ? "bg-green-100 text-green-800" : ""}`}
+              >
+                {plugin.status === PluginStatus.Active ? "已启用" : "已禁用"}
+              </Badge>
+            )}
+          </DialogTitle>
+          <DialogDescription>
+            {plugin.description}
+          </DialogDescription>
+        </DialogHeader>
+        
+        <ScrollArea className="max-h-[60vh]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">作者</h3>
+              <p>{plugin.author}</p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">分类</h3>
+              <p>{plugin.category}</p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">评分</h3>
+              <div className="flex items-center">
+                <div className="flex text-amber-400">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <span key={i}>
+                      {i < Math.floor(plugin.rating) ? "★" : (i < plugin.rating ? "★" : "☆")}
+                    </span>
+                  ))}
+                </div>
+                <span className="ml-2">({plugin.rating})</span>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">下载次数</h3>
+              <p>{plugin.downloads}</p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">创建日期</h3>
+              <p>{new Date(plugin.createdAt).toLocaleDateString()}</p>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">更新日期</h3>
+              <p>{new Date(plugin.updatedAt).toLocaleDateString()}</p>
+            </div>
+          </div>
+          
+          <Separator className="my-4" />
+          
+          <div>
+            <h3 className="text-base font-medium mb-2">插件功能</h3>
+            <p className="text-sm text-muted-foreground mb-2">本插件提供以下功能：</p>
+            <ul className="space-y-2">
+              <li className="flex flex-col">
+                <span className="font-medium">集成到智能体工具中</span>
+                <span className="text-sm text-muted-foreground">允许智能体直接调用此插件提供的功能</span>
+              </li>
+              <li className="flex flex-col">
+                <span className="font-medium">扩展系统能力</span>
+                <span className="text-sm text-muted-foreground">为应用程序增加新的功能和能力</span>
+              </li>
+              <li className="flex flex-col">
+                <span className="font-medium">用户界面集成</span>
+                <span className="text-sm text-muted-foreground">可选择性地提供用户界面元素</span>
+              </li>
+            </ul>
+          </div>
+        </ScrollArea>
+        
+        <DialogFooter className="flex justify-between items-center">
           {plugin.isInstalled && (
-            <Chip 
-              label={plugin.status === PluginStatus.Active ? "已启用" : "已禁用"} 
-              color={plugin.status === PluginStatus.Active ? "success" : "default"}
-              size="small"
-              sx={{ ml: 1 }}
-            />
+            <Button 
+              variant="destructive" 
+              onClick={onUninstall}
+            >
+              <Trash2 className="mr-2 h-4 w-4" /> 卸载
+            </Button>
           )}
-        </Box>
-      </DialogTitle>
-      <DialogContent>
-        <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Typography variant="body1" gutterBottom>
-              {plugin.description}
-            </Typography>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                作者
-              </Typography>
-              <Typography variant="body2">
-                {plugin.author}
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                分类
-              </Typography>
-              <Typography variant="body2">
-                {plugin.category}
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                评分
-              </Typography>
-              <Box display="flex" alignItems="center">
-                <Rating value={plugin.rating} precision={0.1} readOnly size="small" />
-                <Typography variant="body2" sx={{ ml: 1 }}>
-                  ({plugin.rating})
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                下载次数
-              </Typography>
-              <Typography variant="body2">
-                {plugin.downloads}
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                创建日期
-              </Typography>
-              <Typography variant="body2">
-                {new Date(plugin.createdAt).toLocaleDateString()}
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary">
-                更新日期
-              </Typography>
-              <Typography variant="body2">
-                {new Date(plugin.updatedAt).toLocaleDateString()}
-              </Typography>
-            </Box>
-          </Grid>
-          
-          <Grid item xs={12}>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle1" gutterBottom>
-              插件功能
-            </Typography>
-            <Typography variant="body2">
-              本插件提供以下功能：
-            </Typography>
-            <List dense>
-              <ListItem>
-                <ListItemText 
-                  primary="集成到智能体工具中" 
-                  secondary="允许智能体直接调用此插件提供的功能"
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText 
-                  primary="扩展系统能力" 
-                  secondary="为应用程序增加新的功能和能力"
-                />
-              </ListItem>
-              <ListItem>
-                <ListItemText 
-                  primary="用户界面集成" 
-                  secondary="可选择性地提供用户界面元素"
-                />
-              </ListItem>
-            </List>
-          </Grid>
-        </Grid>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              onClick={onClose}
+            >
+              关闭
+            </Button>
+            {getActionButton()}
+          </div>
+        </DialogFooter>
       </DialogContent>
-      <DialogActions>
-        {plugin.isInstalled && (
-          <Button 
-            color="error" 
-            startIcon={<DeleteIcon />}
-            onClick={onUninstall}
-          >
-            卸载
-          </Button>
-        )}
-        <Button onClick={onClose} color="inherit">
-          关闭
-        </Button>
-        {getActionButton()}
-      </DialogActions>
     </Dialog>
   );
 };
@@ -367,69 +333,51 @@ const PluginDetail: React.FC<{ plugin: any, onClose: () => void, onInstall: () =
 const PluginCard: React.FC<{ plugin: any, onClick: () => void }> = ({ plugin, onClick }) => {
   return (
     <Card 
-      elevation={3}
-      sx={{ 
-        height: '100%', 
-        display: 'flex', 
-        flexDirection: 'column',
-        transition: 'transform 0.2s',
-        '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: 6
-        },
-        cursor: 'pointer'
-      }}
+      className="h-full transition-all hover:shadow-lg cursor-pointer hover:-translate-y-1"
       onClick={onClick}
     >
-      <CardHeader
-        avatar={
-          <Avatar sx={{ bgcolor: 'primary.light', fontFamily: '"Segoe UI Emoji"' }}>
-            {plugin.icon}
-          </Avatar>
-        }
-        title={plugin.name}
-        subheader={`v${plugin.version} · ${plugin.author}`}
-        action={
-          plugin.isInstalled && (
-            <Chip 
-              label={plugin.status === PluginStatus.Active ? "已启用" : "已禁用"} 
-              color={plugin.status === PluginStatus.Active ? "success" : "default"}
-              size="small"
-            />
-          )
-        }
-      />
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          {plugin.description}
-        </Typography>
-        <Box 
-          display="flex" 
-          justifyContent="space-between"
-          alignItems="center" 
-          mt={2}
-        >
-          <Box display="flex" alignItems="center">
-            <Rating value={plugin.rating} precision={0.1} readOnly size="small" />
-            <Typography variant="body2" sx={{ ml: 0.5 }}>
-              ({plugin.rating})
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="text.secondary">
-            {plugin.downloads} 下载
-          </Typography>
-        </Box>
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Avatar className="h-8 w-8 bg-primary/10 mr-2">
+              <AvatarFallback className="text-lg">{plugin.icon}</AvatarFallback>
+            </Avatar>
+            <div>
+              <CardTitle className="text-base">{plugin.name}</CardTitle>
+              <CardDescription className="text-xs">v{plugin.version} · {plugin.author}</CardDescription>
+            </div>
+          </div>
+          {plugin.isInstalled && (
+            <Badge 
+              variant={plugin.status === PluginStatus.Active ? "default" : "secondary"} 
+              className={`ml-auto ${plugin.status === PluginStatus.Active ? "bg-green-100 text-green-800" : ""}`}
+            >
+              {plugin.status === PluginStatus.Active ? "已启用" : "已禁用"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pb-2">
+        <p className="text-sm text-muted-foreground line-clamp-3">{plugin.description}</p>
       </CardContent>
+      <CardFooter className="pt-2 flex justify-between">
+        <div className="flex text-amber-400 text-sm">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <span key={i}>
+              {i < Math.floor(plugin.rating) ? "★" : (i < plugin.rating ? "★" : "☆")}
+            </span>
+          ))}
+          <span className="ml-1 text-muted-foreground">({plugin.rating})</span>
+        </div>
+        <span className="text-xs text-muted-foreground">{plugin.downloads} 下载</span>
+      </CardFooter>
     </Card>
   );
 };
 
 // 插件市场页面
 const PluginMarketPage: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
-  const [tabValue, setTabValue] = useState(0);
+  const [activeTab, setActiveTab] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [plugins, setPlugins] = useState<any[]>([]);
@@ -437,15 +385,42 @@ const PluginMarketPage: React.FC = () => {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [confirmAction, setConfirmAction] = useState<() => void>(() => {});
   const [confirmMessage, setConfirmMessage] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  // 加载插件列表
+  const loadPlugins = async () => {
+    try {
+      setLoading(true);
+      
+      // 获取已安装的插件
+      const installedPlugins = pluginManager.getAllPlugins();
+      
+      // 合并模拟市场数据和已安装的插件数据
+      const allPlugins = [...mockPlugins];
+      
+      // 用真实插件数据更新模拟数据的状态
+      installedPlugins.forEach(installedPlugin => {
+        const index = allPlugins.findIndex(p => p.id === (installedPlugin as any).manifest?.id);
+        if (index !== -1) {
+          allPlugins[index] = {
+            ...allPlugins[index],
+            isInstalled: true,
+            status: installedPlugin.status || PluginStatus.Installed
+          };
+        }
+      });
+      
+      setPlugins(allPlugins);
+    } catch (error) {
+      console.error('加载插件失败:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   
   useEffect(() => {
-    // 模拟从API加载插件
-    setPlugins(mockPlugins);
+    loadPlugins();
   }, []);
-  
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabValue(newValue);
-  };
   
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(event.target.value);
@@ -463,72 +438,117 @@ const PluginMarketPage: React.FC = () => {
     setSelectedPlugin(null);
   };
   
-  const handleInstall = () => {
+  const handleInstall = async () => {
     if (selectedPlugin) {
-      const updatedPlugins = plugins.map(p => 
-        p.id === selectedPlugin.id 
-          ? { ...p, isInstalled: true, status: PluginStatus.Installed } 
-          : p
-      );
-      setPlugins(updatedPlugins);
-      setSelectedPlugin({ ...selectedPlugin, isInstalled: true, status: PluginStatus.Installed });
-      // 实际应用中应该调用插件管理器
-      // pluginManager.installPlugin(selectedPlugin);
+      try {
+        // 从模拟数据中查找对应的插件定义
+        const pluginDefinition = [
+          fileSystemPluginDefinition, 
+          networkPluginDefinition, 
+          databasePluginDefinition, 
+          toolPluginDefinition
+        ].find(p => p.manifest.id === selectedPlugin.id);
+        
+        if (pluginDefinition) {
+          // 调用插件管理器安装插件
+          await pluginManager.installPlugin(pluginDefinition);
+          
+          // 更新UI状态
+          const updatedPlugins = plugins.map(p => 
+            p.id === selectedPlugin.id 
+              ? { ...p, isInstalled: true, status: PluginStatus.Installed } 
+              : p
+          );
+          setPlugins(updatedPlugins);
+          setSelectedPlugin({ ...selectedPlugin, isInstalled: true, status: PluginStatus.Installed });
+          
+          console.log(`插件 ${selectedPlugin.name} 安装成功`);
+        } else {
+          console.error(`找不到插件定义: ${selectedPlugin.id}`);
+        }
+      } catch (error) {
+        console.error(`安装插件失败: ${error}`);
+      }
     }
   };
   
-  const handleUninstall = () => {
+  const handleUninstall = async () => {
     if (selectedPlugin) {
       setConfirmMessage(`确定要卸载插件 "${selectedPlugin.name}" 吗？`);
-      setConfirmAction(() => () => {
-        const updatedPlugins = plugins.map(p => 
-          p.id === selectedPlugin.id 
-            ? { ...p, isInstalled: false, status: PluginStatus.NotInstalled } 
-            : p
-        );
-        setPlugins(updatedPlugins);
-        setSelectedPlugin(null);
-        // 实际应用中应该调用插件管理器
-        // pluginManager.uninstallPlugin(selectedPlugin.id);
-        setConfirmDialogOpen(false);
+      setConfirmAction(() => async () => {
+        try {
+          // 调用插件管理器卸载插件
+          await pluginManager.uninstallPlugin(selectedPlugin.id);
+          
+          // 更新UI状态
+          const updatedPlugins = plugins.map(p => 
+            p.id === selectedPlugin.id 
+              ? { ...p, isInstalled: false, status: PluginStatus.Installed } 
+              : p
+          );
+          setPlugins(updatedPlugins);
+          setSelectedPlugin(null);
+          
+          console.log(`插件 ${selectedPlugin.name} 卸载成功`);
+        } catch (error) {
+          console.error(`卸载插件失败: ${error}`);
+        } finally {
+          setConfirmDialogOpen(false);
+        }
       });
       setConfirmDialogOpen(true);
     }
   };
   
-  const handleEnable = () => {
+  const handleEnable = async () => {
     if (selectedPlugin) {
-      const updatedPlugins = plugins.map(p => 
-        p.id === selectedPlugin.id 
-          ? { ...p, status: PluginStatus.Active } 
-          : p
-      );
-      setPlugins(updatedPlugins);
-      setSelectedPlugin({ ...selectedPlugin, status: PluginStatus.Active });
-      // 实际应用中应该调用插件管理器
-      // pluginManager.enablePlugin(selectedPlugin.id);
+      try {
+        // 调用插件管理器启用插件
+        await pluginManager.enablePlugin(selectedPlugin.id);
+        
+        // 更新UI状态
+        const updatedPlugins = plugins.map(p => 
+          p.id === selectedPlugin.id 
+            ? { ...p, status: PluginStatus.Active } 
+            : p
+        );
+        setPlugins(updatedPlugins);
+        setSelectedPlugin({ ...selectedPlugin, status: PluginStatus.Active });
+        
+        console.log(`插件 ${selectedPlugin.name} 启用成功`);
+      } catch (error) {
+        console.error(`启用插件失败: ${error}`);
+      }
     }
   };
   
-  const handleDisable = () => {
+  const handleDisable = async () => {
     if (selectedPlugin) {
-      const updatedPlugins = plugins.map(p => 
-        p.id === selectedPlugin.id 
-          ? { ...p, status: PluginStatus.Inactive } 
-          : p
-      );
-      setPlugins(updatedPlugins);
-      setSelectedPlugin({ ...selectedPlugin, status: PluginStatus.Inactive });
-      // 实际应用中应该调用插件管理器
-      // pluginManager.disablePlugin(selectedPlugin.id);
+      try {
+        // 调用插件管理器禁用插件
+        await pluginManager.disablePlugin(selectedPlugin.id);
+        
+        // 更新UI状态
+        const updatedPlugins = plugins.map(p => 
+          p.id === selectedPlugin.id 
+            ? { ...p, status: PluginStatus.Inactive } 
+            : p
+        );
+        setPlugins(updatedPlugins);
+        setSelectedPlugin({ ...selectedPlugin, status: PluginStatus.Inactive });
+        
+        console.log(`插件 ${selectedPlugin.name} 禁用成功`);
+      } catch (error) {
+        console.error(`禁用插件失败: ${error}`);
+      }
     }
   };
   
   // 过滤和排序插件
   const filteredPlugins = plugins.filter(plugin => {
     // 根据标签过滤
-    if (tabValue === 1 && !plugin.isInstalled) return false;
-    if (tabValue === 2 && plugin.status !== PluginStatus.Active) return false;
+    if (activeTab === 'installed' && !plugin.isInstalled) return false;
+    if (activeTab === 'active' && plugin.status !== PluginStatus.Active) return false;
     
     // 根据搜索词过滤
     if (searchQuery && !plugin.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
@@ -548,87 +568,93 @@ const PluginMarketPage: React.FC = () => {
   const categories = Array.from(new Set(plugins.map(plugin => plugin.category)));
   
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
-          插件市场
-        </Typography>
-        <IconButton color="primary" aria-label="刷新插件列表">
-          <RefreshIcon />
-        </IconButton>
-      </Box>
+    <div className="container py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">插件市场</h1>
+        <Button variant="ghost" size="icon" onClick={loadPlugins} disabled={loading}>
+          <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
       
-      <Tabs 
-        value={tabValue} 
-        onChange={handleTabChange}
-        indicatorColor="primary"
-        textColor="primary"
-        variant={isMobile ? "fullWidth" : "standard"}
-        sx={{ mb: 3 }}
-      >
-        <Tab label="全部插件" />
-        <Tab label="已安装" />
-        <Tab label="已启用" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="all">全部插件</TabsTrigger>
+          <TabsTrigger value="installed">已安装</TabsTrigger>
+          <TabsTrigger value="active">已启用</TabsTrigger>
+        </TabsList>
       </Tabs>
       
-      <Box sx={{ mb: 3, display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
-        <TextField
-          fullWidth
-          variant="outlined"
-          size="small"
-          placeholder="搜索插件..."
-          value={searchQuery}
-          onChange={handleSearchChange}
-          InputProps={{
-            startAdornment: <SearchIcon sx={{ color: 'text.secondary', mr: 1 }} />,
-          }}
-        />
-        
-        <Box sx={{ 
-          display: 'flex', 
-          flexWrap: 'wrap',
-          gap: 1,
-          justifyContent: isMobile ? 'flex-start' : 'flex-end',
-          flex: isMobile ? '1' : '0 0 auto' 
-        }}>
-          <Chip 
-            label="全部分类" 
-            onClick={() => handleCategoryChange(null)}
-            color={selectedCategory === null ? "primary" : "default"}
-            variant={selectedCategory === null ? "filled" : "outlined"}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="relative flex-grow">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="搜索插件..."
+            value={searchQuery}
+            onChange={handleSearchChange}
+            className="pl-8"
           />
+        </div>
+        
+        <div className="flex flex-wrap gap-2">
+          <Badge 
+            variant={selectedCategory === null ? "default" : "outline"}
+            className="cursor-pointer"
+            onClick={() => handleCategoryChange(null)}
+          >
+            全部分类
+          </Badge>
           {categories.map(category => (
-            <Chip 
+            <Badge 
               key={category}
-              label={category}
+              variant={selectedCategory === category ? "default" : "outline"}
+              className="cursor-pointer"
               onClick={() => handleCategoryChange(category)}
-              color={selectedCategory === category ? "primary" : "default"}
-              variant={selectedCategory === category ? "filled" : "outlined"}
+            >
+              {category}
+            </Badge>
+          ))}
+        </div>
+      </div>
+      
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <Card key={i} className="h-full">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-8 w-8 rounded-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-24" />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="pb-2">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-2/3" />
+              </CardContent>
+              <CardFooter className="pt-2 flex justify-between">
+                <Skeleton className="h-3 w-20" />
+                <Skeleton className="h-3 w-16" />
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      ) : filteredPlugins.length === 0 ? (
+        <div className="bg-background border rounded-lg p-8 text-center">
+          <h3 className="text-lg font-medium text-muted-foreground">没有找到匹配的插件</h3>
+          <p className="text-sm text-muted-foreground mt-2">尝试更改搜索词或过滤条件</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPlugins.map(plugin => (
+            <PluginCard 
+              key={plugin.id}
+              plugin={plugin} 
+              onClick={() => handleCardClick(plugin)} 
             />
           ))}
-        </Box>
-      </Box>
-      
-      {filteredPlugins.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h6" color="text.secondary">
-            没有找到匹配的插件
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            尝试更改搜索词或过滤条件
-          </Typography>
-        </Paper>
-      ) : (
-        <Grid container spacing={3}>
-          {filteredPlugins.map(plugin => (
-            <Grid item key={plugin.id} xs={12} sm={6} md={4}>
-              <PluginCard 
-                plugin={plugin} 
-                onClick={() => handleCardClick(plugin)} 
-              />
-            </Grid>
-          ))}
-        </Grid>
+        </div>
       )}
       
       {selectedPlugin && (
@@ -642,26 +668,21 @@ const PluginMarketPage: React.FC = () => {
         />
       )}
       
-      <Dialog
-        open={confirmDialogOpen}
-        onClose={() => setConfirmDialogOpen(false)}
-      >
-        <DialogTitle>确认操作</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            {confirmMessage}
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmDialogOpen(false)} color="inherit">
-            取消
-          </Button>
-          <Button onClick={() => confirmAction()} color="error" autoFocus>
-            确认
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+      <AlertDialog open={confirmDialogOpen} onOpenChange={setConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认操作</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmMessage}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => confirmAction()}>确认</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 

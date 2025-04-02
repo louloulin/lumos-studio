@@ -26,6 +26,8 @@ import ToolEditorPage from './pages/ToolEditorPage'
 import ToolTestPage from './pages/ToolTestPage'
 import WorkflowPage from './pages/WorkflowPage'
 import PluginMarketPage from './pages/PluginMarketPage'
+import { pluginManager } from './plugins/PluginManager'
+import { registerCorePlugins } from './plugins'
 
 // The Window interface is now defined in window.d.ts
 
@@ -146,6 +148,23 @@ export default function App() {
             setInitialized(true);
         });
     }, [setSessions]);
+
+    useEffect(() => {
+        // 初始化插件管理器
+        const initPlugins = async () => {
+            try {
+                await pluginManager.initialize();
+                console.log('插件管理器初始化成功');
+                
+                // 注册核心插件
+                await registerCorePlugins();
+            } catch (error) {
+                console.error('插件管理器初始化失败:', error);
+            }
+        };
+        
+        initPlugins();
+    }, []);
 
     if (!initialized) {
         return (

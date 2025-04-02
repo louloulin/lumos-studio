@@ -230,7 +230,7 @@ const PluginDetail: React.FC<{
             {plugin.isInstalled && (
               <Badge 
                 variant={plugin.status === PluginStatus.Active ? "default" : "secondary"}
-                className={`ml-2 ${plugin.status === PluginStatus.Active ? "bg-green-100 text-green-800" : ""}`}
+                className={`ml-2 ${plugin.status === PluginStatus.Active ? "bg-green-500 hover:bg-green-500/80" : ""}`}
               >
                 {plugin.status === PluginStatus.Active ? "已启用" : "已禁用"}
               </Badge>
@@ -350,7 +350,7 @@ const PluginCard: React.FC<{ plugin: any, onClick: () => void }> = ({ plugin, on
           {plugin.isInstalled && (
             <Badge 
               variant={plugin.status === PluginStatus.Active ? "default" : "secondary"} 
-              className={`ml-auto ${plugin.status === PluginStatus.Active ? "bg-green-100 text-green-800" : ""}`}
+              className={`ml-auto ${plugin.status === PluginStatus.Active ? "bg-green-500 hover:bg-green-500/80" : ""}`}
             >
               {plugin.status === PluginStatus.Active ? "已启用" : "已禁用"}
             </Badge>
@@ -400,7 +400,8 @@ const PluginMarketPage: React.FC = () => {
       
       // 用真实插件数据更新模拟数据的状态
       installedPlugins.forEach(installedPlugin => {
-        const index = allPlugins.findIndex(p => p.id === (installedPlugin as any).manifest?.id);
+        const pluginId = (installedPlugin as any).manifest?.id || '';
+        const index = allPlugins.findIndex(p => p.id === pluginId);
         if (index !== -1) {
           allPlugins[index] = {
             ...allPlugins[index],
@@ -442,12 +443,14 @@ const PluginMarketPage: React.FC = () => {
     if (selectedPlugin) {
       try {
         // 从模拟数据中查找对应的插件定义
-        const pluginDefinition = [
-          fileSystemPluginDefinition, 
-          networkPluginDefinition, 
-          databasePluginDefinition, 
-          toolPluginDefinition
-        ].find(p => p.manifest.id === selectedPlugin.id);
+        const pluginModules = {
+          'file-system-plugin': fileSystemPluginDefinition,
+          'network-plugin': networkPluginDefinition,
+          'database-plugin': databasePluginDefinition,
+          'tool-plugin': toolPluginDefinition
+        };
+        
+        const pluginDefinition = pluginModules[selectedPlugin.id as keyof typeof pluginModules];
         
         if (pluginDefinition) {
           // 调用插件管理器安装插件

@@ -17,10 +17,10 @@ export interface MarketAgent extends Agent {
  * 提供智能体的CRUD操作和持久化，集成Mastra API
  */
 export class AgentService {
-  private api: MastraAPI;
+  private api;
 
   constructor() {
-    this.api = new MastraAPI();
+    this.api = MastraAPI;
   }
 
   /**
@@ -29,11 +29,11 @@ export class AgentService {
   async getMastraAgents(): Promise<Agent[]> {
     try {
       // 使用market-agents工具获取智能体市场列表
-      const marketAgents = await this.api.getMastraAgents();
+      const marketAgents = await this.api.getMarketAgents();
       
       // 如果工具API成功，整理数据
       if (marketAgents && marketAgents.length > 0) {
-        return marketAgents.map(agent => ({
+        return marketAgents.map((agent: any) => ({
           id: agent.id || agent.name,
           name: agent.name,
           description: agent.description || `Mastra智能体: ${agent.name}`,
@@ -47,7 +47,7 @@ export class AgentService {
       
       // 如果工具API失败或返回为空，尝试使用老方法
       const mastraAgents = await this.api.getAgents();
-      return mastraAgents.map(name => ({
+      return mastraAgents.map((name: string) => ({
         id: name,
         name: name,
         description: `Mastra智能体: ${name}`,
@@ -64,8 +64,8 @@ export class AgentService {
    */
   async getAllAgents(): Promise<Agent[]> {
     try {
-      const agents = await this.api.getAgents();
-      return agents;
+      const agents = await this.api.getAllAgents();
+      return agents as Agent[];
     } catch (error) {
       console.error('Failed to get agents:', error);
       return [];
@@ -148,8 +148,8 @@ export class AgentService {
    */
   async updateAgent(agent: Agent): Promise<Agent> {
     try {
-      const updatedAgent = await this.api.updateAgent(agent);
-      return updatedAgent;
+      const updatedAgent = await this.api.updateAgent(agent.id, agent);
+      return updatedAgent as Agent;
     } catch (error) {
       console.error('Failed to update agent:', error);
       throw error;
@@ -202,6 +202,7 @@ export class AgentService {
       // 创建新智能体
       return await this.createAgent({
         ...agentWithoutId,
+        id: this.generateUniqueId(), // 添加ID字段
         name: `${parsedAgent.name} (导入)`,
         systemAgent: false
       });
@@ -221,9 +222,9 @@ export class AgentService {
   // 获取市场智能体列表
   async getMarketAgents(): Promise<MarketAgent[]> {
     try {
-      const agents = await this.api.getMastraAgents();
+      const agents = await this.api.getMarketAgents();
       // 添加评分和下载次数等市场信息
-      return agents.map(agent => ({
+      return agents.map((agent: any) => ({
         ...agent,
         rating: Math.random() * 2 + 3, // 模拟 3-5 分的评分
         downloads: Math.floor(Math.random() * 1000), // 模拟下载次数
@@ -240,7 +241,7 @@ export class AgentService {
   async installAgent(agentId: string): Promise<Agent | null> {
     try {
       // 从市场获取智能体配置
-      const marketAgent = await this.api.getMastraAgent(agentId);
+      const marketAgent = await this.api.getMarketAgent(agentId);
       if (!marketAgent) {
         throw new Error('Agent not found in market');
       }

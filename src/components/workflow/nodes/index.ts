@@ -11,11 +11,13 @@ import ConditionNode from './ConditionNode';
 import LoopNode from './LoopNode';
 import InputNode from './InputNode';
 import OutputNode from './OutputNode';
+import HttpRequestNode from './HttpRequestNode';
 import { AINodeEditor } from './AINodeEditor';
 import { StringNodeEditor } from './StringNodeEditor';
 import { FunctionNodeEditor } from './FunctionNodeEditor';
 import { VariableNodeEditor } from './VariableNodeEditor';
 import { TriggerNodeEditor } from './TriggerNodeEditor';
+import { HttpRequestNodeEditor } from './HttpRequestNodeEditor';
 
 export {
   StringNode,
@@ -31,11 +33,13 @@ export {
   LoopNode,
   InputNode,
   OutputNode,
+  HttpRequestNode,
   AINodeEditor,
   StringNodeEditor,
   FunctionNodeEditor,
   VariableNodeEditor,
-  TriggerNodeEditor
+  TriggerNodeEditor,
+  HttpRequestNodeEditor
 };
 
 export const NODE_TYPES = {
@@ -51,5 +55,6 @@ export const NODE_TYPES = {
   condition: ConditionNode,
   loop: LoopNode,
   input: InputNode,
-  output: OutputNode
+  output: OutputNode,
+  http_request: HttpRequestNode
 }; 

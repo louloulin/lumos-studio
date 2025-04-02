@@ -3,7 +3,15 @@ import { useParams, useNavigate } from 'react-router-dom';
 import WorkflowEditor from '@/components/workflow/WorkflowEditor';
 import { Workflow, workflowService } from '@/api/WorkflowService';
 import { ReactFlowProvider } from 'reactflow';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Download, FileJson } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { toast } from '@/components/ui/use-toast';
 
 interface WorkflowEditorPageProps {
   id?: string | null;
@@ -57,6 +65,33 @@ export default function WorkflowEditorPage({ id: propId, onBack: propOnBack }: W
   const handleSaveWorkflow = (updatedWorkflow: Workflow) => {
     workflowService.updateWorkflow(updatedWorkflow);
     setWorkflow(updatedWorkflow);
+    toast({
+      title: "工作流已保存",
+      description: `${updatedWorkflow.name} 已成功保存`,
+    });
+  };
+
+  // 导出工作流为JSON
+  const handleExportWorkflowAsJson = () => {
+    if (!workflow) return;
+    
+    const jsonData = workflowService.exportWorkflow(workflow.id);
+    if (!jsonData) return;
+    
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflow.name.replace(/\s+/g, '_')}_workflow.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "工作流已导出",
+      description: "工作流已导出为JSON格式文件",
+    });
   };
 
   // 返回工作流列表
@@ -81,6 +116,23 @@ export default function WorkflowEditorPage({ id: propId, onBack: propOnBack }: W
 
   return (
     <div className="h-screen">
+      <div className="absolute top-4 right-4 z-10">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <FileJson className="h-4 w-4 mr-1" />
+              导出
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleExportWorkflowAsJson}>
+              <Download className="h-4 w-4 mr-2" />
+              导出为JSON
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      
       <ReactFlowProvider>
         {workflow && (
           <WorkflowEditor 

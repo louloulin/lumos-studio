@@ -6,7 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Play, Pause, RotateCcw, ArrowLeft, Info, AlertTriangle, AlertCircle, 
-  CheckCircle, Clock, ArrowRight, Settings
+  CheckCircle, Clock, ArrowRight, Settings, FileWarning
 } from 'lucide-react';
 import { format } from 'date-fns';
 import ReactFlow, { Node, Edge, Background, Controls, MiniMap } from 'reactflow';
@@ -15,6 +15,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 
 import { workflowService, Workflow, WorkflowNodeType } from '@/api/WorkflowService';
 import { 
@@ -104,6 +114,7 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
   const [executor, setExecutor] = useState<WorkflowExecutor | null>(null);
   const [inputParams, setInputParams] = useState<Record<string, any>>({});
   const [showInputDialog, setShowInputDialog] = useState(false);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
   
   // 加载工作流
   useEffect(() => {
@@ -222,6 +233,8 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
       // 开始执行
       executor.execute({ initial: inputParams.input || '' }).catch(err => {
         console.error('执行工作流失败:', err);
+        setError(err instanceof Error ? err.message : String(err));
+        setErrorDialogOpen(true);
       });
       
       // 立即更新状态
@@ -229,6 +242,7 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
     } catch (err) {
       console.error('启动工作流执行失败:', err);
       setError(err instanceof Error ? err.message : String(err));
+      setErrorDialogOpen(true);
     }
   };
   
@@ -466,6 +480,47 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
     );
   };
   
+  // 添加重试功能
+  const handleRetry = () => {
+    setErrorDialogOpen(false);
+    setTimeout(() => {
+      handleResetWorkflow();
+      setTimeout(() => {
+        handleRunWorkflow();
+      }, 500);
+    }, 500);
+  };
+  
+  // 添加错误对话框组件
+  const renderErrorDialog = () => {
+    return (
+      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <FileWarning className="h-5 w-5" />
+              工作流执行错误
+            </AlertDialogTitle>
+            <AlertDialogDescription className="py-3">
+              <div className="space-y-2">
+                <p>工作流执行过程中发生错误:</p>
+                <p className="font-mono text-sm bg-muted p-2 rounded-md whitespace-pre-wrap">
+                  {error || '未知错误'}
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>关闭</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRetry}>
+              重试执行
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+  };
+  
   // 返回工作流列表
   const handleBack = () => {
     if (propOnBack) {
@@ -642,6 +697,9 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
           </Card>
         </div>
       </div>
+      
+      {/* 错误对话框 */}
+      {renderErrorDialog()}
       
       {/* 输入参数对话框 */}
       {renderInputDialog()}

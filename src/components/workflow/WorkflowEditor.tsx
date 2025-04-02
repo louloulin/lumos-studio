@@ -46,7 +46,8 @@ import {
   StringNodeEditor,
   FunctionNodeEditor,
   VariableNodeEditor,
-  TriggerNodeEditor
+  TriggerNodeEditor,
+  HttpRequestNodeEditor
 } from './nodes';
 
 import { Button } from '@/components/ui/button';
@@ -102,6 +103,7 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
   const [functionNodeEditorOpen, setFunctionNodeEditorOpen] = useState(false);
   const [variableNodeEditorOpen, setVariableNodeEditorOpen] = useState(false);
   const [triggerNodeEditorOpen, setTriggerNodeEditorOpen] = useState(false);
+  const [httpRequestNodeEditorOpen, setHttpRequestNodeEditorOpen] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const workflowService = new WorkflowService();
@@ -198,6 +200,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         setVariableNodeEditorOpen(true);
       } else if (node.type === 'trigger') {
         setTriggerNodeEditorOpen(true);
+      } else if (node.type === 'http_request') {
+        setHttpRequestNodeEditorOpen(true);
       }
     }
   };
@@ -290,6 +294,14 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
           schedule: '0 0 * * *'
         }
       };
+    } else if (type === 'http_request') {
+      newWorkflowNode.httpRequestConfig = {
+        url: '',
+        method: 'GET',
+        headers: [],
+        body: '',
+        responseType: 'json'
+      };
     }
 
     // 为ReactFlow创建一个节点
@@ -317,7 +329,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
     setNodes((nodes) => [...nodes, newNode]);
     
     // 对于特定类型的节点，自动打开编辑器
-    if (type === 'ai' || type === 'string' || type === 'function' || type === 'variable' || type === 'trigger') {
+    if (type === 'ai' || type === 'string' || type === 'function' || 
+        type === 'variable' || type === 'trigger' || type === 'http_request') {
       setSelectedNode(newNode);
       
       if (type === 'ai') {
@@ -330,6 +343,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         setVariableNodeEditorOpen(true);
       } else if (type === 'trigger') {
         setTriggerNodeEditorOpen(true);
+      } else if (type === 'http_request') {
+        setHttpRequestNodeEditorOpen(true);
       }
     }
   };
@@ -374,7 +389,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
       stringValue: node.data.stringValue,
       functionConfig: node.data.functionConfig,
       variableConfig: node.data.variableConfig,
-      triggerConfig: node.data.triggerConfig
+      triggerConfig: node.data.triggerConfig,
+      httpRequestConfig: node.data.httpRequestConfig
     }));
 
     const workflowEdges = edges.map((edge) => ({
@@ -609,6 +625,15 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         <TriggerNodeEditor
           open={triggerNodeEditorOpen}
           onOpenChange={setTriggerNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'http_request' && (
+        <HttpRequestNodeEditor
+          open={httpRequestNodeEditorOpen}
+          onOpenChange={setHttpRequestNodeEditorOpen}
           initialData={selectedNode.data}
           onSave={saveNodeData}
         />

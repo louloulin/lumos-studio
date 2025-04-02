@@ -23,7 +23,9 @@ export enum WorkflowNodeType {
   AI = 'ai',
   VARIABLE = 'variable',
   KNOWLEDGE = 'knowledge',
-  WEBHOOK = 'webhook'
+  WEBHOOK = 'webhook',
+  HTTP_REQUEST = 'http_request',
+  FILE_OPERATION = 'file_operation'
 }
 
 // 触发器类型
@@ -140,6 +142,13 @@ export interface WorkflowNode {
   triggerConfig?: {
     type: string;
     config: Record<string, any>;
+  };
+  httpConfig?: {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string | Record<string, any>;
+    timeout?: number;
   };
 }
 
@@ -657,6 +666,11 @@ module.exports = {
           result = await this.executeFunctionNode(workflow, node, executionRecord);
           break;
           
+        case WorkflowNodeType.HTTP_REQUEST:
+          // HTTP请求节点，执行HTTP请求
+          result = await this.executeHttpRequestNode(workflow, node, executionRecord);
+          break;
+          
         default:
           // 不支持的节点类型
           throw new Error(`不支持的节点类型: ${node.type}`);
@@ -906,6 +920,125 @@ module.exports = {
       return { success: true, data: result };
     } catch (error) {
       throw new Error(`函数执行失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+  
+  /**
+   * 执行HTTP请求节点
+   */
+  private async executeHttpRequestNode(
+    workflow: Workflow, 
+    node: WorkflowNode,
+    executionRecord: ExecutionRecord
+  ): Promise<NodeResult> {
+    if (!node.httpConfig) {
+      throw new Error('HTTP请求节点缺少配置');
+    }
+    
+    const { url, method, headers, body, timeout } = node.httpConfig;
+    
+    // 解析URL中的变量引用
+    const resolvedUrl = this.resolveVariables(url, executionRecord.variables);
+    
+    // 解析Headers中的变量引用
+    const resolvedHeaders: Record<string, string> = {};
+    if (headers) {
+      Object.entries(headers).forEach(([key, value]) => {
+        resolvedHeaders[key] = this.resolveVariables(value, executionRecord.variables);
+      });
+    }
+    
+    // 解析Body中的变量引用
+    let resolvedBody = body;
+    if (body && typeof body === 'string') {
+      resolvedBody = this.resolveVariables(body, executionRecord.variables);
+    } else if (body && typeof body === 'object') {
+      resolvedBody = this.resolveVariables(body, executionRecord.variables);
+    }
+    
+    // 添加HTTP请求日志
+    this.addExecutionLog(executionRecord, {
+      id: uuidv4(),
+      timestamp: Date.now(),
+      nodeId: node.id,
+      nodeName: node.name,
+      message: `执行HTTP请求: ${method} ${resolvedUrl}`,
+      level: 'info',
+      data: { method, url: resolvedUrl, headers: resolvedHeaders }
+    });
+    
+    try {
+      // 执行HTTP请求
+      const controller = new AbortController();
+      const timeoutId = timeout ? setTimeout(() => controller.abort(), timeout) : null;
+      
+      const response = await fetch(resolvedUrl, {
+        method: method || 'GET',
+        headers: resolvedHeaders,
+        body: ['GET', 'HEAD'].includes(method || 'GET') 
+          ? undefined 
+          : typeof resolvedBody === 'string' 
+            ? resolvedBody 
+            : resolvedBody ? JSON.stringify(resolvedBody) : undefined,
+        signal: controller.signal
+      });
+      
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      // 处理响应
+      let responseData;
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType?.includes('application/json')) {
+        responseData = await response.json();
+      } else if (contentType?.includes('text/')) {
+        responseData = await response.text();
+      } else {
+        responseData = await response.arrayBuffer();
+      }
+      
+      // 添加HTTP响应日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `HTTP请求完成: ${response.status} ${response.statusText}`,
+        level: 'info',
+        data: { 
+          status: response.status, 
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          contentType
+        }
+      });
+      
+      return { 
+        success: response.ok, 
+        data: {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          data: responseData
+        }
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : '未知错误';
+      
+      // 添加HTTP错误日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `HTTP请求失败: ${errorMessage}`,
+        level: 'error',
+        data: { error: errorMessage }
+      });
+      
+      throw new Error(`HTTP请求失败: ${errorMessage}`);
     }
   }
   

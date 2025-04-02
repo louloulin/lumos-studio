@@ -50,6 +50,7 @@ import {
   HttpRequestNodeEditor,
   HttpRequestNode,
   ConditionNodeEditor,
+  LoopNodeEditor,
 } from './nodes';
 
 import { Button } from '@/components/ui/button';
@@ -108,6 +109,7 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
   const [triggerNodeEditorOpen, setTriggerNodeEditorOpen] = useState(false);
   const [httpRequestNodeEditorOpen, setHttpRequestNodeEditorOpen] = useState(false);
   const [conditionNodeEditorOpen, setConditionNodeEditorOpen] = useState(false);
+  const [loopNodeEditorOpen, setLoopNodeEditorOpen] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const workflowService = new WorkflowService();
@@ -208,6 +210,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         setHttpRequestNodeEditorOpen(true);
       } else if (node.type === 'condition') {
         setConditionNodeEditorOpen(true);
+      } else if (node.type === 'loop') {
+        setLoopNodeEditorOpen(true);
       }
     }
   };
@@ -319,6 +323,17 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         inputParams: [],
         outputParams: [{ name: 'result', type: 'boolean' }]
       };
+    } else if (type === 'loop') {
+      newWorkflowNode.loopConfig = {
+        type: 'while',
+        maxIterations: 10,
+        condition: 'context.iterations < 10'
+      };
+      newWorkflowNode.functionConfig = {
+        code: 'function evaluateLoop(data, context) {\n  return context.iterations < 10;\n}',
+        inputParams: [],
+        outputParams: [{ name: 'continue', type: 'boolean' }]
+      };
     }
 
     // 为ReactFlow创建一个节点
@@ -347,7 +362,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
     
     // 对于特定类型的节点，自动打开编辑器
     if (type === 'ai' || type === 'string' || type === 'function' || 
-        type === 'variable' || type === 'trigger' || type === 'http_request') {
+        type === 'variable' || type === 'trigger' || type === 'http_request' ||
+        type === 'condition' || type === 'loop') {
       setSelectedNode(newNode);
       
       if (type === 'ai') {
@@ -362,6 +378,10 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         setTriggerNodeEditorOpen(true);
       } else if (type === 'http_request') {
         setHttpRequestNodeEditorOpen(true);
+      } else if (type === 'condition') {
+        setConditionNodeEditorOpen(true);
+      } else if (type === 'loop') {
+        setLoopNodeEditorOpen(true);
       }
     }
   };
@@ -660,6 +680,15 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         <ConditionNodeEditor
           open={conditionNodeEditorOpen}
           onOpenChange={setConditionNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'loop' && (
+        <LoopNodeEditor
+          open={loopNodeEditorOpen}
+          onOpenChange={setLoopNodeEditorOpen}
           initialData={selectedNode.data}
           onSave={saveNodeData}
         />

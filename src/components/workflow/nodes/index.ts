@@ -19,6 +19,7 @@ import { VariableNodeEditor } from './VariableNodeEditor';
 import { TriggerNodeEditor } from './TriggerNodeEditor';
 import { HttpRequestNodeEditor } from './HttpRequestNodeEditor';
 import { ConditionNodeEditor } from './ConditionNodeEditor';
+import { LoopNodeEditor } from './LoopNodeEditor';
 
 export {
   StringNode,
@@ -41,7 +42,8 @@ export {
   VariableNodeEditor,
   TriggerNodeEditor,
   HttpRequestNodeEditor,
-  ConditionNodeEditor
+  ConditionNodeEditor,
+  LoopNodeEditor
 };
 
 export const NODE_TYPES = {

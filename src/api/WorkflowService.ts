@@ -156,6 +156,13 @@ export interface WorkflowNode {
     operator?: string;
     rightOperand?: string;
   };
+  loopConfig?: {
+    type: string;
+    maxIterations?: number;
+    condition?: string;
+    collectionPath?: string;
+    itemName?: string;
+  };
 }
 
 // 工作流连接定义

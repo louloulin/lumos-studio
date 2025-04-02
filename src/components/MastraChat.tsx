@@ -63,6 +63,36 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const { toast } = useToast();
   const [showArtifacts, setShowArtifacts] = useState(false);
   
+  // 自动滚动到最新消息（仅在适当情况下）
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // 处理滚动事件，决定是否应该自动滚动
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    // 如果用户滚动到距离底部50px以内，则自动滚动到底部
+    // 如果用户向上滚动，则停止自动滚动
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setShouldScrollToBottom(isNearBottom);
+  };
+  
+  // 滚动到底部的函数
+  const scrollToBottom = useCallback(() => {
+    if (shouldScrollToBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: isTyping ? 'auto' : 'smooth',
+        block: 'end'
+      });
+    }
+  }, [shouldScrollToBottom, isTyping]);
+  
+  // 当消息更新或有新消息时，决定是否滚动到底部
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+  
   // 检查Mastra服务是否运行
   useEffect(() => {
     const checkMastraService = async () => {
@@ -209,11 +239,6 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     }
   }, [sessionId, agentId, selectedAgent, toast]);
   
-  // 自动滚动到最新消息
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-  
   // 发送消息
   const sendMessage = async () => {
     if (!inputValue.trim()) return;
@@ -274,6 +299,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       // 使用流式API获取回复
       try {
         let fullResponse = '';
+        let streamChunks = [];
         
         for await (const chunk of MastraAPI.streamGenerate(activeAgentId, {
           messages: mastraMessages,
@@ -282,9 +308,28 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             max_tokens: 2048
           }
         })) {
-          // 更新消息内容
+          // 收集流式块
+          streamChunks.push(chunk);
           fullResponse += chunk;
           
+          // 批量更新以获得更流畅的体验，每3个块或50ms更新一次
+          if (streamChunks.length >= 3) {
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === tempId 
+                  ? { ...msg, content: fullResponse } 
+                  : msg
+              )
+            );
+            streamChunks = [];
+            
+            // 给UI时间渲染
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+        
+        // 确保显示完整的响应
+        if (streamChunks.length > 0) {
           setMessages(prev => 
             prev.map(msg => 
               msg.id === tempId 
@@ -292,9 +337,6 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                 : msg
             )
           );
-          
-          // 滚动到最新消息
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }
         
         // 生成完成后，添加最终消息到聊天服务
@@ -786,7 +828,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       {/* 主聊天区域 */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* 聊天头部 */}
-        <div className="border-b border-border p-3 flex justify-between items-center">
+        <div className="border-b border-border p-3 flex justify-between items-center shrink-0">
           <div className="flex items-center">
             <Avatar className="h-8 w-8 mr-2">
               {selectedAgent?.avatar ? (
@@ -801,8 +843,8 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
               <p className="text-xs text-muted-foreground">
                 会话ID: {sessionId.substring(0, 8)}...
               </p>
-                </div>
-        </div>
+            </div>
+          </div>
         
           <div>
             <Button 
@@ -813,13 +855,20 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             >
               <GitBranch size={16} className="mr-1" />
               {showBranchView ? '隐藏分支树' : '显示分支树'}
-          </Button>
+            </Button>
+          </div>
         </div>
-      </div>
       
-        {/* 消息列表 */}
-        <ScrollArea className="flex-1 p-4 h-[calc(100%-7rem)] overflow-y-auto">
-          <div className="space-y-4">
+        {/* 消息列表 - 使用div加overflow-y-auto替代ScrollArea组件 */}
+        <div 
+          className="relative flex-1 overflow-hidden"
+        >
+          <div 
+            ref={scrollContainerRef}
+            className="h-full overflow-y-auto px-4 py-4" 
+            onScroll={handleScroll}
+          >
+            <div className="space-y-4 min-h-full">
               {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500">
                   <Avatar className="h-16 w-16 mb-4">
@@ -838,69 +887,70 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                 messages.map(message => (
                   <div
                     key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}
                   >
                     <div
-                    className={`p-3 rounded-lg max-w-3xl ${
+                      className={`p-3 rounded-lg ${
                         message.role === 'user'
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 mr-2">
-                        <Markdown>
-                          {message.content}
-                        </Markdown>
+                      } max-w-[85%] w-auto break-words overflow-hidden`}
+                    >
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 w-full">
+                          <Markdown className="w-full">
+                            {message.content}
+                          </Markdown>
+                        </div>
+                        {message.role === 'assistant' && !message.isStreaming && (
+                          <SpeechPlayer
+                            text={message.content}
+                            agentId={selectedAgent?.id || 'generalAssistant'}
+                            className="opacity-70 hover:opacity-100 flex-shrink-0 ml-2"
+                          />
+                        )}
                       </div>
-                      {message.role === 'assistant' && (
-                        <SpeechPlayer
-                          text={message.content}
-                          agentId={selectedAgent?.id || 'generalAssistant'}
-                          className="opacity-70 hover:opacity-100"
-                        />
-                      )}
-                    </div>
-                    
-                    {/* 如果有图片，显示图片 */}
-                    {message.image && (
-                      <div className="mt-2">
-                        <img 
-                          src={message.image} 
-                          alt="Shared canvas" 
-                          className="max-w-full rounded-md" 
-                          style={{ maxHeight: '300px' }}
-                        />
+                      
+                      {/* 如果有图片，显示图片 */}
+                      {message.image && (
+                        <div className="mt-2">
+                          <img 
+                            src={message.image} 
+                            alt="Shared canvas" 
+                            className="max-w-full rounded-md" 
+                            style={{ maxHeight: '300px' }}
+                          />
                         </div>
                       )}
-                    <div className="text-xs mt-1 opacity-70 text-right">
-                      {message.timestamp.toLocaleTimeString()}
-                    </div>
+                      <div className="text-xs mt-1 opacity-70 text-right">
+                        {message.timestamp.toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             
-            {/* 显示输入中状态 */}
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="p-3 rounded-lg bg-muted max-w-3xl">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              {/* 显示输入中状态 */}
+              {isTyping && (
+                <div className="flex justify-start w-full">
+                  <div className="p-3 rounded-lg bg-muted">
+                    <div className="flex space-x-2">
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                      <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    </div>
                   </div>
                 </div>
+              )}
+              
+              {/* 用于自动滚动的引用 */}
+              <div ref={messagesEndRef} className="h-px" />
             </div>
-            )}
-            
-            {/* 用于自动滚动的引用 */}
-            <div ref={messagesEndRef} />
           </div>
-        </ScrollArea>
+        </div>
             
-            {/* 输入区域 */}
-        <div className="p-3 border-t border-border">
+        {/* 输入区域 - 固定在底部 */}
+        <div className="p-3 border-t border-border shrink-0">
           <div className="flex">
             <Textarea
               className="flex-1 min-h-10 resize-none"

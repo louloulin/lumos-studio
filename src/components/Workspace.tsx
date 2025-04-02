@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   MessageSquare, 
   PlusCircle, 
@@ -47,15 +47,17 @@ interface WorkspaceProps {
 }
 
 const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
-  // 状态管理
+  // 会话管理
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+
+  // 页面状态
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeView, setActiveView] = useState<ViewType>('chat');
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const initializedRef = useRef(false);
   
   // 从URL获取初始视图
@@ -133,33 +135,31 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   }, [sessions, selectedSessionId, editingAgentId, currentPage]);
 
   // 更新URL hash
-  const navigateTo = (view: ViewType, param?: string) => {
-    try {
-      // Validate the view type
-      if (!['chat', 'market', 'editor', 'settings', 'workflow', 'agent-manager'].includes(view)) {
-        console.error(`Invalid view type: ${view}`);
-        return;
-      }
-      
-      // For chat view, ensure the session exists
-      if (view === 'chat' && param && !sessions.some(s => s.id === param)) {
-        console.warn(`Trying to navigate to non-existent session: ${param}`);
-        if (sessions.length > 0) {
-          param = sessions[0].id;
-        } else {
-          // If no sessions exist, redirect to market view
-          view = 'market';
-          param = undefined;
+  const navigateTo = (view: ViewType, id?: string) => {
+    setActiveView(view);
+    
+    // 根据视图类型设置URL
+    let url = `#/${view}`;
+    if (view === 'chat' && id) {
+      url = `#/chat/${id}`;
+      setSelectedSessionId(id);
+    } else if (view === 'editor' && id) {
+      url = `#/editor/${id}`;
+    }
+    
+    // 更新URL
+    window.location.hash = url;
+    
+    // 强制重新渲染内容区域
+    setTimeout(() => {
+      // 如果在聊天视图，确保currentSession正确反映选择的会话
+      if (view === 'chat' && id) {
+        const session = sessions.find(s => s.id === id);
+        if (session) {
+          setSelectedSessionId(id);
         }
       }
-      
-      const newHash = param ? `#${view}/${param}` : `#${view}`;
-      console.log(`Navigating to: ${newHash}`);
-      window.location.hash = newHash;
-      setActiveView(view);
-    } catch (error) {
-      console.error(`Navigation error: ${error}`);
-    }
+    }, 50);
   };
   
   // 监听窗口大小变化
@@ -233,7 +233,10 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   };
 
   // 获取当前会话
-  const currentSession = sessions.find(s => s.id === selectedSessionId);
+  const currentSession = useMemo(() => 
+    sessions.find(s => s.id === selectedSessionId) || null, 
+    [sessions, selectedSessionId]
+  );
 
   // 删除会话
   const deleteSession = (sessionId: string) => {

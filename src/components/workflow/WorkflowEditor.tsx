@@ -47,7 +47,8 @@ import {
   FunctionNodeEditor,
   VariableNodeEditor,
   TriggerNodeEditor,
-  HttpRequestNodeEditor
+  HttpRequestNodeEditor,
+  HttpRequestNode
 } from './nodes';
 
 import { Button } from '@/components/ui/button';
@@ -70,7 +71,8 @@ const nodeTypes = {
   string: StringNode,
   function: FunctionNode,
   trigger: TriggerNode,
-  variable: VariableNode
+  variable: VariableNode,
+  http_request: HttpRequestNode
 };
 
 interface WorkflowEditorProps {

@@ -20,7 +20,11 @@ import {
   Database,
   Square,
   Search,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Text,
+  ArrowUpRight,
+  ArrowDownRight,
+  Globe
 } from 'lucide-react';
 import { WorkflowNodeType } from '@/api/WorkflowService';
 import { Input } from '@/components/ui/input';
@@ -77,7 +81,7 @@ const DraggableNode: React.FC<{ nodeType: NodeTypeDefinition; onAddNode?: (type:
 };
 
 // 节点类型定义
-const nodeTypes: Record<string, NodeCategory> = {
+export const nodeTypes: Record<string, NodeCategory> = {
   basic: {
     id: 'basic',
     name: '基础节点',
@@ -192,10 +196,10 @@ const nodeTypes: Record<string, NodeCategory> = {
         color: '#7c3aed',
       },
       {
-        type: 'http_tool',
+        type: 'http_request',
         title: 'HTTP请求',
         description: '发送HTTP请求并处理响应',
-        icon: <Webhook size={18} />,
+        icon: <Globe size={18} />,
         color: '#059669',
       },
       {

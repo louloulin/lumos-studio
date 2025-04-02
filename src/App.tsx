@@ -25,6 +25,7 @@ import ToolsPage from './pages/ToolsPage'
 import ToolEditorPage from './pages/ToolEditorPage'
 import ToolTestPage from './pages/ToolTestPage'
 import WorkflowPage from './pages/WorkflowPage'
+import PluginMarketPage from './pages/PluginMarketPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -173,6 +174,7 @@ export default function App() {
                             <Route path="/workflow/editor/new" element={<WorkflowEditorPage />} />
                             <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
                             <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
+                            <Route path="/plugins/market" element={<PluginMarketPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
                     </Router>

@@ -30,6 +30,7 @@ const WorkflowBuilder = () => {
   const [workflowToDelete, setWorkflowToDelete] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importJson, setImportJson] = useState('');
+  const navigate = useNavigate();
   
   // 初始化时加载工作流列表
   useEffect(() => {
@@ -54,17 +55,17 @@ const WorkflowBuilder = () => {
   
   // 创建新工作流
   const handleCreateWorkflow = () => {
-    window.location.href = '/workflow/editor/new';
+    navigate('/workflow/editor/new');
   };
   
   // 编辑工作流
   const handleEditWorkflow = (id: string) => {
-    window.location.href = `/workflow/editor/${id}`;
+    navigate(`/workflow/editor/${id}`);
   };
   
   // 运行工作流
   const handleRunWorkflow = (id: string) => {
-    window.location.href = `/workflow/run/${id}`;
+    navigate(`/workflow/run/${id}`);
   };
   
   // 删除工作流确认

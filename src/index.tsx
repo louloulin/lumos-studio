@@ -6,9 +6,13 @@ import './i18n'
 import './static/index.css'
 import './static/globals.css'
 
+// Setup Sentry
 import './setup/sentry_init'
 
+// Setup GA
 import './setup/ga_init'
+
+import { Provider } from 'jotai'
 
 // 计算视口高度并设置CSS变量
 const setViewportHeight = () => {
@@ -33,11 +37,12 @@ window.addEventListener('orientationchange', () => {
   setTimeout(setViewportHeight, 200);
 });
 
-const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
-root.render(
-    <React.StrictMode>
-        <App />
-    </React.StrictMode>
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <Provider>
+      <App />
+    </Provider>
+  </React.StrictMode>
 )
 
 // If you want to start measuring performance in your app, pass a function

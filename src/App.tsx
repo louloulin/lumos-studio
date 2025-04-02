@@ -1,18 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import SettingDialog from './pages/SettingDialog'
-import ChatConfigWindow from './pages/ChatConfigWindow'
-import CleanWidnow from './pages/CleanWindow'
-import AboutWindow from './pages/AboutWindow'
-import useAppTheme from './hooks/useAppTheme'
-import CopilotWindow from './pages/CopilotWindow'
 import { useI18nEffect } from './hooks/useI18nEffect'
 import Toasts from './components/Toasts'
-import RemoteDialogWindow from './pages/RemoteDialogWindow'
 import { useSystemLanguageWhenInit } from './hooks/useDefaultSystemLanguage'
-import MainPane from './MainPane'
+import useAppTheme from './hooks/useAppTheme'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import * as atoms from './stores/atoms'
-import Sidebar from './Sidebar'
 import * as premiumActions from './stores/premiumActions'
 import { tauriBridge, initializeTauriEvents } from './tauri-bridge'
 import platform from './packages/platform'
@@ -20,11 +12,9 @@ import { ThemeProvider } from './components/ui/theme-provider'
 import Workspace from './components/Workspace'
 import * as defaults from './shared/defaults'
 import ErrorBoundary from './components/ErrorBoundary'
-import { TauriAPI } from './shared/tauri-types'
 import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'react-router-dom'
 import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
-import ChatPage from './pages/ChatPage'
 import AgentsPage from './pages/AgentsPage'
 import WorkflowListPage from './pages/WorkflowListPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
@@ -37,12 +27,6 @@ import ToolTestPage from './pages/ToolTestPage'
 
 function Main() {
     const spellCheck = useAtomValue(atoms.spellCheckAtom)
-    const [openSettingWindow, setOpenSettingWindow] = useAtom(atoms.openSettingDialogAtom)
-    const [openAboutWindow, setOpenAboutWindow] = React.useState(false)
-    const [openCopilotWindow, setOpenCopilotWindow] = React.useState(false)
-    const [showLegacyUI, setShowLegacyUI] = React.useState(false)
-    const [sidebarVisible, setSidebarVisible] = useState(true)
-    const currentSession = useAtomValue(atoms.currentSessionAtom);
     // Get the current route/page from URL
     const [currentPage, setCurrentPage] = useState(() => {
         const path = window.location.pathname;
@@ -70,85 +54,11 @@ function Main() {
         return () => window.removeEventListener('popstate', handleRouteChange);
     }, []);
 
-    // 开发模式下，可以通过URL参数强制显示新UI
-    const [forceNewUI] = useState(() => {
-        // 检查URL参数或localStorage
-        const urlParams = new URLSearchParams(window.location.search);
-        const hasNewUIParam = urlParams.has('newui');
-        const newUIValue = urlParams.get('newui');
-        
-        // 如果URL中有newui参数
-        if (hasNewUIParam) {
-            const shouldForce = newUIValue === '1' || newUIValue === 'true';
-            // 存储到localStorage以便持久化
-            localStorage.setItem('force_new_ui', shouldForce ? 'true' : 'false');
-            return shouldForce;
-        }
-        
-        // 否则从localStorage读取
-        return localStorage.getItem('force_new_ui') === 'true';
-    });
-
-    // 显示新界面条件
-    const shouldShowNewUI = forceNewUI && !showLegacyUI;
-
-    // 切换回传统UI并清除hash
-    const switchToLegacyUI = () => {
-        // 更新状态
-        setShowLegacyUI(true);
-        
-        // 确保localStorage中的标志也被重置
-        localStorage.setItem('force_new_ui', 'false');
-        
-        // 清除hash
-        if (window.location.hash) {
-            // 清除hash但不刷新页面
-            history.pushState("", document.title, window.location.pathname + window.location.search);
-        }
-        
-        // 可选：刷新页面以确保状态完全重置
-        // window.location.reload();
-    };
-
     return (
         <div className="box-border App w-full h-full" spellCheck={spellCheck}>
-            {shouldShowNewUI ? (
-                <div className="h-full w-full">
-                    <Workspace currentPage={currentPage} />
-                </div>
-            ) : (
-                <>
-                    <div className="h-full w-full flex">
-                        <ErrorBoundary>
-                            <Sidebar
-                                openCopilotWindow={() => setOpenCopilotWindow(true)}
-                                openAboutWindow={() => setOpenAboutWindow(true)}
-                                setOpenSettingWindow={setOpenSettingWindow}
-                                openShadcnTest={() => setShowLegacyUI(false)}
-                                onToggleVisibility={(visible) => setSidebarVisible(visible)}
-                                currentPage={currentPage}
-                            />
-                        </ErrorBoundary>
-                        <ErrorBoundary>
-                            <MainPane 
-                                sidebarVisible={sidebarVisible} 
-                                onSwitchToNewUI={() => setShowLegacyUI(false)}
-                                currentPage={currentPage}
-                            />
-                        </ErrorBoundary>
-                    </div>
-                    <SettingDialog
-                        open={!!openSettingWindow}
-                        targetTab={openSettingWindow || undefined}
-                        close={() => setOpenSettingWindow(null)}
-                    />
-                    <AboutWindow open={openAboutWindow} close={() => setOpenAboutWindow(false)} />
-                    <ChatConfigWindow />
-                    <CleanWidnow />
-                    <CopilotWindow open={openCopilotWindow} close={() => setOpenCopilotWindow(false)} />
-                    <RemoteDialogWindow />
-                </>
-            )}
+            <div className="h-full w-full">
+                <Workspace currentPage={currentPage} />
+            </div>
             <Toasts />
         </div>
     )
@@ -249,49 +159,13 @@ export default function App() {
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
-                            <Route path="/tools" element={
-                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                                    <div className="w-full h-full overflow-hidden tauri-window-container">
-                                        <ToolsPage />
-                                    </div>
-                                </ThemeProvider>
-                            } />
-                            <Route path="/tools/new" element={
-                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                                    <div className="w-full h-full overflow-hidden tauri-window-container">
-                                        <ToolEditorPage />
-                                    </div>
-                                </ThemeProvider>
-                            } />
-                            <Route path="/tools/test/:id" element={
-                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                                    <div className="w-full h-full overflow-hidden tauri-window-container">
-                                        <ToolTestPage />
-                                    </div>
-                                </ThemeProvider>
-                            } />
-                            <Route path="/tools/:id" element={
-                                <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-                                    <div className="w-full h-full overflow-hidden tauri-window-container">
-                                        <ToolEditorPage />
-                                    </div>
-                                </ThemeProvider>
-                            } />
+                            <Route path="/tools" element={<ToolsPage />} />
+                            <Route path="/tools/new" element={<ToolEditorPage />} />
+                            <Route path="/tools/test/:id" element={<ToolTestPage />} />
+                            <Route path="/tools/:id" element={<ToolEditorPage />} />
                             <Route path="/workflow" element={<WorkflowListPage />} />
-                            <Route path="/workflow/new" element={
-                              <div className="w-full h-full overflow-hidden">
-                                <div className="h-screen">
-                                  <WorkflowEditorPage />
-                                </div>
-                              </div>
-                            } />
-                            <Route path="/workflow/editor/new" element={
-                              <div className="w-full h-full overflow-hidden">
-                                <div className="h-screen">
-                                  <WorkflowEditorPage />
-                                </div>
-                              </div>
-                            } />
+                            <Route path="/workflow/new" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/editor/new" element={<WorkflowEditorPage />} />
                             <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
                             <Route path="/workflow/:id" element={<WorkflowEditorPage />} />
                             <Route path="*" element={<Navigate to="/" replace />} />

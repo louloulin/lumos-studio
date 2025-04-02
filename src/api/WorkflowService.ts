@@ -66,42 +66,39 @@ export interface WorkflowVariable {
 
 // 执行状态
 export enum ExecutionStatus {
-  PENDING = 'pending',
-  RUNNING = 'running',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  CANCELED = 'canceled'
+  PENDING = 'PENDING',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  CANCELED = 'CANCELED'
 }
 
-// 执行记录
+export type LogLevel = 'info' | 'warning' | 'error';
+
+export interface ExecutionLog {
+  id: string;
+  timestamp: number;
+  level: LogLevel;
+  nodeName?: string;
+  message: string;
+}
+
+export interface NodeExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
 export interface ExecutionRecord {
   id: string;
   workflowId: string;
   workflowName: string;
-  status: ExecutionStatus;
   startTime: number;
   endTime?: number;
-  nodeResults: Record<string, any>;
+  status: ExecutionStatus;
   variables: Record<string, any>;
-  error?: string;
   logs: ExecutionLog[];
-}
-
-// 执行日志
-export interface ExecutionLog {
-  id: string;
-  timestamp: number;
-  nodeId: string;
-  nodeName: string;
-  message: string;
-  level: 'info' | 'warning' | 'error';
-  data?: any;
-}
-
-// 节点输出结果
-export interface NodeResult {
-  success: boolean;
-  data?: any;
+  nodeResults: Record<string, NodeExecutionResult>;
   error?: string;
 }
 
@@ -170,6 +167,7 @@ export class WorkflowService {
   private workflows: Map<string, Workflow> = new Map();
   private executors: Map<string, any> = new Map(); // 工作流执行器缓存
   private executions: Map<string, ExecutionRecord> = new Map(); // 执行记录
+  private executionRecords: Map<string, ExecutionRecord[]> = new Map();
   
   constructor() {
     this.loadWorkflows();
@@ -938,9 +936,19 @@ module.exports = {
    * @param workflowId 工作流ID
    */
   getWorkflowExecutions(workflowId: string): ExecutionRecord[] {
-    return Array.from(this.executions.values())
-      .filter(execution => execution.workflowId === workflowId)
-      .sort((a, b) => b.startTime - a.startTime); // 按开始时间降序排序
+    // 尝试从本地存储加载
+    try {
+      const storedRecords = localStorage.getItem(`workflow_executions_${workflowId}`);
+      if (storedRecords) {
+        const records = JSON.parse(storedRecords) as ExecutionRecord[];
+        this.executionRecords.set(workflowId, records);
+        return records;
+      }
+    } catch (error) {
+      console.error('Failed to load execution records:', error);
+    }
+    
+    return this.executionRecords.get(workflowId) || [];
   }
   
   /**
@@ -955,16 +963,25 @@ module.exports = {
    * 删除执行记录
    * @param executionId 执行ID
    */
-  deleteExecution(executionId: string): boolean {
-    const initialSize = this.executions.size;
-    this.executions.delete(executionId);
-    
-    if (this.executions.size !== initialSize) {
-      this.saveExecutions();
-      return true;
+  deleteExecution(executionId: string): void {
+    // 遍历所有工作流的执行记录
+    for (const [workflowId, records] of this.executionRecords.entries()) {
+      const filteredRecords = records.filter(r => r.id !== executionId);
+      
+      if (filteredRecords.length !== records.length) {
+        this.executionRecords.set(workflowId, filteredRecords);
+        
+        // 更新本地存储
+        try {
+          localStorage.setItem(`workflow_executions_${workflowId}`, 
+            JSON.stringify(filteredRecords));
+        } catch (error) {
+          console.error('Failed to update execution records:', error);
+        }
+        
+        break;
+      }
     }
-    
-    return false;
   }
   
   /**
@@ -972,18 +989,13 @@ module.exports = {
    * @param workflowId 工作流ID
    */
   clearWorkflowExecutions(workflowId: string): void {
-    const executionsToDelete = Array.from(this.executions.values())
-      .filter(execution => execution.workflowId === workflowId)
-      .map(execution => execution.id);
-      
-    let hasDeleted = false;
+    this.executionRecords.set(workflowId, []);
     
-    for (const executionId of executionsToDelete) {
-      hasDeleted = this.executions.delete(executionId) || hasDeleted;
-    }
-    
-    if (hasDeleted) {
-      this.saveExecutions();
+    // 清除本地存储
+    try {
+      localStorage.removeItem(`workflow_executions_${workflowId}`);
+    } catch (error) {
+      console.error('Failed to clear execution records:', error);
     }
   }
   
@@ -995,7 +1007,7 @@ module.exports = {
   }
 }
 
-// 导出单例实例
+// 创建单例实例供组件直接使用
 export const workflowService = new WorkflowService();
 
 /**

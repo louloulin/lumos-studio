@@ -29,7 +29,7 @@ import AgentEditor from './AgentEditor';
 import SettingsPage from './SettingsPage';
 import WorkflowBuilder from './WorkflowBuilder';
 import AgentsPage from "../pages/AgentsPage";
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 
 // 定义会话类型
 interface ChatSession {
@@ -61,7 +61,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const initializedRef = useRef(false);
-  const router = useRouter();
+  const navigate = useNavigate();
   
   // 从URL获取初始视图
   useEffect(() => {
@@ -122,7 +122,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
             setActiveView('agent-manager');
             break;
           case 'plugins':
-            router.push('/plugins/market');
+            navigate('/plugins/market');
             break;
           default:
             setActiveView('chat');
@@ -138,13 +138,19 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
     };
-  }, [sessions, selectedSessionId, editingAgentId, currentPage, router]);
+  }, [sessions, selectedSessionId, editingAgentId, currentPage, navigate]);
 
-  // 更新URL hash
+  // 更新路由导航逻辑
   const navigateTo = (view: ViewType, id?: string) => {
     setActiveView(view);
     
     // 根据视图类型设置URL
+    if (view === 'plugins') {
+      navigate('/plugins/market');
+      return;
+    }
+    
+    // 对于其他视图，保持现有的hash-based路由逻辑
     let url = `#/${view}`;
     if (view === 'chat' && id) {
       url = `#/chat/${id}`;
@@ -221,7 +227,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
         navigateTo('chat', '1');
       }
     }, 0);
-  }, []);
+  }, [navigate]);
 
   // 创建新会话
   const createNewSession = (agentId: string, name: string) => {
@@ -296,10 +302,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           // 使用工作流组件代替不存在的Whiteboard组件
           return <WorkflowBuilder />;
         case 'plugins':
-          // 插件市场页面
-          return <div className="h-full">
-            <iframe src="/plugins/market" className="w-full h-full border-none" />
-          </div>;
+          // 这种情况会直接通过路由处理，不需要在这里渲染内容
+          return null;
         case 'chat':
           // 如果是聊天页面，使用现有逻辑
           break;
@@ -334,10 +338,8 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     } else if (activeView === 'workflow') {
       return <WorkflowBuilder />;
     } else if (activeView === 'plugins') {
-      // 插件市场页面
-      return <div className="h-full">
-        <iframe src="/plugins/market" className="w-full h-full border-none" />
-      </div>;
+      // 这种情况会直接通过路由处理，不需要在这里渲染内容
+      return null;
     } else {
       return <div className="flex items-center justify-center h-full">请选择一个会话或功能</div>;
     }

@@ -1,6 +1,6 @@
 # Lumos Studio
 
-基于Mastra框架的智能体工作室，借鉴LobeChat的用户体验和界面设计，打造现代化、易用且功能丰富的AI智能体开发和部署平台。
+基于Mastra框架的Lumos，借鉴LobeChat的用户体验和界面设计，打造现代化、易用且功能丰富的AI模型开发和部署平台。
 
 ![Lumos Studio主界面](doc/img/nomarl.png)
 

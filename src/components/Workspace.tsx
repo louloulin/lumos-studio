@@ -362,7 +362,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           <h1 className="text-xl font-bold tracking-tight">
             {isMobile 
               ? '菜单' 
-              : '智能体工作室'}
+              : 'Lumos'}
           </h1>
         )}
         
@@ -405,7 +405,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           }}
         >
           <Store className="h-5 w-5" />
-          {!sidebarCollapsed && <span className="ml-2">智能体市场</span>}
+          {!sidebarCollapsed && <span className="ml-2">模型市场</span>}
         </Button>
         
         <Button 
@@ -418,7 +418,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           }}
         >
           <Bot className="h-5 w-5" />
-          {!sidebarCollapsed && <span className="ml-2">智能体编辑器</span>}
+          {!sidebarCollapsed && <span className="ml-2">模型编辑器</span>}
         </Button>
 
         <Button 
@@ -442,7 +442,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           }}
         >
           <Users className="h-5 w-5" />
-          {!sidebarCollapsed && <span className="ml-2">智能体管理</span>}
+          {!sidebarCollapsed && <span className="ml-2">模型管理</span>}
         </Button>
       </div>
       
@@ -724,13 +724,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
               {activeView === 'chat' && currentSession 
                 ? currentSession.name 
                 : activeView === 'market'
-                ? '智能体市场'
+                ? '模型市场'
                 : activeView === 'editor'
-                ? '智能体编辑器'
+                ? '模型编辑器'
                 : activeView === 'workflow'
                 ? '工作流构建器'
                 : activeView === 'agent-manager'
-                ? '智能体管理'
+                ? '模型管理'
                 : '设置'}
             </h1>
             
@@ -745,13 +745,13 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
               {activeView === 'chat' && currentSession 
                 ? currentSession.name 
                 : activeView === 'market'
-                ? '智能体市场'
+                ? '模型市场'
                 : activeView === 'editor'
-                ? '智能体编辑器'
+                ? '模型编辑器'
                 : activeView === 'workflow'
                 ? '工作流构建器'
                 : activeView === 'agent-manager'
-                ? '智能体管理'
+                ? '模型管理'
                 : '设置'}
             </h1>
           </header>

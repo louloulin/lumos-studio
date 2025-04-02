@@ -22,6 +22,7 @@ import { MastraAPI } from '../api/mastra'; // 导入Mastra API
 import { MastraMessage } from '../api/types'; // 导入类型定义
 import { VoiceRecorder } from './VoiceRecorder';
 import { SpeechPlayer } from './SpeechPlayer';
+import Markdown from './Markdown';
 
 // 定义组件属性
 interface MastraChatProps {
@@ -397,8 +398,8 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const clearConversation = async () => {
     if (window.confirm('确定要清除当前对话吗？此操作不可撤销。')) {
       try {
-        // 删除当前会话
-        await chatService.deleteSession(sessionId);
+        // 删除当前会话内容并创建新的
+        await chatService.createBranchFromNode(sessionId, chatTree?.id || '');
         
         // 创建新会话
         const newSession = await chatService.createSession(
@@ -433,10 +434,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const handleCreateBranch = async (parentNodeId: string) => {
     try {
       // 创建新分支
-      const newBranchId = await chatService.createBranch(sessionId, parentNodeId);
-      
-      // 更新当前节点
-      setCurrentNodeId(newBranchId);
+      await chatService.createBranchFromNode(sessionId, parentNodeId);
       
       // 更新对话历史
       const history = await chatService.getChatHistory(sessionId);
@@ -447,6 +445,12 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         timestamp: node.timestamp
       }));
       setMessages(chatMessages);
+      
+      // 更新当前节点
+      const session = await chatService.getSession(sessionId);
+      if (session) {
+        setCurrentNodeId(session.currentNodeId);
+      }
       
       // 更新对话树
       const updatedTree = await chatService.getChatTree(sessionId);
@@ -770,6 +774,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         <div className="w-64 h-full">
           <ChatTree 
             sessionId={sessionId}
+            treeData={chatTree}
             onSelectNode={handleSelectNode}
             onCreateBranch={handleCreateBranch}
             onDeleteBranch={handleDeleteBranch}
@@ -844,7 +849,9 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1 mr-2">
-                        {message.content}
+                        <Markdown>
+                          {message.content}
+                        </Markdown>
                       </div>
                       {message.role === 'assistant' && (
                         <SpeechPlayer
@@ -933,7 +940,6 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl h-[80vh]">
                   <ArtifactsTab 
-                    sessionId={sessionId} 
                     onShareArtifact={handleShareArtifact}
                   />
                 </DialogContent>

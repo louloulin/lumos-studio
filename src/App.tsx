@@ -39,6 +39,7 @@ function Main() {
         if (path.includes('/whiteboard')) return 'whiteboard';
         if (path.includes('/workflow')) return 'workflow';
         if (path.includes('/tools')) return 'tools';
+        if (path.includes('/plugins')) return 'plugins';
         return 'home';
     });
     
@@ -51,6 +52,7 @@ function Main() {
             else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
             else if (path.includes('/workflow')) setCurrentPage('workflow');
             else if (path.includes('/tools')) setCurrentPage('tools');
+            else if (path.includes('/plugins')) setCurrentPage('plugins');
             else setCurrentPage('home');
         };
         

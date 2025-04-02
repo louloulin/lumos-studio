@@ -14,7 +14,8 @@ import {
   LifeBuoy,
   LogOut,
   Bot,
-  Share2
+  Share2,
+  Puzzle
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
@@ -28,6 +29,7 @@ import AgentEditor from './AgentEditor';
 import SettingsPage from './SettingsPage';
 import WorkflowBuilder from './WorkflowBuilder';
 import AgentsPage from "../pages/AgentsPage";
+import { useRouter } from 'next/router';
 
 // 定义会话类型
 interface ChatSession {
@@ -40,7 +42,7 @@ interface ChatSession {
 }
 
 // 视图类型
-type ViewType = 'chat' | 'market' | 'editor' | 'settings' | 'workflow' | 'agent-manager';
+type ViewType = 'chat' | 'market' | 'editor' | 'settings' | 'workflow' | 'agent-manager' | 'plugins';
 
 interface WorkspaceProps {
   currentPage: string;
@@ -59,6 +61,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const initializedRef = useRef(false);
+  const router = useRouter();
   
   // 从URL获取初始视图
   useEffect(() => {
@@ -118,6 +121,9 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           case 'agent-manager':
             setActiveView('agent-manager');
             break;
+          case 'plugins':
+            router.push('/plugins/market');
+            break;
           default:
             setActiveView('chat');
         }
@@ -132,7 +138,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
     return () => {
       window.removeEventListener('hashchange', handleRouteChange);
     };
-  }, [sessions, selectedSessionId, editingAgentId, currentPage]);
+  }, [sessions, selectedSessionId, editingAgentId, currentPage, router]);
 
   // 更新URL hash
   const navigateTo = (view: ViewType, id?: string) => {
@@ -289,6 +295,11 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
         case 'whiteboard':
           // 使用工作流组件代替不存在的Whiteboard组件
           return <WorkflowBuilder />;
+        case 'plugins':
+          // 插件市场页面
+          return <div className="h-full">
+            <iframe src="/plugins/market" className="w-full h-full border-none" />
+          </div>;
         case 'chat':
           // 如果是聊天页面，使用现有逻辑
           break;
@@ -322,17 +333,14 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
       return <SettingsPage />;
     } else if (activeView === 'workflow') {
       return <WorkflowBuilder />;
+    } else if (activeView === 'plugins') {
+      // 插件市场页面
+      return <div className="h-full">
+        <iframe src="/plugins/market" className="w-full h-full border-none" />
+      </div>;
+    } else {
+      return <div className="flex items-center justify-center h-full">请选择一个会话或功能</div>;
     }
-    
-    return (
-      <div className="flex items-center justify-center h-full flex-col">
-        <div className="text-xl font-semibold mb-2">请选择或创建一个会话</div>
-        <Button onClick={() => setShowNewSessionDialog(true)}>
-          <PlusCircle className="h-4 w-4 mr-2" />
-          新建会话
-        </Button>
-      </div>
-    );
   };
 
   // 渲染侧边栏
@@ -446,6 +454,18 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
         >
           <Users className="h-5 w-5" />
           {!sidebarCollapsed && <span className="ml-2">模型管理</span>}
+        </Button>
+
+        <Button 
+          variant={activeView === 'plugins' ? 'secondary' : 'ghost'}
+          className={`w-full justify-${sidebarCollapsed ? 'center' : 'start'} mb-1`}
+          onClick={() => {
+            navigateTo('plugins');
+            if (isMobile) setMobileSidebarOpen(false);
+          }}
+        >
+          <Puzzle className="h-5 w-5" />
+          {!sidebarCollapsed && <span className="ml-2">插件市场</span>}
         </Button>
       </div>
       

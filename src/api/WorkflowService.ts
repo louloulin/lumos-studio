@@ -79,11 +79,20 @@ export interface ExecutionLog {
   id: string;
   timestamp: number;
   level: LogLevel;
-  nodeName?: string;
   message: string;
+  nodeId?: string;
+  nodeName?: string;
+  data?: any;
 }
 
 export interface NodeExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+}
+
+// 添加节点结果接口，避免类型错误
+export interface NodeResult {
   success: boolean;
   data?: any;
   error?: string;
@@ -114,12 +123,14 @@ export interface WorkflowNode {
     prompt: string;
     temperature: number;
     maxTokens: number;
+    params?: Record<string, any>;
   };
   stringValue?: string;
   functionConfig?: {
     code: string;
     inputParams: { name: string; type: string }[];
     outputParams: { name: string; type: string }[];
+    params?: Record<string, any>;
   };
   variableConfig?: {
     key: string;

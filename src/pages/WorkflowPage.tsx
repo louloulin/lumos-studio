@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 /**
@@ -6,5 +6,5 @@ import { Navigate } from 'react-router-dom';
  * 用于从Sidebar导航到工作流系统
  */
 export default function WorkflowPage() {
-  return <Navigate to="/workflow" replace />;
+  return <Navigate to="/" replace />;
 } 

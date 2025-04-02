@@ -43,18 +43,66 @@ export interface AgentGenerateResponse {
   metadata?: Record<string, any>;
 }
 
+/**
+ * 智能体类型枚举
+ * 用于标识智能体的主要功能类型
+ */
+export enum AgentType {
+  General = 'general',           // 通用型智能体
+  Coding = 'coding',             // 编程助手
+  Writing = 'writing',           // 写作助手
+  Research = 'research',         // 研究助手
+  Customer = 'customer',         // 客户服务
+  Data = 'data',                 // 数据分析
+  Creative = 'creative',         // 创意设计
+  Education = 'education',       // 教育辅导
+  Tool = 'tool',                 // 工具型智能体
+  Custom = 'custom'              // 自定义类型
+}
+
+/**
+ * 智能体能力标签
+ * 用于描述智能体具备的能力和专长
+ */
+export interface AgentCapability {
+  id: string;                     // 能力唯一标识
+  name: string;                   // 能力名称
+  description: string;            // 能力描述
+  level: 'basic' | 'intermediate' | 'advanced'; // 能力熟练程度
+}
+
 // 智能体定义
 export interface Agent {
-  id: string;
-  name: string;
-  description: string;
-  avatar?: string;
-  instructions?: string;
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  tools?: AgentTool[];
-  systemAgent?: boolean; // 标记是否为系统智能体
+  id: string;                     // 智能体唯一标识
+  name: string;                   // 智能体名称
+  description: string;            // 智能体描述
+  avatar?: string;                // 智能体头像URL
+  instructions?: string;          // 系统提示词
+  model?: string;                 // 使用的模型
+  type?: AgentType;               // 智能体类型
+  version?: string;               // 版本号，如"1.0.0"
+  author?: string;                // 作者名称
+  authorLink?: string;            // 作者链接
+  temperature?: number;           // 温度参数
+  maxTokens?: number;             // 最大token数
+  tools?: AgentTool[];            // 智能体工具
+  systemAgent?: boolean;          // 是否为系统智能体
+  categories?: string[];          // 分类标签
+  capabilities?: AgentCapability[]; // 智能体能力
+  createdAt?: number;             // 创建时间
+  updatedAt?: number;             // 更新时间
+  metadata?: Record<string, any>; // 元数据
+  icon?: string;                  // 图标URL
+  featured?: boolean;             // 是否为推荐智能体
+  public?: boolean;               // 是否公开
+  welcomeMessage?: string;        // 欢迎消息
+  examples?: string[];            // 示例提示词
+  homepage?: string;              // 主页链接
+  documentationUrl?: string;      // 文档链接
+  license?: string;               // 许可证
+  supportContact?: string;        // 支持联系方式
+  parentId?: string;              // 父智能体ID，用于版本控制
+  compatibleModels?: string[];    // 兼容的模型列表
 }
 
 // 智能体工具

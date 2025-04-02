@@ -1,4 +1,6 @@
 import { MastraAPI } from './mastra';
+import { toolService, Tool } from './ToolService';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 工作流服务类
@@ -14,18 +16,123 @@ export enum WorkflowNodeType {
   TOOL = 'tool',
   INPUT = 'input',
   OUTPUT = 'output',
-  LOOP = 'loop'
+  LOOP = 'loop',
+  FUNCTION = 'function',
+  API = 'api',
+  MESSAGE = 'message',
+  AI = 'ai',
+  VARIABLE = 'variable',
+  KNOWLEDGE = 'knowledge',
+  WEBHOOK = 'webhook'
+}
+
+// 触发器类型
+export enum TriggerType {
+  MANUAL = 'manual',         // 手动触发
+  SCHEDULED = 'scheduled',   // 定时触发
+  WEBHOOK = 'webhook',       // Webhook触发
+  EVENT = 'event',           // 事件触发
+  MESSAGE = 'message'        // 消息触发
+}
+
+// 变量类型
+export enum VariableType {
+  STRING = 'string',
+  NUMBER = 'number',
+  BOOLEAN = 'boolean',
+  ARRAY = 'array',
+  OBJECT = 'object',
+  ANY = 'any'
+}
+
+// 触发器定义
+export interface WorkflowTrigger {
+  id: string;
+  type: TriggerType;
+  name: string;
+  description?: string;
+  config: Record<string, any>;
+}
+
+// 变量定义
+export interface WorkflowVariable {
+  id: string;
+  name: string;
+  type: VariableType;
+  description?: string;
+  defaultValue?: any;
+  required: boolean;
+}
+
+// 执行状态
+export enum ExecutionStatus {
+  PENDING = 'pending',
+  RUNNING = 'running',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELED = 'canceled'
+}
+
+// 执行记录
+export interface ExecutionRecord {
+  id: string;
+  workflowId: string;
+  workflowName: string;
+  status: ExecutionStatus;
+  startTime: number;
+  endTime?: number;
+  nodeResults: Record<string, any>;
+  variables: Record<string, any>;
+  error?: string;
+  logs: ExecutionLog[];
+}
+
+// 执行日志
+export interface ExecutionLog {
+  id: string;
+  timestamp: number;
+  nodeId: string;
+  nodeName: string;
+  message: string;
+  level: 'info' | 'warning' | 'error';
+  data?: any;
+}
+
+// 节点输出结果
+export interface NodeResult {
+  success: boolean;
+  data?: any;
+  error?: string;
 }
 
 // 工作流节点定义
 export interface WorkflowNode {
   id: string;
-  type: WorkflowNodeType;
-  label: string;
+  type: WorkflowNodeType | string;
+  name: string;
   description?: string;
-  config?: Record<string, any>;
-  x: number;
-  y: number;
+  position?: { x: number, y: number };
+  aiConfig?: {
+    model: string;
+    prompt: string;
+    temperature: number;
+    maxTokens: number;
+  };
+  stringValue?: string;
+  functionConfig?: {
+    code: string;
+    inputParams: { name: string; type: string }[];
+    outputParams: { name: string; type: string }[];
+  };
+  variableConfig?: {
+    key: string;
+    type: string;
+    defaultValue: any;
+  };
+  triggerConfig?: {
+    type: string;
+    config: Record<string, any>;
+  };
 }
 
 // 工作流连接定义
@@ -35,6 +142,7 @@ export interface WorkflowEdge {
   target: string;
   label?: string;
   condition?: string;
+  mappings?: Record<string, string>; // 映射源节点输出到目标节点输入
 }
 
 // 工作流定义
@@ -42,23 +150,30 @@ export interface Workflow {
   id: string;
   name: string;
   description?: string;
+  trigger?: WorkflowTrigger;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
+  variables?: WorkflowVariable[];
   createdAt: number;
   updatedAt: number;
   isPublic?: boolean;
   author?: string;
+  tags?: string[];
+  category?: string;
 }
 
 // 本地存储键
 const LOCAL_WORKFLOWS_KEY = 'lumos_studio_workflows';
+const LOCAL_EXECUTIONS_KEY = 'lumos_studio_workflow_executions';
 
 export class WorkflowService {
   private workflows: Map<string, Workflow> = new Map();
   private executors: Map<string, any> = new Map(); // 工作流执行器缓存
+  private executions: Map<string, ExecutionRecord> = new Map(); // 执行记录
   
   constructor() {
     this.loadWorkflows();
+    this.loadExecutions();
   }
   
   /**
@@ -88,6 +203,36 @@ export class WorkflowService {
       localStorage.setItem(LOCAL_WORKFLOWS_KEY, JSON.stringify(workflows));
     } catch (error) {
       console.error('保存工作流失败:', error);
+    }
+  }
+  
+  /**
+   * 从本地存储加载执行记录
+   */
+  private loadExecutions(): void {
+    try {
+      const storedExecutions = localStorage.getItem(LOCAL_EXECUTIONS_KEY);
+      if (storedExecutions) {
+        const executions = JSON.parse(storedExecutions);
+        executions.forEach((execution: ExecutionRecord) => {
+          this.executions.set(execution.id, execution);
+        });
+      }
+    } catch (error) {
+      console.error('加载执行记录失败:', error);
+      this.executions = new Map();
+    }
+  }
+  
+  /**
+   * 保存执行记录到本地存储
+   */
+  private saveExecutions(): void {
+    try {
+      const executions = Array.from(this.executions.values());
+      localStorage.setItem(LOCAL_EXECUTIONS_KEY, JSON.stringify(executions));
+    } catch (error) {
+      console.error('保存执行记录失败:', error);
     }
   }
   
@@ -203,194 +348,642 @@ export class WorkflowService {
   
   /**
    * 生成工作流代码
+   * @param workflow 工作流定义
    */
   generateWorkflowCode(workflow: Workflow): string {
-    // 创建可运行的工作流代码
-    let code = `
-import { Step, Workflow } from '@mastra/core/workflows';
+    try {
+      // 简单的工作流代码生成，后续可以扩展为更复杂的代码
+      const code = `/**
+ * 工作流: ${workflow.name}
+ * 描述: ${workflow.description || '无描述'}
+ * 创建时间: ${new Date(workflow.createdAt).toLocaleString()}
+ * 更新时间: ${new Date(workflow.updatedAt).toLocaleString()}
+ */
 
-// ${workflow.name} 工作流
-// ${workflow.description || ''}
-const ${workflow.name.replace(/\s+/g, '')} = new Workflow({
-  name: '${workflow.name.replace(/\s+/g, '-').toLowerCase()}',
-  description: '${workflow.description || workflow.name}'
-});
+// 工作流定义
+const workflow = {
+  id: '${workflow.id}',
+  name: '${workflow.name}',
+  description: '${workflow.description || ''}',
+  nodes: ${JSON.stringify(workflow.nodes, null, 2)},
+  edges: ${JSON.stringify(workflow.edges, null, 2)}
+};
 
-// 定义步骤
-`;
-
-    // 添加节点定义
-    workflow.nodes.forEach(node => {
-      switch (node.type) {
-        case WorkflowNodeType.AGENT:
-          code += `
-// ${node.label} - 智能体步骤
-const step${node.id} = new Step({
-  name: '${node.label}',
-  execute: async (context) => {
-    // 获取输入
-    const input = context.getInput();
-    
-    // 调用智能体
-    const agent = context.agents.${node.config?.agentId || 'agent'};
-    const result = await agent.generate({
-      messages: [
-        { role: 'system', content: '${node.config?.instructions || '你是一个有用的助手'}' },
-        { role: 'user', content: input }
-      ]
-    });
-    
-    // 返回结果
-    return result.text;
-  }
-});
-`;
-          break;
-          
-        case WorkflowNodeType.TOOL:
-          code += `
-// ${node.label} - 工具步骤
-const step${node.id} = new Step({
-  name: '${node.label}',
-  execute: async (context) => {
-    // 获取输入
-    const input = context.getInput();
-    
-    // 执行工具操作
-    ${node.config?.toolCode || '// 在这里添加工具调用代码'}
-    
-    // 返回结果
-    return result;
-  }
-});
-`;
-          break;
-          
-        case WorkflowNodeType.CONDITION:
-          code += `
-// ${node.label} - 条件步骤
-const step${node.id} = new Step({
-  name: '${node.label}',
-  execute: async (context) => {
-    // 获取输入
-    const input = context.getInput();
-    
-    // 评估条件
-    ${node.config?.conditionCode || '// 在这里添加条件评估代码'}
-    
-    // 返回结果
-    return result;
-  }
-});
-`;
-          break;
-          
-        default:
-          if (node.type !== WorkflowNodeType.START && node.type !== WorkflowNodeType.END) {
-            code += `
-// ${node.label} - ${node.type} 步骤
-const step${node.id} = new Step({
-  name: '${node.label}',
-  execute: async (context) => {
-    // 获取输入
-    const input = context.getInput();
-    
-    // 处理逻辑
-    ${node.config?.code || '// 在这里添加处理代码'}
-    
-    // 返回结果
-    return input;
-  }
-});
-`;
-          }
-      }
-    });
-    
-    // 添加步骤到工作流
-    code += `
-// 添加步骤到工作流
-`;
-    workflow.nodes.forEach(node => {
-      if (node.type !== WorkflowNodeType.START && node.type !== WorkflowNodeType.END) {
-        code += `${workflow.name.replace(/\s+/g, '')}.addStep(step${node.id});\n`;
-      }
-    });
-    
-    // 添加连接
-    code += `
-// 添加连接
-`;
-    workflow.edges.forEach(edge => {
-      code += `${workflow.name.replace(/\s+/g, '')}.addEdge({
-  from: 'step${edge.source}',
-  to: 'step${edge.target}'${edge.condition ? `,
-  condition: (result) => ${edge.condition}` : ''}
-});\n`;
-    });
-    
-    // 完成工作流
-    code += `
-// 提交工作流
-${workflow.name.replace(/\s+/g, '')}.commit();
-
-export { ${workflow.name.replace(/\s+/g, '')} };
-`;
-    
-    return code;
+// 工作流执行函数
+async function executeWorkflow(inputs = {}) {
+  console.log('开始执行工作流:', workflow.name);
+  
+  // 初始化节点状态
+  const nodeStates = {};
+  const nodeOutputs = {};
+  
+  // 获取开始节点
+  const startNode = workflow.nodes.find(node => node.type === 'start');
+  if (!startNode) {
+    throw new Error('工作流缺少开始节点');
   }
   
-  /**
-   * 执行工作流
-   */
-  async executeWorkflow(id: string, input: any = {}): Promise<any> {
-    try {
-      const workflow = this.getWorkflow(id);
-      if (!workflow) {
-        throw new Error(`找不到工作流: ${id}`);
-      }
+  // 执行开始节点
+  nodeOutputs[startNode.id] = inputs;
+  
+  // 工作流执行逻辑
+  // ...此处根据具体实现添加节点执行逻辑...
+  
+  return nodeOutputs;
+}
+
+// 导出工作流
+module.exports = {
+  workflow,
+  executeWorkflow
+};`;
       
-      // 动态导入工作流执行器以避免循环依赖
-      const { WorkflowExecutor } = await import('./WorkflowExecutor');
-      
-      // 创建执行器
-      const executor = new WorkflowExecutor(workflow, {
-        onNodeComplete: (result) => {
-          console.log(`节点执行完成: ${result.nodeId}`, result);
-        },
-        onWorkflowComplete: (state) => {
-          console.log('工作流执行完成', state);
-        },
-        onWorkflowError: (error, state) => {
-          console.error('工作流执行失败', error, state);
-        }
-      });
-      
-      // 缓存执行器
-      this.executors.set(id, executor);
-      
-      // 执行工作流并返回结果
-      const result = await executor.execute({ initial: input });
-      return result.outputs.final;
+      return code;
     } catch (error) {
-      console.error(`执行工作流失败: ${id}`, error);
-      throw new Error(`执行工作流失败: ${error instanceof Error ? error.message : String(error)}`);
+      console.error('生成工作流代码失败:', error);
+      return `// 生成代码失败: ${error instanceof Error ? error.message : '未知错误'}`;
     }
   }
   
   /**
-   * 获取工作流执行器
+   * 执行工作流
+   * @param id 工作流ID
+   * @param inputs 输入参数
    */
-  getWorkflowExecutor(id: string): any {
-    return this.executors.get(id) || null;
+  async executeWorkflow(id: string, inputs: Record<string, any> = {}): Promise<ExecutionRecord> {
+    // 获取工作流
+    const workflow = this.getWorkflow(id);
+    if (!workflow) {
+      throw new Error(`工作流不存在: ${id}`);
+    }
+    
+    // 创建执行记录
+    const executionId = uuidv4();
+    const executionRecord: ExecutionRecord = {
+      id: executionId,
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      status: ExecutionStatus.RUNNING,
+      startTime: Date.now(),
+      nodeResults: {},
+      variables: { ...inputs },
+      logs: []
+    };
+    
+    // 保存初始执行记录
+    this.executions.set(executionId, executionRecord);
+    this.saveExecutions();
+    
+    try {
+      // 执行工作流
+      await this.runWorkflow(workflow, executionRecord);
+      
+      // 更新执行状态为完成
+      executionRecord.status = ExecutionStatus.COMPLETED;
+      executionRecord.endTime = Date.now();
+    } catch (error) {
+      // 更新执行状态为失败
+      executionRecord.status = ExecutionStatus.FAILED;
+      executionRecord.endTime = Date.now();
+      executionRecord.error = error instanceof Error ? error.message : '未知错误';
+      
+      // 添加错误日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: '',
+        nodeName: '工作流执行器',
+        message: `工作流执行失败: ${executionRecord.error}`,
+        level: 'error'
+      });
+      
+      console.error('工作流执行失败:', error);
+    }
+    
+    // 保存最终执行记录
+    this.executions.set(executionId, executionRecord);
+    this.saveExecutions();
+    
+    return executionRecord;
   }
   
   /**
-   * 清理工作流执行器缓存
+   * 运行工作流
+   * @param workflow 工作流定义
+   * @param executionRecord 执行记录
    */
-  clearExecutor(id: string): void {
-    if (this.executors.has(id)) {
-      this.executors.delete(id);
+  private async runWorkflow(workflow: Workflow, executionRecord: ExecutionRecord): Promise<void> {
+    // 获取开始节点
+    const startNode = workflow.nodes.find(node => node.type === WorkflowNodeType.START);
+    if (!startNode) {
+      throw new Error('工作流缺少开始节点');
+    }
+    
+    // 添加开始执行日志
+    this.addExecutionLog(executionRecord, {
+      id: uuidv4(),
+      timestamp: Date.now(),
+      nodeId: startNode.id,
+      nodeName: startNode.name,
+      message: '开始执行工作流',
+      level: 'info'
+    });
+    
+    // 初始化已访问节点集合
+    const visitedNodes = new Set<string>();
+    
+    // 从开始节点开始执行
+    await this.executeNode(workflow, startNode.id, executionRecord, visitedNodes);
+  }
+  
+  /**
+   * 执行工作流节点
+   * @param workflow 工作流定义
+   * @param nodeId 当前节点ID
+   * @param executionRecord 执行记录
+   * @param visitedNodes 已访问节点集合
+   */
+  private async executeNode(
+    workflow: Workflow, 
+    nodeId: string, 
+    executionRecord: ExecutionRecord,
+    visitedNodes: Set<string>
+  ): Promise<NodeResult> {
+    // 如果节点已被访问，返回已有结果
+    if (visitedNodes.has(nodeId) && executionRecord.nodeResults[nodeId]) {
+      return executionRecord.nodeResults[nodeId];
+    }
+    
+    // 标记节点已访问
+    visitedNodes.add(nodeId);
+    
+    // 获取节点定义
+    const node = workflow.nodes.find(n => n.id === nodeId);
+    if (!node) {
+      throw new Error(`找不到节点: ${nodeId}`);
+    }
+    
+    // 添加节点开始执行日志
+    this.addExecutionLog(executionRecord, {
+      id: uuidv4(),
+      timestamp: Date.now(),
+      nodeId: node.id,
+      nodeName: node.name,
+      message: `开始执行节点: ${node.name}`,
+      level: 'info'
+    });
+    
+    try {
+      let result: NodeResult;
+      
+      // 根据节点类型执行不同的操作
+      switch (node.type) {
+        case WorkflowNodeType.START:
+          // 开始节点，直接返回成功
+          result = { success: true, data: executionRecord.variables };
+          break;
+          
+        case WorkflowNodeType.END:
+          // 结束节点，直接返回成功
+          result = { success: true, data: executionRecord.variables };
+          break;
+          
+        case WorkflowNodeType.TOOL:
+          // 工具节点，执行工具
+          result = await this.executeToolNode(workflow, node, executionRecord);
+          break;
+          
+        case WorkflowNodeType.CONDITION:
+          // 条件节点，执行条件逻辑
+          result = await this.executeConditionNode(workflow, node, executionRecord, visitedNodes);
+          break;
+          
+        case WorkflowNodeType.AI:
+          // AI节点，执行AI模型
+          result = await this.executeAINode(workflow, node, executionRecord);
+          break;
+          
+        case WorkflowNodeType.FUNCTION:
+          // 函数节点，执行自定义函数
+          result = await this.executeFunctionNode(workflow, node, executionRecord);
+          break;
+          
+        default:
+          // 不支持的节点类型
+          throw new Error(`不支持的节点类型: ${node.type}`);
+      }
+      
+      // 保存节点执行结果
+      executionRecord.nodeResults[nodeId] = result;
+      
+      // 添加节点执行成功日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `节点执行成功: ${node.name}`,
+        level: 'info',
+        data: result.data
+      });
+      
+      // 如果不是结束节点，执行后续节点
+      if (node.type !== WorkflowNodeType.END) {
+        // 获取所有从当前节点出发的边
+        const outgoingEdges = workflow.edges.filter(edge => edge.source === nodeId);
+        
+        // 如果是条件节点，已经在条件逻辑中处理了后续节点，这里不需要重复执行
+        if (node.type !== WorkflowNodeType.CONDITION) {
+          // 执行所有后续节点
+          for (const edge of outgoingEdges) {
+            // 检查条件
+            if (edge.condition) {
+              const conditionMet = this.evaluateCondition(edge.condition, result.data, executionRecord.variables);
+              if (!conditionMet) {
+                continue; // 条件不满足，跳过此边
+              }
+            }
+            
+            // 执行目标节点
+            await this.executeNode(workflow, edge.target, executionRecord, visitedNodes);
+          }
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      // 添加节点执行失败日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `节点执行失败: ${error instanceof Error ? error.message : '未知错误'}`,
+        level: 'error'
+      });
+      
+      // 保存节点执行结果
+      const result: NodeResult = {
+        success: false,
+        error: error instanceof Error ? error.message : '未知错误'
+      };
+      executionRecord.nodeResults[nodeId] = result;
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * 执行工具节点
+   */
+  private async executeToolNode(
+    workflow: Workflow,
+    node: WorkflowNode,
+    executionRecord: ExecutionRecord
+  ): Promise<NodeResult> {
+    if (!node.aiConfig || !node.aiConfig.model) {
+      throw new Error('工具节点缺少模型');
+    }
+    
+    const model = node.aiConfig.model;
+    const params = node.aiConfig.params || {};
+    
+    // 解析参数中的变量引用
+    const resolvedParams = this.resolveVariables(params, executionRecord.variables);
+    
+    try {
+      // 获取工具
+      const tool = await toolService.getTool(model);
+      if (!tool) {
+        throw new Error(`找不到工具: ${model}`);
+      }
+      
+      // 添加工具执行日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `执行工具: ${model}`,
+        level: 'info',
+        data: resolvedParams
+      });
+      
+      // 执行工具
+      const result = await toolService.executeTool(model, { data: resolvedParams });
+      
+      return { success: true, data: result };
+    } catch (error) {
+      throw new Error(`工具执行失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+  
+  /**
+   * 执行条件节点
+   */
+  private async executeConditionNode(
+    workflow: Workflow,
+    node: WorkflowNode,
+    executionRecord: ExecutionRecord,
+    visitedNodes: Set<string>
+  ): Promise<NodeResult> {
+    if (!node.functionConfig || !node.functionConfig.code) {
+      throw new Error('条件节点缺少条件表达式');
+    }
+    
+    const condition = node.functionConfig.code;
+    
+    // 评估条件
+    const conditionResult = this.evaluateCondition(condition, null, executionRecord.variables);
+    
+    // 获取所有从当前节点出发的边
+    const outgoingEdges = workflow.edges.filter(edge => edge.source === node.id);
+    
+    // 获取满足条件的边
+    const matchingEdge = outgoingEdges.find(edge => {
+      if (!edge.condition) {
+        return false; // 没有条件的边不应该从条件节点出发
+      }
+      
+      const edgeCondition = edge.condition === 'true' ? true : 
+                           edge.condition === 'false' ? false : 
+                           this.evaluateCondition(edge.condition, null, executionRecord.variables);
+                           
+      return edgeCondition === conditionResult;
+    });
+    
+    // 如果没有找到匹配的边，查找默认边
+    const defaultEdge = outgoingEdges.find(edge => !edge.condition || edge.condition === 'default');
+    
+    // 确定要执行的下一个节点
+    const nextEdge = matchingEdge || defaultEdge;
+    
+    if (nextEdge) {
+      // 执行下一个节点
+      await this.executeNode(workflow, nextEdge.target, executionRecord, visitedNodes);
+    }
+    
+    return { success: true, data: { result: conditionResult } };
+  }
+  
+  /**
+   * 执行AI节点
+   */
+  private async executeAINode(
+    workflow: Workflow,
+    node: WorkflowNode,
+    executionRecord: ExecutionRecord
+  ): Promise<NodeResult> {
+    if (!node.aiConfig) {
+      throw new Error('AI节点缺少AI配置');
+    }
+    
+    const { model, prompt, temperature } = node.aiConfig;
+    
+    // 解析提示词中的变量
+    const resolvedPrompt = this.resolveVariablesInString(prompt || '', executionRecord.variables);
+    
+    try {
+      // 这里应该调用实际的AI服务API
+      // 由于这是一个示例，我们创建一个模拟响应
+      const mockResponse = `这是来自 ${model} 的响应。
+系统提示: ${resolvedPrompt}
+温度: ${temperature || 0.7}
+      
+这是一个模拟的AI响应，在实际实现中，这里应该是调用真实AI服务API获取的响应内容。`;
+      
+      // 添加AI执行日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `执行AI模型: ${model}`,
+        level: 'info',
+        data: {
+          prompt: resolvedPrompt,
+          temperature
+        }
+      });
+      
+      return { success: true, data: { response: mockResponse } };
+    } catch (error) {
+      throw new Error(`AI执行失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+  
+  /**
+   * 执行函数节点
+   */
+  private async executeFunctionNode(
+    workflow: Workflow,
+    node: WorkflowNode,
+    executionRecord: ExecutionRecord
+  ): Promise<NodeResult> {
+    if (!node.functionConfig || !node.functionConfig.code) {
+      throw new Error('函数节点缺少函数代码');
+    }
+    
+    const functionCode = node.functionConfig.code;
+    const functionParams = node.functionConfig.params || {};
+    
+    // 解析参数中的变量引用
+    const resolvedParams = this.resolveVariables(functionParams, executionRecord.variables);
+    
+    try {
+      // 添加函数执行日志
+      this.addExecutionLog(executionRecord, {
+        id: uuidv4(),
+        timestamp: Date.now(),
+        nodeId: node.id,
+        nodeName: node.name,
+        message: `执行函数`,
+        level: 'info',
+        data: resolvedParams
+      });
+      
+      // 创建函数
+      // 注意: 在实际环境中，应该使用更安全的函数执行方式，比如Web Worker或沙箱
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('params', 'context', functionCode);
+      
+      // 执行函数
+      const result = await fn(resolvedParams, {
+        variables: executionRecord.variables,
+        workflow,
+        node
+      });
+      
+      return { success: true, data: result };
+    } catch (error) {
+      throw new Error(`函数执行失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+  
+  /**
+   * 评估条件表达式
+   * @param condition 条件表达式
+   * @param nodeData 节点数据
+   * @param variables 工作流变量
+   */
+  private evaluateCondition(
+    condition: string,
+    nodeData: any,
+    variables: Record<string, any>
+  ): boolean {
+    try {
+      // 创建上下文
+      const context = {
+        data: nodeData,
+        vars: variables,
+        // 添加一些辅助函数
+        isNull: (val: any) => val === null || val === undefined,
+        isEmpty: (val: any) => {
+          if (val === null || val === undefined) return true;
+          if (typeof val === 'string') return val.trim() === '';
+          if (Array.isArray(val)) return val.length === 0;
+          if (typeof val === 'object') return Object.keys(val).length === 0;
+          return false;
+        },
+        contains: (str: string, substr: string) => {
+          if (typeof str !== 'string') return false;
+          return str.includes(substr);
+        }
+      };
+      
+      // 使用 eval 评估条件 (在实际环境中应该使用更安全的方式)
+      // eslint-disable-next-line no-new-func
+      const evalFn = new Function('ctx', `with(ctx) { return (${condition}); }`);
+      return !!evalFn(context);
+    } catch (error) {
+      console.error('条件评估失败:', error, condition);
+      return false;
+    }
+  }
+  
+  /**
+   * 解析对象中的变量引用
+   * @param obj 包含变量引用的对象
+   * @param variables 变量值
+   */
+  private resolveVariables(obj: any, variables: Record<string, any>): any {
+    if (!obj) return obj;
+    
+    if (typeof obj === 'string') {
+      return this.resolveVariablesInString(obj, variables);
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.resolveVariables(item, variables));
+    }
+    
+    if (typeof obj === 'object') {
+      const result: Record<string, any> = {};
+      for (const [key, value] of Object.entries(obj)) {
+        result[key] = this.resolveVariables(value, variables);
+      }
+      return result;
+    }
+    
+    return obj;
+  }
+  
+  /**
+   * 解析字符串中的变量引用
+   * @param str 包含变量引用的字符串
+   * @param variables 变量值
+   */
+  private resolveVariablesInString(str: string, variables: Record<string, any>): string {
+    if (!str || typeof str !== 'string') return str;
+    
+    // 替换 {{variable}} 格式的变量引用
+    return str.replace(/\{\{([^{}]+)\}\}/g, (match, variablePath) => {
+      try {
+        // 解析变量路径
+        const path = variablePath.trim().split('.');
+        let value = variables;
+        
+        for (const key of path) {
+          if (value === undefined || value === null) return match;
+          value = value[key];
+        }
+        
+        if (value === undefined || value === null) return '';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
+      } catch (error) {
+        console.error('变量解析失败:', error, variablePath);
+        return match;
+      }
+    });
+  }
+  
+  /**
+   * 添加执行日志
+   */
+  private addExecutionLog(executionRecord: ExecutionRecord, log: ExecutionLog): void {
+    executionRecord.logs.push(log);
+  }
+  
+  /**
+   * 获取执行记录
+   * @param executionId 执行ID
+   */
+  getExecutionRecord(executionId: string): ExecutionRecord | null {
+    return this.executions.get(executionId) || null;
+  }
+  
+  /**
+   * 获取工作流的所有执行记录
+   * @param workflowId 工作流ID
+   */
+  getWorkflowExecutions(workflowId: string): ExecutionRecord[] {
+    return Array.from(this.executions.values())
+      .filter(execution => execution.workflowId === workflowId)
+      .sort((a, b) => b.startTime - a.startTime); // 按开始时间降序排序
+  }
+  
+  /**
+   * 获取所有执行记录
+   */
+  getAllExecutions(): ExecutionRecord[] {
+    return Array.from(this.executions.values())
+      .sort((a, b) => b.startTime - a.startTime); // 按开始时间降序排序
+  }
+  
+  /**
+   * 删除执行记录
+   * @param executionId 执行ID
+   */
+  deleteExecution(executionId: string): boolean {
+    const initialSize = this.executions.size;
+    this.executions.delete(executionId);
+    
+    if (this.executions.size !== initialSize) {
+      this.saveExecutions();
+      return true;
+    }
+    
+    return false;
+  }
+  
+  /**
+   * 清除工作流的所有执行记录
+   * @param workflowId 工作流ID
+   */
+  clearWorkflowExecutions(workflowId: string): void {
+    const executionsToDelete = Array.from(this.executions.values())
+      .filter(execution => execution.workflowId === workflowId)
+      .map(execution => execution.id);
+      
+    let hasDeleted = false;
+    
+    for (const executionId of executionsToDelete) {
+      hasDeleted = this.executions.delete(executionId) || hasDeleted;
+    }
+    
+    if (hasDeleted) {
+      this.saveExecutions();
     }
   }
   
@@ -403,4 +996,25 @@ export { ${workflow.name.replace(/\s+/g, '')} };
 }
 
 // 导出单例实例
-export const workflowService = new WorkflowService(); 
+export const workflowService = new WorkflowService();
+
+/**
+ * 创建一个新的工作流节点
+ * @param type 节点类型
+ * @param name 节点名称
+ * @param position 节点位置
+ * @returns 新创建的工作流节点
+ */
+export function createWorkflowNode(
+  type: WorkflowNodeType | string, 
+  name: string, 
+  position: { x: number, y: number }
+): WorkflowNode {
+  return {
+    id: `node_${Date.now()}`,
+    type,
+    name,
+    description: '',
+    position
+  };
+} 

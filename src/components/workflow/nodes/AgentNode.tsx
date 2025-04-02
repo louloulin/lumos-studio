@@ -1,36 +1,42 @@
-import { memo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
-import { MessageSquare } from 'lucide-react';
+import React from 'react';
+import { Handle, Position } from 'reactflow';
+import { Bot } from 'lucide-react';
 
-const AgentNode = ({ data, isConnectable }: NodeProps) => {
+interface AgentNodeProps {
+  data: {
+    name: string;
+    description?: string;
+    onNodeClick?: (id: string) => void;
+  };
+  id: string;
+}
+
+export default function AgentNode({ data, id }: AgentNodeProps) {
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-blue-500 min-w-[150px]">
+    <div 
+      className="flex flex-col border-2 border-purple-300 rounded-md bg-purple-50 p-4 min-w-[180px]"
+      onClick={() => data.onNodeClick?.(id)}
+    >
       <Handle
         type="target"
         position={Position.Top}
-        isConnectable={isConnectable}
-        className="w-2 h-2 bg-blue-500"
+        className="w-2 h-2 bg-purple-500"
       />
-      <div className="flex items-center">
-        <MessageSquare className="mr-2 h-5 w-5 text-blue-500" />
-        <div>
-          <div className="font-bold">{data.label}</div>
-          {data.description && (
-            <div className="text-xs text-gray-500">{data.description}</div>
-          )}
-          {data.agentId && (
-            <div className="text-xs mt-1 text-blue-500">ID: {data.agentId}</div>
-          )}
-        </div>
+      
+      <div className="flex items-center mb-2">
+        <Bot className="w-4 h-4 mr-2 text-purple-600" />
+        <div className="font-medium text-sm text-purple-800">{data.name}</div>
       </div>
+      
+      {data.description && (
+        <div className="text-xs text-purple-600 mt-1">{data.description}</div>
+      )}
+      
       <Handle
         type="source"
         position={Position.Bottom}
-        isConnectable={isConnectable}
-        className="w-2 h-2 bg-blue-500"
+        className="w-2 h-2 bg-purple-500"
       />
     </div>
   );
-};
-
-export default memo(AgentNode); 
+} 

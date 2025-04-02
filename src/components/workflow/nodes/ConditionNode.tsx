@@ -1,43 +1,50 @@
-import { memo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import React from 'react';
+import { Handle, Position } from 'reactflow';
 import { GitBranch } from 'lucide-react';
 
-const ConditionNode = ({ data, isConnectable }: NodeProps) => {
+interface ConditionNodeProps {
+  data: {
+    name: string;
+    description?: string;
+    onNodeClick?: (id: string) => void;
+  };
+  id: string;
+}
+
+export default function ConditionNode({ data, id }: ConditionNodeProps) {
   return (
-    <div className="px-4 py-2 shadow-md rounded-md bg-white border-2 border-yellow-500 min-w-[150px]">
+    <div 
+      className="flex flex-col border-2 border-yellow-300 rounded-md bg-yellow-50 p-4 min-w-[180px]"
+      onClick={() => data.onNodeClick?.(id)}
+    >
       <Handle
         type="target"
         position={Position.Top}
-        isConnectable={isConnectable}
         className="w-2 h-2 bg-yellow-500"
       />
-      <div className="flex items-center">
-        <GitBranch className="mr-2 h-5 w-5 text-yellow-500" />
-        <div>
-          <div className="font-bold">{data.label}</div>
-          {data.description && (
-            <div className="text-xs text-gray-500">{data.description}</div>
-          )}
-        </div>
+      
+      <div className="flex items-center mb-2">
+        <GitBranch className="w-4 h-4 mr-2 text-yellow-600" />
+        <div className="font-medium text-sm text-yellow-800">{data.name}</div>
       </div>
+      
+      {data.description && (
+        <div className="text-xs text-yellow-600 mt-1">{data.description}</div>
+      )}
+      
       <Handle
         type="source"
         position={Position.Bottom}
         id="true"
-        style={{ left: '30%' }}
-        isConnectable={isConnectable}
-        className="w-2 h-2 bg-green-500"
+        className="w-2 h-2 bg-green-500 -mb-[5px] -right-[5px]"
       />
+      
       <Handle
         type="source"
         position={Position.Bottom}
         id="false"
-        style={{ left: '70%' }}
-        isConnectable={isConnectable}
-        className="w-2 h-2 bg-red-500"
+        className="w-2 h-2 bg-red-500 -mb-[5px] -left-[5px]"
       />
     </div>
   );
-};
-
-export default memo(ConditionNode); 
+} 

@@ -1,361 +1,535 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactFlow, {
-  Node,
-  Edge,
+  ReactFlowProvider,
   Controls,
   Background,
-  MiniMap,
+  useNodesState,
+  useEdgesState,
+  addEdge,
+  Connection,
+  Edge,
+  Node,
   NodeChange,
   EdgeChange,
-  Connection,
-  addEdge,
+  ReactFlowInstance,
+  BackgroundVariant,
   Panel,
-  useNodesState,
-  useEdgesState
+  MarkerType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+
+import {
+  Workflow,
+  WorkflowNode as WorkflowNodeType,
+  WorkflowEdge,
+  WorkflowNodeType as NodeType,
+  WorkflowService,
+  createWorkflowNode,
+} from '@/api/WorkflowService';
+
+import WorkflowNodePanel from './WorkflowNodePanel';
+import {
+  CircleNode,
+  DefaultNode,
+  AgentNode,
+  ToolNode,
+  ConditionNode,
+  LoopNode,
+  InputNode,
+  OutputNode,
+  AINode,
+  StringNode,
+  FunctionNode,
+  TriggerNode,
+  VariableNode,
+  AINodeEditor,
+  StringNodeEditor,
+  FunctionNodeEditor,
+  VariableNodeEditor,
+  TriggerNodeEditor
+} from './nodes';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Save, ZoomIn, ZoomOut, Undo, Redo, Plus } from 'lucide-react';
-import { Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType, workflowService } from '@/api/WorkflowService';
-import { useNavigate, useParams } from 'react-router-dom';
-import AgentNode from './nodes/AgentNode';
-import ToolNode from './nodes/ToolNode';
-import ConditionNode from './nodes/ConditionNode';
-import StartNode from './nodes/StartNode';
-import EndNode from './nodes/EndNode';
-import WorkflowNodePanel from './WorkflowNodePanel';
-import WorkflowPropertiesPanel from './WorkflowPropertiesPanel';
+import { toast } from '@/components/ui/use-toast';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from '@/components/ui/alert-dialog';
+import { Plus, Save, Play, Settings } from 'lucide-react';
 
-// 注册自定义节点
+// 注册节点类型
 const nodeTypes = {
+  circle: CircleNode,
+  default: DefaultNode,
   agent: AgentNode,
   tool: ToolNode,
   condition: ConditionNode,
-  start: StartNode,
-  end: EndNode,
+  loop: LoopNode,
+  input: InputNode,
+  output: OutputNode,
+  ai: AINode,
+  string: StringNode,
+  function: FunctionNode,
+  trigger: TriggerNode,
+  variable: VariableNode
 };
 
-const initialNodes: Node[] = [
-  {
-    id: 'start',
-    type: 'start',
-    data: { label: '开始' },
-    position: { x: 0, y: 0 },
-  },
-  {
-    id: 'end',
-    type: 'end',
-    data: { label: '结束' },
-    position: { x: 0, y: 300 },
-  },
-];
-
 interface WorkflowEditorProps {
-  onSave?: (workflow: Workflow) => void;
+  workflow: Workflow;
+  onSave: (workflow: Workflow) => void;
 }
 
-export default function WorkflowEditor({ onSave }: WorkflowEditorProps) {
-  const { id } = useParams<{ id: string }>();
-  const isNewWorkflow = id === 'new';
-  const navigate = useNavigate();
+export default function WorkflowEditorProvider({ workflow, onSave }: WorkflowEditorProps) {
+  return (
+    <ReactFlowProvider>
+      <WorkflowEditor workflow={workflow} onSave={onSave} />
+    </ReactFlowProvider>
+  );
+}
 
-  // 工作流属性
-  const [workflowName, setWorkflowName] = useState('新工作流');
-  const [workflowDescription, setWorkflowDescription] = useState('');
-  const [originalWorkflow, setOriginalWorkflow] = useState<Workflow | null>(null);
-
-  // 节点和边状态
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+function WorkflowEditor({ workflow, onSave }: WorkflowEditorProps) {
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  
-  // 侧边栏状态
-  const [showNodePanel, setShowNodePanel] = useState(true);
-  const [showPropertiesPanel, setShowPropertiesPanel] = useState(true);
-  
-  // 历史记录
-  const [history, setHistory] = useState<{ nodes: Node[]; edges: Edge[] }[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(0);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const [workflowName, setWorkflowName] = useState(workflow?.name || '新工作流');
+  const [workflowDescription, setWorkflowDescription] = useState(workflow?.description || '');
   
-  // React Flow 实例
-  const reactFlowInstance = useRef(null);
+  // Node editor states
+  const [aiNodeEditorOpen, setAiNodeEditorOpen] = useState(false);
+  const [stringNodeEditorOpen, setStringNodeEditorOpen] = useState(false);
+  const [functionNodeEditorOpen, setFunctionNodeEditorOpen] = useState(false);
+  const [variableNodeEditorOpen, setVariableNodeEditorOpen] = useState(false);
+  const [triggerNodeEditorOpen, setTriggerNodeEditorOpen] = useState(false);
 
-  // 加载工作流
+  const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const workflowService = new WorkflowService();
+
   useEffect(() => {
-    if (!isNewWorkflow && id) {
-      const workflow = workflowService.getWorkflow(id);
-      if (workflow) {
-        setOriginalWorkflow(workflow);
-        setWorkflowName(workflow.name);
-        setWorkflowDescription(workflow.description || '');
+    if (workflow) {
+      // 将工作流数据转换为ReactFlow节点和边
+      const flowNodes = workflow.nodes.map((node) => {
+        let nodeType = 'default';
         
-        // 转换节点
-        const flowNodes = workflow.nodes.map(node => ({
-          id: node.id,
-          type: node.type,
-          data: { 
-            label: node.label,
-            description: node.description,
-            ...node.config 
-          },
-          position: { x: node.x, y: node.y },
-        }));
-        
-        // 转换边
-        const flowEdges = workflow.edges.map(edge => ({
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          label: edge.label,
-          data: { condition: edge.condition },
-        }));
-        
-        setNodes(flowNodes);
-        setEdges(flowEdges);
-        addToHistory(flowNodes, flowEdges);
-      } else {
-        // 工作流不存在，返回列表
-        navigate('/workflow');
-      }
-    } else {
-      // 新工作流，初始化
-      addToHistory(initialNodes, []);
-    }
-  }, [id, isNewWorkflow, navigate]);
-
-  // 添加到历史记录
-  const addToHistory = useCallback((newNodes: Node[], newEdges: Edge[]) => {
-    setHistory(prev => {
-      // 移除当前索引之后的历史记录
-      const newHistory = prev.slice(0, historyIndex + 1);
-      // 添加新状态
-      return [...newHistory, { nodes: JSON.parse(JSON.stringify(newNodes)), edges: JSON.parse(JSON.stringify(newEdges)) }];
-    });
-    setHistoryIndex(prev => prev + 1);
-  }, [historyIndex]);
-
-  // 处理节点变化
-  const handleNodesChange = (changes: NodeChange[]) => {
-    onNodesChange(changes);
-    // 选择节点
-    const selectChange = changes.find(change => change.type === 'select');
-    if (selectChange && 'id' in selectChange) {
-      const selected = nodes.find(node => node.id === selectChange.id);
-      setSelectedNode(selected || null);
-    }
-  };
-
-  // 处理边变化
-  const handleEdgesChange = (changes: EdgeChange[]) => {
-    onEdgesChange(changes);
-  };
-
-  // 添加连接
-  const handleConnect = (connection: Connection) => {
-    const newEdge = {
-      ...connection,
-      id: `e-${Date.now()}`,
-      label: '',
-    };
-    const newEdges = addEdge(newEdge, edges);
-    setEdges(newEdges);
-    addToHistory(nodes, newEdges);
-  };
-
-  // 添加节点
-  const handleAddNode = (type: WorkflowNodeType, name: string) => {
-    const newNode: Node = {
-      id: `${type}-${Date.now()}`,
-      type,
-      data: { label: name },
-      position: { x: 100, y: 100 },
-    };
-    
-    const newNodes = [...nodes, newNode];
-    setNodes(newNodes);
-    addToHistory(newNodes, edges);
-  };
-
-  // 更新节点
-  const handleUpdateNode = (updatedNode: Node) => {
-    const newNodes = nodes.map(node => 
-      node.id === updatedNode.id ? updatedNode : node
-    );
-    setNodes(newNodes);
-    addToHistory(newNodes, edges);
-  };
-
-  // 撤销
-  const handleUndo = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      const { nodes: prevNodes, edges: prevEdges } = history[newIndex];
-      setNodes(prevNodes);
-      setEdges(prevEdges);
-      setHistoryIndex(newIndex);
-    }
-  };
-
-  // 重做
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      const { nodes: nextNodes, edges: nextEdges } = history[newIndex];
-      setNodes(nextNodes);
-      setEdges(nextEdges);
-      setHistoryIndex(newIndex);
-    }
-  };
-
-  // 保存工作流
-  const handleSaveWorkflow = () => {
-    // 转换节点
-    const workflowNodes: WorkflowNode[] = nodes.map(node => ({
-      id: node.id,
-      type: node.type as WorkflowNodeType,
-      label: node.data.label,
-      description: node.data.description,
-      config: Object.keys(node.data).reduce((config, key) => {
-        if (key !== 'label' && key !== 'description') {
-          config[key] = node.data[key];
+        // 根据节点类型选择不同的节点视图
+        switch (node.type) {
+          case NodeType.START:
+          case NodeType.END:
+            nodeType = 'circle';
+            break;
+          case NodeType.AGENT:
+            nodeType = 'agent';
+            break;
+          case NodeType.TOOL:
+            nodeType = 'tool';
+            break;
+          case NodeType.CONDITION:
+            nodeType = 'condition';
+            break;
+          case NodeType.LOOP:
+            nodeType = 'loop';
+            break;
+          case NodeType.INPUT:
+            nodeType = 'input';
+            break;
+          case NodeType.OUTPUT:
+            nodeType = 'output';
+            break;
+          default:
+            if (node.type === 'ai') {
+              nodeType = 'ai';
+            } else if (node.type === 'string') {
+              nodeType = 'string';
+            } else if (node.type === 'function') {
+              nodeType = 'function';
+            } else if (node.type === 'trigger') {
+              nodeType = 'trigger';
+            } else if (node.type === 'variable') {
+              nodeType = 'variable';
+            }
+            break;
         }
-        return config;
-      }, {} as Record<string, any>),
-      x: node.position.x,
-      y: node.position.y,
+
+        return {
+          id: node.id,
+          type: nodeType,
+          position: node.position || { x: 0, y: 0 },
+          data: { ...node, onNodeClick: handleNodeClick },
+        };
+      });
+
+      const flowEdges = workflow.edges.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: 'smoothstep',
+        markerEnd: {
+          type: MarkerType.Arrow,
+        },
+        data: { ...edge },
+      }));
+
+      setNodes(flowNodes);
+      setEdges(flowEdges);
+    } else {
+      // 如果没有工作流数据，初始化一个空的工作流
+      setNodes([]);
+      setEdges([]);
+    }
+  }, [workflow]);
+
+  const handleNodeClick = (nodeId: string) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setSelectedNode(node);
+      
+      // Open the appropriate editor based on node type
+      if (node.type === 'ai') {
+        setAiNodeEditorOpen(true);
+      } else if (node.type === 'string') {
+        setStringNodeEditorOpen(true);
+      } else if (node.type === 'function') {
+        setFunctionNodeEditorOpen(true);
+      } else if (node.type === 'variable') {
+        setVariableNodeEditorOpen(true);
+      } else if (node.type === 'trigger') {
+        setTriggerNodeEditorOpen(true);
+      }
+    }
+  };
+
+  const onConnect = useCallback(
+    (params: Connection) => {
+      if (!params.source || !params.target) return;
+      
+      // 创建一个新的边
+      const newEdge: Edge = {
+        ...params,
+        id: `e${params.source}-${params.target}`,
+        source: params.source, // 确保source不为null
+        target: params.target, // 确保target不为null
+        type: 'smoothstep',
+        markerEnd: {
+          type: MarkerType.Arrow,
+        },
+        data: {
+          id: `e${params.source}-${params.target}`,
+          source: params.source,
+          target: params.target,
+        },
+      };
+
+      setEdges((eds) => addEdge(newEdge, eds));
+    },
+    [setEdges]
+  );
+
+  const handleAddNode = (type: string) => {
+    if (!reactFlowInstance) return;
+
+    // 获取视图的中心位置
+    const viewport = reactFlowInstance.getViewport();
+    const centerX = (window.innerWidth / 2 - viewport.x) / viewport.zoom;
+    const centerY = (window.innerHeight / 2 - viewport.y) / viewport.zoom;
+
+    // 为每种节点类型选择正确的类型值
+    let nodeTypeValue: NodeType | string;
+    
+    // 将字符串类型映射到枚举（如果适用）
+    if (type === NodeType.START || 
+        type === NodeType.END || 
+        type === NodeType.AGENT || 
+        type === NodeType.TOOL || 
+        type === NodeType.CONDITION || 
+        type === NodeType.LOOP || 
+        type === NodeType.INPUT || 
+        type === NodeType.OUTPUT) {
+      nodeTypeValue = type;
+    } else {
+      // 对于自定义节点类型，保持字符串值
+      nodeTypeValue = type;
+    }
+
+    // 创建新的工作流节点
+    const newWorkflowNode = createWorkflowNode(
+      nodeTypeValue, 
+      `新${type}节点`, 
+      { x: centerX, y: centerY }
+    );
+
+    // 为不同节点类型添加特定的属性
+    if (type === 'ai') {
+      newWorkflowNode.aiConfig = {
+        model: 'gpt-3.5-turbo',
+        prompt: '',
+        temperature: 0.7,
+        maxTokens: 1000
+      };
+    } else if (type === 'string') {
+      newWorkflowNode.stringValue = '';
+    } else if (type === 'function') {
+      newWorkflowNode.functionConfig = {
+        code: '',
+        inputParams: [],
+        outputParams: []
+      };
+    } else if (type === 'variable') {
+      newWorkflowNode.variableConfig = {
+        key: '',
+        type: 'STRING',
+        defaultValue: ''
+      };
+    } else if (type === 'trigger') {
+      newWorkflowNode.triggerConfig = {
+        type: 'SCHEDULED',
+        config: {
+          schedule: '0 0 * * *'
+        }
+      };
+    }
+
+    // 为ReactFlow创建一个节点
+    const newNode: Node = {
+      id: newWorkflowNode.id,
+      type: type === NodeType.START || type === NodeType.END 
+        ? 'circle' 
+        : type === NodeType.AGENT 
+          ? 'agent' 
+          : type === NodeType.TOOL 
+            ? 'tool' 
+            : type === NodeType.CONDITION 
+              ? 'condition' 
+              : type === NodeType.LOOP 
+                ? 'loop' 
+                : type === NodeType.INPUT 
+                  ? 'input' 
+                  : type === NodeType.OUTPUT 
+                    ? 'output' 
+                    : type,
+      position: newWorkflowNode.position || { x: centerX, y: centerY },
+      data: { ...newWorkflowNode, onNodeClick: handleNodeClick },
+    };
+
+    setNodes((nodes) => [...nodes, newNode]);
+    
+    // 对于特定类型的节点，自动打开编辑器
+    if (type === 'ai' || type === 'string' || type === 'function' || type === 'variable' || type === 'trigger') {
+      setSelectedNode(newNode);
+      
+      if (type === 'ai') {
+        setAiNodeEditorOpen(true);
+      } else if (type === 'string') {
+        setStringNodeEditorOpen(true);
+      } else if (type === 'function') {
+        setFunctionNodeEditorOpen(true);
+      } else if (type === 'variable') {
+        setVariableNodeEditorOpen(true);
+      } else if (type === 'trigger') {
+        setTriggerNodeEditorOpen(true);
+      }
+    }
+  };
+
+  const handleSaveWorkflow = () => {
+    // 将ReactFlow数据转换回工作流数据结构
+    const workflowNodes = nodes.map((node) => ({
+      id: node.id,
+      type: node.data.type,
+      name: node.data.name,
+      description: node.data.description,
+      position: node.position,
+      aiConfig: node.data.aiConfig,
+      stringValue: node.data.stringValue,
+      functionConfig: node.data.functionConfig,
+      variableConfig: node.data.variableConfig,
+      triggerConfig: node.data.triggerConfig
     }));
 
-    // 转换边
-    const workflowEdges: WorkflowEdge[] = edges.map(edge => ({
+    const workflowEdges = edges.map((edge) => ({
       id: edge.id,
       source: edge.source,
       target: edge.target,
-      label: edge.label,
-      condition: edge.data?.condition,
     }));
 
-    const workflow: Workflow = {
-      id: originalWorkflow?.id || `wf-${Date.now()}`,
+    const updatedWorkflow = {
+      ...workflow,
       name: workflowName,
       description: workflowDescription,
       nodes: workflowNodes,
       edges: workflowEdges,
-      createdAt: originalWorkflow?.createdAt || Date.now(),
-      updatedAt: Date.now(),
     };
 
-    // 保存工作流
-    if (originalWorkflow) {
-      workflowService.updateWorkflow(workflow);
-    } else {
-      workflowService.createWorkflow(workflow);
-    }
+    onSave(updatedWorkflow);
+    toast({
+      title: '保存成功',
+      description: '工作流已保存',
+    });
+  };
 
-    // 调用回调
-    if (onSave) {
-      onSave(workflow);
+  const handleExecuteWorkflow = async () => {
+    setIsExecuting(true);
+    try {
+      // 执行工作流逻辑（未实现）
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      toast({
+        title: '执行完成',
+        description: '工作流已执行完成',
+      });
+    } catch (error) {
+      toast({
+        title: '执行失败',
+        description: error instanceof Error ? error.message : '未知错误',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExecuting(false);
     }
+  };
 
-    // 导航回列表
-    navigate('/workflow');
+  // 保存编辑器中的节点数据
+  const saveNodeData = (nodeData: any) => {
+    if (!selectedNode) return;
+
+    setNodes((nds) =>
+      nds.map((node) => {
+        if (node.id === selectedNode.id) {
+          // 更新节点数据
+          return {
+            ...node,
+            data: { ...node.data, ...nodeData, onNodeClick: handleNodeClick },
+          };
+        }
+        return node;
+      })
+    );
   };
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* 工具栏 */}
-      <div className="border-b p-2 flex justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col">
-            <Label htmlFor="workflowName">工作流名称</Label>
-            <Input
-              id="workflowName"
-              value={workflowName}
-              onChange={e => setWorkflowName(e.target.value)}
-              className="w-64"
-            />
-          </div>
-          <div className="flex flex-col">
-            <Label htmlFor="workflowDescription">描述</Label>
-            <Input
-              id="workflowDescription"
-              value={workflowDescription}
-              onChange={e => setWorkflowDescription(e.target.value)}
-              className="w-96"
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handleUndo} disabled={historyIndex <= 0}>
-            <Undo className="h-4 w-4 mr-1" />
-            撤销
-          </Button>
-          <Button variant="outline" onClick={handleRedo} disabled={historyIndex >= history.length - 1}>
-            <Redo className="h-4 w-4 mr-1" />
-            重做
-          </Button>
-          <Button onClick={handleSaveWorkflow}>
-            <Save className="h-4 w-4 mr-1" />
-            保存
-          </Button>
-        </div>
+    <div className="flex h-full">
+      <WorkflowNodePanel onAddNode={handleAddNode} />
+
+      <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onInit={setReactFlowInstance}
+          nodeTypes={nodeTypes}
+          fitView
+        >
+          <Background variant={BackgroundVariant.Dots} />
+          <Controls />
+          <Panel position="top-right" className="space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowSettingsDialog(true)}
+            >
+              <Settings className="h-4 w-4 mr-1" />
+              设置
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSaveWorkflow}
+            >
+              <Save className="h-4 w-4 mr-1" />
+              保存
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExecuteWorkflow}
+              disabled={isExecuting}
+            >
+              <Play className="h-4 w-4 mr-1" />
+              {isExecuting ? '执行中...' : '执行'}
+            </Button>
+          </Panel>
+        </ReactFlow>
       </div>
 
-      {/* 编辑器布局 */}
-      <div className="flex flex-grow">
-        {/* 节点面板 */}
-        {showNodePanel && (
-          <WorkflowNodePanel onAddNode={handleAddNode} />
-        )}
+      {/* 工作流设置对话框 */}
+      <AlertDialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>工作流设置</AlertDialogTitle>
+            <AlertDialogDescription>
+              配置工作流的基本信息
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-sm font-medium">名称</label>
+              <Input
+                id="name"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="description" className="text-sm font-medium">描述</label>
+              <Input
+                id="description"
+                value={workflowDescription}
+                onChange={(e) => setWorkflowDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={() => setShowSettingsDialog(false)}>保存</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* 流程图编辑器 */}
-        <div className="flex-grow">
-          <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={handleNodesChange}
-            onEdgesChange={handleEdgesChange}
-            onConnect={handleConnect}
-            nodeTypes={nodeTypes}
-            fitView
-            attributionPosition="bottom-right"
-            className="bg-gray-50 dark:bg-gray-900"
-          >
-            <Controls position="bottom-right" />
-            <MiniMap position="bottom-left" />
-            <Background />
-            <Panel position="top-right" className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => setShowNodePanel(!showNodePanel)}
-                title="显示/隐藏节点面板"
-              >
-                <Plus size={16} />
-              </Button>
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => setShowPropertiesPanel(!showPropertiesPanel)}
-                title="显示/隐藏属性面板"
-              >
-                <ZoomIn size={16} />
-              </Button>
-            </Panel>
-          </ReactFlow>
-        </div>
-
-        {/* 属性面板 */}
-        {showPropertiesPanel && selectedNode && (
-          <WorkflowPropertiesPanel
-            node={selectedNode}
-            onUpdateNode={handleUpdateNode}
-            onClose={() => setSelectedNode(null)}
-          />
-        )}
-      </div>
+      {/* Node Editors */}
+      {selectedNode && selectedNode.type === 'ai' && (
+        <AINodeEditor
+          open={aiNodeEditorOpen}
+          onOpenChange={setAiNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'string' && (
+        <StringNodeEditor
+          open={stringNodeEditorOpen}
+          onOpenChange={setStringNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'function' && (
+        <FunctionNodeEditor
+          open={functionNodeEditorOpen}
+          onOpenChange={setFunctionNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'variable' && (
+        <VariableNodeEditor
+          open={variableNodeEditorOpen}
+          onOpenChange={setVariableNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'trigger' && (
+        <TriggerNodeEditor
+          open={triggerNodeEditorOpen}
+          onOpenChange={setTriggerNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
     </div>
   );
 } 

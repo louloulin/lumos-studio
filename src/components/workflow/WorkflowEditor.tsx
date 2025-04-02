@@ -48,7 +48,8 @@ import {
   VariableNodeEditor,
   TriggerNodeEditor,
   HttpRequestNodeEditor,
-  HttpRequestNode
+  HttpRequestNode,
+  ConditionNodeEditor,
 } from './nodes';
 
 import { Button } from '@/components/ui/button';
@@ -106,6 +107,7 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
   const [variableNodeEditorOpen, setVariableNodeEditorOpen] = useState(false);
   const [triggerNodeEditorOpen, setTriggerNodeEditorOpen] = useState(false);
   const [httpRequestNodeEditorOpen, setHttpRequestNodeEditorOpen] = useState(false);
+  const [conditionNodeEditorOpen, setConditionNodeEditorOpen] = useState(false);
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const workflowService = new WorkflowService();
@@ -204,6 +206,8 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         setTriggerNodeEditorOpen(true);
       } else if (node.type === 'http_request') {
         setHttpRequestNodeEditorOpen(true);
+      } else if (node.type === 'condition') {
+        setConditionNodeEditorOpen(true);
       }
     }
   };
@@ -302,6 +306,18 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         method: 'GET',
         headers: {},
         timeout: 30000
+      };
+    } else if (type === 'condition') {
+      newWorkflowNode.conditionConfig = {
+        type: 'simple',
+        leftOperand: 'context.variables.value',
+        operator: 'equals',
+        rightOperand: 'true'
+      };
+      newWorkflowNode.functionConfig = {
+        code: 'function evaluateCondition(data, context) {\n  return context.variables.value === true;\n}',
+        inputParams: [],
+        outputParams: [{ name: 'result', type: 'boolean' }]
       };
     }
 
@@ -635,6 +651,15 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         <HttpRequestNodeEditor
           open={httpRequestNodeEditorOpen}
           onOpenChange={setHttpRequestNodeEditorOpen}
+          initialData={selectedNode.data}
+          onSave={saveNodeData}
+        />
+      )}
+      
+      {selectedNode && selectedNode.type === 'condition' && (
+        <ConditionNodeEditor
+          open={conditionNodeEditorOpen}
+          onOpenChange={setConditionNodeEditorOpen}
           initialData={selectedNode.data}
           onSave={saveNodeData}
         />

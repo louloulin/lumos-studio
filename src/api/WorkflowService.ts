@@ -150,6 +150,12 @@ export interface WorkflowNode {
     body?: string | Record<string, any>;
     timeout?: number;
   };
+  conditionConfig?: {
+    type: string;
+    leftOperand?: string;
+    operator?: string;
+    rightOperand?: string;
+  };
 }
 
 // 工作流连接定义

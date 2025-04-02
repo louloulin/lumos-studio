@@ -295,12 +295,11 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
         }
       };
     } else if (type === 'http_request') {
-      newWorkflowNode.httpRequestConfig = {
+      newWorkflowNode.httpConfig = {
         url: '',
         method: 'GET',
-        headers: [],
-        body: '',
-        responseType: 'json'
+        headers: {},
+        timeout: 30000
       };
     }
 
@@ -390,7 +389,7 @@ function WorkflowEditor({ workflow, onSave, onBack }: WorkflowEditorProps) {
       functionConfig: node.data.functionConfig,
       variableConfig: node.data.variableConfig,
       triggerConfig: node.data.triggerConfig,
-      httpRequestConfig: node.data.httpRequestConfig
+      httpConfig: node.data.httpConfig
     }));
 
     const workflowEdges = edges.map((edge) => ({

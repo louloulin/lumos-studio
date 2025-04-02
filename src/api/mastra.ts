@@ -32,12 +32,42 @@ import { MastraMessage, AgentGenerateRequest, AgentGenerateResponse, Tool, ToolE
 // 添加导入
 import { textToSpeech, speakWithWebSpeech } from './speech';
 
-// Get the Mastra service URL from the Tauri backend
+// 读取环境变量的帮助函数
+function getEnv(key: string, defaultValue: string = ''): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || defaultValue;
+  }
+  return defaultValue;
+}
+
+// 读取数值类型环境变量的帮助函数
+function getNumEnv(key: string, defaultValue: number): number {
+  const value = getEnv(key, '');
+  if (!value) return defaultValue;
+  
+  const num = Number(value);
+  return isNaN(num) ? defaultValue : num;
+}
+
+// Get the Mastra service URL from the environment variables or fallback to Tauri backend
 async function getMastraUrl(): Promise<string> {
   try {
+    // 如果在浏览器环境且使用Vite开发服务器，则使用相对URL，通过Vite代理访问
+    if (typeof window !== 'undefined') {
+      console.log('使用Vite代理访问Mastra服务器: /api');
+      return '/api'; // 使用相对路径，将通过Vite代理访问
+    }
+    
+    // 检查环境变量中是否有API URL
+    const envApiUrl = getEnv('VITE_MASTRA_API_URL', '');
+    if (envApiUrl) {
+      console.log('Using Mastra URL from environment:', envApiUrl);
+      return envApiUrl;
+    }
+    
     // 添加重试机制
     let retries = 0;
-    const maxRetries = 3;
+    const maxRetries = getNumEnv('VITE_RETRY_ATTEMPTS', 3);
     let lastError: any = null;
     
     // 先检查Tauri API是否已加载
@@ -54,11 +84,12 @@ async function getMastraUrl(): Promise<string> {
         }
         
         // 使用Promise包装invoke调用，设置超时
+        const timeout = getNumEnv('VITE_CONNECTION_TIMEOUT', 2000);
         const invokeWithTimeout = (fn: any, ...args: any[]) => {
           return Promise.race([
             fn(...args),
             new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Invoke timeout')), 2000);
+              setTimeout(() => reject(new Error('Invoke timeout')), timeout);
             })
           ]);
         };
@@ -86,7 +117,7 @@ async function getMastraUrl(): Promise<string> {
     return `http://localhost:${DEFAULT_PORT}`; // 使用默认端口
   } catch (error) {
     console.error('Failed to get Mastra service URL:', error);
-    return 'http://localhost:4111'; // 修改默认端口为4111
+    return getEnv('VITE_API_BASE_URL', 'http://localhost:4111');
   }
 }
 
@@ -99,6 +130,12 @@ export async function getClient() {
     const baseUrl = await getMastraUrl();
     mastraClient = new MastraClient({
       baseUrl,
+      // 必须添加这些头部信息以确保与Mastra服务器的正常通信
+      // 这些头部将在预检请求(OPTIONS)中发送，因此Mastra服务器必须配置为允许它们
+      headers: {
+        'x-mastra-client-type': 'lumos-studio',
+        'x-mastra-client-id': 'lumos-client'
+      }
     });
   }
   return mastraClient;

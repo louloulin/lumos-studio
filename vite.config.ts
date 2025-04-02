@@ -29,6 +29,32 @@ export default defineConfig(async () => ({
       // 3. tell vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
+    // 添加代理配置，解决跨域问题
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4111',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+        // 移除路径前缀，因为Mastra服务器已经包含/api路径
+        rewrite: (path) => path.replace(/^\/api/, ''),
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('代理错误:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('正在发送请求:', req.method, req.url);
+            // 保留自定义头部
+            if (req.headers['x-mastra-client-type']) {
+              proxyReq.setHeader('x-mastra-client-type', req.headers['x-mastra-client-type']);
+            }
+            if (req.headers['x-mastra-client-id']) {
+              proxyReq.setHeader('x-mastra-client-id', req.headers['x-mastra-client-id']);
+            }
+          });
+        }
+      }
+    }
   },
   // 添加路径别名配置
   resolve: {

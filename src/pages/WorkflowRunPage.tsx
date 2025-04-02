@@ -26,11 +26,11 @@ import {
 } from '@/api/WorkflowExecutor';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { NODE_TYPES } from '@/components/workflow/nodes';
+import { getNodeTypeLabel, workflowToReactFlowNodes, workflowToReactFlowEdges } from '@/components/workflow/utils/workflowUtils';
 
 // 工作流节点类型
-const nodeTypes = {
-  // 之后可以引入自定义节点类型
-};
+const nodeTypes = NODE_TYPES;
 
 // 状态类型颜色映射
 const workflowStatusColors = {
@@ -118,26 +118,8 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
     setWorkflow(workflowData);
     
     // 转换节点和边为ReactFlow格式
-    const flowNodes = workflowData.nodes.map(node => ({
-      id: node.id,
-      type: node.type.toLowerCase(),
-      data: {
-        ...node,
-        name: node.name
-      },
-      position: node.position || { x: 0, y: 0 },
-      className: 'bg-background border-2 border-muted rounded-md shadow-sm'
-    }));
-    
-    const flowEdges = workflowData.edges.map(edge => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label || '',
-      data: {
-        ...edge
-      }
-    }));
+    const flowNodes = workflowToReactFlowNodes(workflowData.nodes);
+    const flowEdges = workflowToReactFlowEdges(workflowData.edges);
     
     setNodes(flowNodes);
     setEdges(flowEdges);
@@ -354,7 +336,7 @@ export default function WorkflowRunPage({ id: propId, onBack: propOnBack }: Work
       <div className="p-4 border rounded-md space-y-4">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-medium">{node.label || node.id}</h3>
+            <h3 className="text-lg font-medium">{node.name || node.id}</h3>
             <p className="text-sm text-muted-foreground">{renderNodeTypeLabel(node.type)}</p>
           </div>
           {renderStatusBadge(selectedNodeResult.status)}

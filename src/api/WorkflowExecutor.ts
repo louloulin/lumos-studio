@@ -100,10 +100,11 @@ export class WorkflowExecutor {
   }
   
   /**
-   * 获取当前工作流执行状态
+   * 获取当前执行状态
+   * 用于UI组件获取最新的执行状态信息
    */
-  public getState(): WorkflowExecutionState {
-    return this.state;
+  getState(): WorkflowExecutionState {
+    return { ...this.state };
   }
   
   /**

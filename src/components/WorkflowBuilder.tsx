@@ -9,7 +9,7 @@ import {
   CardTitle 
 } from '@/components/ui/card';
 import { Workflow, workflowService } from '@/api/WorkflowService';
-import { Plus, PlusCircle, Edit, Play, Trash } from 'lucide-react';
+import { Plus, PlusCircle, Edit, Play, Trash, PlusSquare } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -182,6 +182,20 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onOpenEditor, onOpenR
     }
   };
   
+  // 创建示例工作流
+  const handleCreateExampleWorkflow = () => {
+    // 创建示例工作流
+    const exampleWorkflow = workflowService.createExampleWorkflow();
+    
+    // 更新工作流列表
+    setWorkflows(prev => [exampleWorkflow, ...prev]);
+    
+    // 如果提供了编辑器打开回调函数，则调用它
+    if (onOpenEditor) {
+      onOpenEditor(exampleWorkflow.id);
+    }
+  };
+  
   return (
     <div className="space-y-6 py-4">
       {/* 顶部按钮和标题 */}
@@ -194,6 +208,10 @@ const WorkflowBuilder: React.FC<WorkflowBuilderProps> = ({ onOpenEditor, onOpenR
           <Button onClick={handleCreateWorkflow}>
             <Plus className="w-4 h-4 mr-2" />
             创建工作流
+          </Button>
+          <Button variant="outline" onClick={handleCreateExampleWorkflow}>
+            <PlusSquare className="w-4 h-4 mr-2" />
+            示例工作流
           </Button>
           <Button variant="outline" onClick={handleImportWorkflow}>
             <Share2 className="w-4 h-4 mr-2" />

@@ -331,6 +331,74 @@ export class WorkflowService {
   }
   
   /**
+   * 创建示例工作流
+   */
+  createExampleWorkflow(): Workflow {
+    const now = Date.now();
+    const id = this.generateUniqueId();
+    
+    // 创建示例工作流节点
+    const startNodeId = this.generateUniqueId();
+    const aiNodeId = this.generateUniqueId();
+    const endNodeId = this.generateUniqueId();
+    
+    const exampleWorkflow: Workflow = {
+      id,
+      name: '文本处理示例工作流',
+      description: '一个简单的工作流示例，展示如何使用AI模型处理输入文本',
+      nodes: [
+        {
+          id: startNodeId,
+          type: WorkflowNodeType.START,
+          name: '开始',
+          position: { x: 250, y: 50 }
+        },
+        {
+          id: aiNodeId,
+          type: WorkflowNodeType.AI,
+          name: 'AI处理',
+          position: { x: 250, y: 150 },
+          aiConfig: {
+            model: 'gpt-4',
+            prompt: '分析以下文本并提供见解:',
+            temperature: 0.7,
+            maxTokens: 1000,
+            params: {
+              systemPrompt: '你是一个专业的文本分析助手，请分析用户输入的文本并提供洞见。'
+            }
+          }
+        },
+        {
+          id: endNodeId,
+          type: WorkflowNodeType.END,
+          name: '结束',
+          position: { x: 250, y: 250 }
+        }
+      ],
+      edges: [
+        {
+          id: `${startNodeId}-${aiNodeId}`,
+          source: startNodeId,
+          target: aiNodeId
+        },
+        {
+          id: `${aiNodeId}-${endNodeId}`,
+          source: aiNodeId,
+          target: endNodeId
+        }
+      ],
+      createdAt: now,
+      updatedAt: now,
+      tags: ['示例', '文本处理', 'AI']
+    };
+    
+    // 保存和返回
+    this.workflows.set(id, exampleWorkflow);
+    this.saveWorkflows();
+    return exampleWorkflow;
+  }
+  
+  /**
    * 导出工作流为JSON
    */
   exportWorkflow(id: string): string | null {

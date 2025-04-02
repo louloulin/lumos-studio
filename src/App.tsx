@@ -16,6 +16,8 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from 'r
 import WhiteboardPage from './pages/WhiteboardPage'
 import HomePage from './pages/HomePage'
 import AgentsPage from './pages/AgentsPage'
+import AgentCreationPage from './pages/AgentCreationPage'
+import AgentMarketPage from './pages/AgentMarketPage'
 import WorkflowListPage from './pages/WorkflowListPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
 import WorkflowRunPage from './pages/WorkflowRunPage'
@@ -23,7 +25,6 @@ import ToolsPage from './pages/ToolsPage'
 import ToolEditorPage from './pages/ToolEditorPage'
 import ToolTestPage from './pages/ToolTestPage'
 import WorkflowPage from './pages/WorkflowPage'
-import AgentCreationPage from './pages/AgentCreationPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -162,6 +163,7 @@ export default function App() {
                             <Route path="/chat" element={<Main />} />
                             <Route path="/agents" element={<Main />} />
                             <Route path="/agents/create" element={<AgentCreationPage />} />
+                            <Route path="/agents/market" element={<AgentMarketPage />} />
                             <Route path="/tools" element={<ToolsPage />} />
                             <Route path="/tools/new" element={<ToolEditorPage />} />
                             <Route path="/tools/test/:id" element={<ToolTestPage />} />

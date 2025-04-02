@@ -1,17 +1,26 @@
 import { MastraAPI } from './mastra';
-import { Agent, AgentTool } from './types';
+import { Agent, AgentType } from './types';
 import { toolService } from './ToolService';
 
 // 本地存储键
 const LOCAL_AGENTS_KEY = 'lumos_studio_agents';
+
+// 市场智能体类型
+export interface MarketAgent extends Agent {
+  rating: number;
+  downloads: number;
+  isInstalled?: boolean;
+}
 
 /**
  * 智能体服务类
  * 提供智能体的CRUD操作和持久化，集成Mastra API
  */
 export class AgentService {
+  private api: MastraAPI;
+
   constructor() {
-    // 不再需要加载本地存储
+    this.api = new MastraAPI();
   }
 
   /**
@@ -20,7 +29,7 @@ export class AgentService {
   async getMastraAgents(): Promise<Agent[]> {
     try {
       // 使用market-agents工具获取智能体市场列表
-      const marketAgents = await MastraAPI.getMarketAgents();
+      const marketAgents = await this.api.getMastraAgents();
       
       // 如果工具API成功，整理数据
       if (marketAgents && marketAgents.length > 0) {
@@ -37,7 +46,7 @@ export class AgentService {
       }
       
       // 如果工具API失败或返回为空，尝试使用老方法
-      const mastraAgents = await MastraAPI.getAgents();
+      const mastraAgents = await this.api.getAgents();
       return mastraAgents.map(name => ({
         id: name,
         name: name,
@@ -55,38 +64,10 @@ export class AgentService {
    */
   async getAllAgents(): Promise<Agent[]> {
     try {
-      // 从API获取所有智能体
-      const response = await MastraAPI.getAllAgents();
-      
-      if (!response || !Array.isArray(response)) {
-        return [];
-      }
-      
-      // 处理每个智能体，确保tools字段被正确解析
-      return response.map(agent => {
-        let tools = [];
-        if (agent.tools && typeof agent.tools === 'string') {
-          try {
-            tools = JSON.parse(agent.tools);
-          } catch (e) {
-            console.warn(`解析智能体ID ${agent.id} 的工具字符串失败`, e);
-          }
-        }
-        
-        return {
-          id: agent.id,
-          name: agent.name,
-          description: agent.description || '',
-          instructions: agent.instructions || '',
-          model: agent.model || 'gpt-4o',
-          temperature: agent.temperature || 0.7,
-          maxTokens: agent.maxTokens || 4000,
-          tools,
-          systemAgent: agent.systemAgent || false
-        };
-      });
+      const agents = await this.api.getAgents();
+      return agents;
     } catch (error) {
-      console.error('获取所有智能体失败:', error);
+      console.error('Failed to get agents:', error);
       return [];
     }
   }
@@ -97,7 +78,7 @@ export class AgentService {
   async getLocalAgents(): Promise<Agent[]> {
     try {
       // 通过agent-storage工具获取本地存储的智能体
-      const agents = await MastraAPI.getAllAgents();
+      const agents = await this.api.getAllAgents();
       // 过滤掉系统智能体
       return agents.filter(agent => !agent.systemAgent).map(agent => ({
         ...agent,
@@ -115,7 +96,7 @@ export class AgentService {
   async getAgent(id: string): Promise<Agent | null> {
     try {
       // 从Mastra API获取智能体
-      const response = await MastraAPI.getAgent(id);
+      const response = await this.api.getAgent(id);
       
       if (!response) {
         return null;
@@ -152,115 +133,55 @@ export class AgentService {
   /**
    * 创建智能体
    */
-  async createAgent(agent: Omit<Agent, 'id'>): Promise<Agent> {
+  async createAgent(agent: Agent): Promise<Agent> {
     try {
-      // 序列化工具列表
-      let toolsString = '[]';
-      if (agent.tools && Array.isArray(agent.tools)) {
-        toolsString = JSON.stringify(agent.tools);
-      }
-      
-      // 准备参数
-      const agentParams = {
-        ...agent,
-        tools: toolsString
-      };
-      
-      // 调用Mastra API创建智能体
-      const result = await MastraAPI.createAgent(agentParams);
-      
-      if (!result) {
-        throw new Error('创建智能体失败，API返回为空');
-      }
-      
-      // 解析工具
-      let tools = [];
-      if (result.tools && typeof result.tools === 'string') {
-        try {
-          tools = JSON.parse(result.tools);
-        } catch (e) {
-          console.warn('解析创建的智能体工具失败:', e);
-        }
-      }
-      
-      return {
-        ...result,
-        tools
-      };
+      const newAgent = await this.api.createAgent(agent);
+      return newAgent;
     } catch (error) {
-      console.error('创建智能体失败:', error);
-      throw new Error(`创建智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to create agent:', error);
+      throw error;
     }
   }
 
   /**
    * 更新智能体
    */
-  async updateAgent(agent: Agent): Promise<Agent | null> {
+  async updateAgent(agent: Agent): Promise<Agent> {
     try {
-      // 序列化工具列表
-      let toolsString = '[]';
-      if (agent.tools && Array.isArray(agent.tools)) {
-        toolsString = JSON.stringify(agent.tools);
-      }
-      
-      // 准备参数
-      const agentParams = {
-        ...agent,
-        tools: toolsString
-      };
-      
-      // 调用Mastra API更新智能体
-      const result = await MastraAPI.updateAgent(agent.id, agentParams);
-      
-      if (!result) {
-        throw new Error(`更新智能体ID ${agent.id} 失败，API返回为空`);
-      }
-      
-      // 解析工具
-      let tools = [];
-      if (result.tools && typeof result.tools === 'string') {
-        try {
-          tools = JSON.parse(result.tools);
-        } catch (e) {
-          console.warn(`解析更新后的智能体ID ${agent.id} 工具失败:`, e);
-        }
-      }
-      
-      return {
-        ...result,
-        tools
-      };
+      const updatedAgent = await this.api.updateAgent(agent);
+      return updatedAgent;
     } catch (error) {
-      console.error(`更新智能体ID ${agent.id} 失败:`, error);
-      throw new Error(`更新智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to update agent:', error);
+      throw error;
     }
   }
 
   /**
    * 删除智能体
    */
-  async deleteAgent(id: string): Promise<boolean> {
+  async deleteAgent(agentId: string): Promise<void> {
     try {
-      // 调用Mastra API删除智能体
-      const result = await MastraAPI.deleteAgent(id);
-      return result;
+      await this.api.deleteAgent(agentId);
     } catch (error) {
-      console.error(`删除智能体ID ${id} 失败:`, error);
-      throw new Error(`删除智能体失败: ${error instanceof Error ? error.message : '未知错误'}`);
+      console.error('Failed to delete agent:', error);
+      throw error;
     }
   }
 
   /**
    * 导出智能体为JSON
    */
-  async exportAgent(id: string): Promise<string | null> {
-    const agent = await this.getAgent(id);
-    if (!agent) {
-      return null;
+  async exportAgent(agentId: string): Promise<string> {
+    try {
+      const agent = await this.api.getAgent(agentId);
+      if (!agent) {
+        throw new Error('Agent not found');
+      }
+      return JSON.stringify(agent, null, 2);
+    } catch (error) {
+      console.error('Failed to export agent:', error);
+      throw error;
     }
-    
-    return JSON.stringify(agent, null, 2);
   }
 
   /**
@@ -295,6 +216,46 @@ export class AgentService {
    */
   private generateUniqueId(): string {
     return `agent-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  }
+
+  // 获取市场智能体列表
+  async getMarketAgents(): Promise<MarketAgent[]> {
+    try {
+      const agents = await this.api.getMastraAgents();
+      // 添加评分和下载次数等市场信息
+      return agents.map(agent => ({
+        ...agent,
+        rating: Math.random() * 2 + 3, // 模拟 3-5 分的评分
+        downloads: Math.floor(Math.random() * 1000), // 模拟下载次数
+        createdAt: Date.now() - Math.floor(Math.random() * 30 * 24 * 60 * 60 * 1000), // 随机创建时间
+        updatedAt: Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000), // 随机更新时间
+      }));
+    } catch (error) {
+      console.error('Failed to get market agents:', error);
+      return [];
+    }
+  }
+
+  // 安装智能体
+  async installAgent(agentId: string): Promise<Agent | null> {
+    try {
+      // 从市场获取智能体配置
+      const marketAgent = await this.api.getMastraAgent(agentId);
+      if (!marketAgent) {
+        throw new Error('Agent not found in market');
+      }
+
+      // 创建本地智能体
+      const localAgent = await this.api.createAgent({
+        ...marketAgent,
+        id: `installed-${Date.now()}`, // 生成新的本地ID
+      });
+
+      return localAgent;
+    } catch (error) {
+      console.error('Failed to install agent:', error);
+      return null;
+    }
   }
 }
 

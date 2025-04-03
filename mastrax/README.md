@@ -32,70 +32,88 @@ bun run dev
 
 #### 请求格式
 
-所有请求必须包含一个`data`对象，内部包含`operation`字段和其他必要参数：
+支持两种请求格式：
+
+1. **带data包装的请求** (推荐用于兼容性)
 
 ```json
 {
   "data": {
     "operation": "操作类型",
-    "agent": {}, // 对于create/update操作提供
-    "agentId": "agent-id" // 对于get/delete操作提供
+    // 其他特定操作所需的参数
   }
 }
 ```
+
+2. **直接请求** (无需data包装)
+
+```json
+{
+  "operation": "操作类型",
+  // 其他特定操作所需的参数
+}
+```
+
+两种格式均支持相同的操作和参数。
 
 #### 操作类型
 
-1. **创建智能体** (`create`)
+每种操作类型需要不同的参数：
+
+1. **获取单个智能体** (`get`)
 
 ```json
 {
-  "data": {
-    "operation": "create",
-    "agent": {
-      "name": "智能体名称",
-      "description": "智能体描述",
-      "instructions": "智能体指令",
-      "model": "gpt-4-turbo",
-      "type": "general",
-      "categories": ["类别1", "类别2"]
-    }
+  "operation": "get",
+  "agentId": "agent-id" // 必填，智能体ID
+}
+```
+
+2. **获取所有智能体** (`getAll`)
+
+```json
+{
+  "operation": "getAll"
+}
+```
+
+3. **创建智能体** (`create`)
+
+```json
+{
+  "operation": "create",
+  "agent": {
+    "id": "agent-xxxx", // 可选，如不提供将自动生成
+    "name": "智能体名称", // 必填
+    "description": "智能体描述", // 可选
+    "instructions": "智能体指令", // 可选
+    "model": "gpt-4-turbo", // 可选
+    "temperature": 0.7, // 可选，0-1之间
+    "maxTokens": 2048, // 可选，正整数
+    "tools": ["tool-id-1", "tool-id-2"], // 可选，工具ID数组
+    "systemAgent": false, // 可选，是否系统智能体
+    "type": "general", // 可选，智能体类型
+    "categories": ["类别1", "类别2"], // 可选，分类标签
+    "version": "1.0.0", // 可选，版本号
+    "createdAt": 1743680976657, // 可选，创建时间戳
+    "updatedAt": 1743680976657, // 可选，更新时间戳 
+    "avatar": "/path/to/avatar.png" // 可选，头像路径
   }
 }
 ```
 
-2. **更新智能体** (`update`)
+4. **更新智能体** (`update`)
 
 ```json
 {
-  "data": {
-    "operation": "update",
-    "agent": {
-      "id": "agent-id",
-      "name": "新的名称",
-      "description": "新的描述"
-    }
-  }
-}
-```
-
-3. **获取单个智能体** (`get`)
-
-```json
-{
-  "data": {
-    "operation": "get",
-    "agentId": "agent-id"
-  }
-}
-```
-
-4. **获取所有智能体** (`getAll`)
-
-```json
-{
-  "data": {
-    "operation": "getAll"
+  "operation": "update",
+  "agent": {
+    "id": "agent-id", // 必填，智能体ID
+    "name": "新的名称", // 至少更新一个属性
+    "description": "新的描述",
+    // 其他可选属性同create操作
+    "type": "coding", // 可选，更新智能体类型
+    "categories": ["编程", "开发", "调试"] // 可选，更新分类标签
   }
 }
 ```
@@ -104,10 +122,20 @@ bun run dev
 
 ```json
 {
-  "data": {
-    "operation": "delete",
-    "agentId": "agent-id"
-  }
+  "operation": "delete",
+  "agentId": "agent-id" // 必填，智能体ID
+}
+```
+
+#### 响应格式
+
+所有响应都遵循以下格式：
+
+```json
+{
+  "success": true, // 或false表示失败
+  "data": {}, // 操作成功时返回的数据
+  "error": "错误消息" // 操作失败时返回的错误信息
 }
 ```
 
@@ -200,16 +228,36 @@ bun run dev
 }
 ```
 
+## 数据验证
+
+新版API使用Zod进行数据验证，提供更清晰的错误信息：
+
+- 智能体名称不能为空
+- 智能体ID不能为空（update和get/delete操作必填，create操作可选）
+- 温度必须是0到1之间的数值
+- maxTokens必须是正整数
+- 所有其他字段均为可选项
+
+## 附加智能体属性
+
+除了基本属性外，智能体还支持以下扩展属性：
+
+- `type`: 智能体类型，如"general", "coding", "writing"等
+- `categories`: 分类标签数组，用于组织和筛选智能体
+- `version`: 版本号，用于智能体版本控制
+- `createdAt`: 创建时间戳(毫秒)
+- `updatedAt`: 更新时间戳(毫秒)
+- `avatar`: 智能体头像的路径或URL
+
 ## 常见问题
 
-### 错误："缺少必要的data参数"
+### 错误："缺少必要的操作参数"
 
-这个错误通常是因为请求格式不正确。确保所有请求都包含一个`data`对象，例如：
+如果收到此错误，请确保请求中包含`operation`字段，例如：
 
 错误的格式：
 ```json
 {
-  "operation": "create",
   "agent": {}
 }
 ```
@@ -217,12 +265,19 @@ bun run dev
 正确的格式：
 ```json
 {
-  "data": {
-    "operation": "create",
-    "agent": {}
-  }
+  "operation": "create",
+  "agent": {}
 }
 ```
+
+### 错误："不支持的操作类型"
+
+请确保`operation`字段的值是以下之一：
+- `get` - 获取单个智能体
+- `getAll` - 获取所有智能体
+- `create` - 创建智能体
+- `update` - 更新智能体
+- `delete` - 删除智能体
 
 ### 其他问题
 

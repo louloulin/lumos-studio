@@ -27,23 +27,77 @@ interface WeatherResponse {
   };
 }
 
-// 定义工具输入类型
-const AgentInput = z.object({
-  data: z.object({
-    operation: z.enum(['get', 'getAll', 'create', 'update', 'delete']),
-    agent: z.any().optional(),
-    agentId: z.string().optional(),
+// 智能体基本信息模式
+const AgentBaseSchema = z.object({
+  name: z.string().min(1, '智能体名称不能为空'),
+  description: z.string().optional(),
+  instructions: z.string().optional(),
+  model: z.string().optional(),
+  temperature: z.number().min(0).max(1).optional(),
+  maxTokens: z.number().positive().int().optional(),
+  tools: z.array(z.string()).or(z.string()).optional(),
+  systemAgent: z.boolean().optional(),
+  type: z.string().optional(),
+  categories: z.array(z.string()).optional(),
+  version: z.string().optional(),
+  createdAt: z.number().optional(),
+  updatedAt: z.number().optional(),
+  avatar: z.string().optional(),
+});
+
+// 定义不同操作的输入类型
+const GetAgentSchema = z.object({
+  operation: z.literal('get'),
+  agentId: z.string().min(1, '智能体ID不能为空'),
+});
+
+const GetAllAgentsSchema = z.object({
+  operation: z.literal('getAll'),
+});
+
+const CreateAgentSchema = z.object({
+  operation: z.literal('create'),
+  agent: AgentBaseSchema.extend({
+    id: z.string().optional(),
   }),
-}) as any;
+});
+
+const UpdateAgentSchema = z.object({
+  operation: z.literal('update'),
+  agent: AgentBaseSchema.extend({
+    id: z.string().min(1, '智能体ID不能为空'),
+  }),
+});
+
+const DeleteAgentSchema = z.object({
+  operation: z.literal('delete'),
+  agentId: z.string().min(1, '智能体ID不能为空'),
+});
+
+// 使用判别联合组合所有操作
+const AgentOperationSchema = z.discriminatedUnion('operation', [
+  GetAgentSchema,
+  GetAllAgentsSchema,
+  CreateAgentSchema,
+  UpdateAgentSchema,
+  DeleteAgentSchema,
+]);
+
+// 同时支持直接操作和data包装的操作
+const AgentInput = z.union([
+  z.object({ data: AgentOperationSchema }),  // 包装在data对象中的请求
+  AgentOperationSchema                       // 直接的操作请求
+]);
 
 // 定义工具输出类型
 const AgentOutput = z.object({
   success: z.boolean(),
   data: z.any().optional(),
   error: z.string().optional(),
-}) as any;
+});
 
 type AgentInputType = z.infer<typeof AgentInput>;
+type AgentOperationType = z.infer<typeof AgentOperationSchema>;
 type AgentOutputType = z.infer<typeof AgentOutput>;
 
 // 智能体存储工具
@@ -64,42 +118,64 @@ export const agentStorageTool = createTool({
       // 使用any类型断言避免TypeScript错误
       const anyContext = context as any;
       
-      // 打印请求的完整结构，帮助调试
-      console.log('完整请求对象:', JSON.stringify(anyContext, null, 2));
-      console.log('请求类型:', typeof anyContext);
-      console.log('请求属性:', Object.keys(anyContext));
+      // 打印完整请求结构以便调试
+      logger.tool.debug(toolId, '完整请求对象', { 
+        contextType: typeof anyContext,
+        hasContext: anyContext.context !== undefined,
+        hasData: anyContext.data !== undefined,
+        hasOperation: anyContext.operation !== undefined,
+        keys: Object.keys(anyContext)
+      });
       
-      if (anyContext.data) {
-        console.log('data属性类型:', typeof anyContext.data);
-        console.log('data属性值:', JSON.stringify(anyContext.data, null, 2));
+      // 准备操作参数
+      let operationParams: any;
+      
+      // 检查各种可能的请求格式
+      if (anyContext.data && anyContext.data.operation) {
+        // 1. 包装在data中的请求 - 标准格式
+        logger.tool.debug(toolId, '使用data包装的请求格式', anyContext.data);
+        operationParams = anyContext.data;
+      } else if (anyContext.operation) {
+        // 2. 直接的操作请求 - 无data包装
+        logger.tool.debug(toolId, '使用直接操作的请求格式', anyContext);
+        operationParams = anyContext;
+      } else if (anyContext.context && anyContext.context.operation) {
+        // 3. context嵌套的操作请求 - 可能来自某些客户端
+        logger.tool.debug(toolId, '使用context嵌套的请求格式', anyContext.context);
+        operationParams = anyContext.context;
       } else {
-        console.log('context中不存在data属性');
-        // 检查是否顶层包含operation
-        if (anyContext.operation) {
-          console.log('发现顶层operation属性, 考虑将整个context作为data使用');
-          // 将整个context视为data对象
-          const typedContext = {
-            data: anyContext
+        // 检查是否有任何字段包含operation
+        let foundParams = null;
+        for (const key of Object.keys(anyContext)) {
+          const value = anyContext[key];
+          if (value && typeof value === 'object' && value.operation) {
+            logger.tool.debug(toolId, `在字段${key}中找到operation`, value);
+            foundParams = value;
+            break;
+          }
+        }
+        
+        if (foundParams) {
+          // 找到了嵌套在某个字段中的操作参数
+          operationParams = foundParams;
+        } else {
+          // 未找到有效的操作
+          const error = {
+            success: false,
+            error: '缺少必要的操作参数，请提供operation字段',
           };
-          logger.tool.debug(toolId, `尝试将整个context作为data使用`, typedContext);
-          return await handleAgentOperation(typedContext, startTime, toolId);
+          logger.tool.error(toolId, '无效的请求格式', { 
+            error, 
+            context,
+            availableKeys: Object.keys(anyContext)
+          });
+          logger.tool.response(toolId, error, Date.now() - startTime);
+          return error;
         }
       }
       
-      // 使用类型断言处理context对象
-      const typedContext = anyContext;
-      
-      if (!typedContext.data) {
-        const error = {
-          success: false,
-          error: '缺少必要的data参数',
-        };
-        logger.tool.error(toolId, '缺少必要的data参数', { error, context });
-        logger.tool.response(toolId, error, Date.now() - startTime);
-        return error;
-      }
-      
-      return await handleAgentOperation(typedContext, startTime, toolId);
+      // 实际处理操作
+      return await processAgentOperation(operationParams, startTime, toolId);
     } catch (error) {
       const duration = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : '未知错误';
@@ -120,18 +196,17 @@ export const agentStorageTool = createTool({
       return result;
     }
   },
-}) as Tool;
+}) as any;
 
-// 单独处理智能体操作的函数，以减少重复代码
-async function handleAgentOperation(typedContext: any, startTime: number, toolId: string) {
-  const input = typedContext.data;
+// 处理智能体操作
+async function processAgentOperation(input: any, startTime: number, toolId: string) {
   logger.tool.debug(toolId, `执行操作: ${input.operation}`, input);
   
   let result;
   switch (input.operation) {
     case 'get':
       logger.tool.debug(toolId, `获取智能体: ${input.agentId}`);
-      result = await getAgent(input.agentId!);
+      result = await getAgent(input.agentId);
       break;
     case 'getAll':
       logger.tool.debug(toolId, '获取所有智能体');
@@ -142,12 +217,12 @@ async function handleAgentOperation(typedContext: any, startTime: number, toolId
       result = await createAgent(input.agent);
       break;
     case 'update':
-      logger.tool.debug(toolId, `更新智能体: ${input.agent?.id}`, { agent: input.agent });
+      logger.tool.debug(toolId, `更新智能体: ${input.agent.id}`, { agent: input.agent });
       result = await updateAgent(input.agent);
       break;
     case 'delete':
       logger.tool.debug(toolId, `删除智能体: ${input.agentId}`);
-      result = await deleteAgent(input.agentId!);
+      result = await deleteAgent(input.agentId);
       break;
     default:
       result = {

@@ -4,6 +4,8 @@ import { eq, and, sql, type InferModel } from 'drizzle-orm';
 import { db } from '../db';
 import { agents, agentLogs } from '../db/schema';
 import type { Agent, AgentLog } from '../db/schema';
+import { logger } from '../logging';
+import { debugTool } from './debug-tool';
 
 interface GeocodingResponse {
   results: {
@@ -27,9 +29,11 @@ interface WeatherResponse {
 
 // 定义工具输入类型
 const AgentInput = z.object({
-  operation: z.enum(['get', 'getAll', 'create', 'update', 'delete']),
-  agent: z.any().optional(),
-  agentId: z.string().optional(),
+  data: z.object({
+    operation: z.enum(['get', 'getAll', 'create', 'update', 'delete']),
+    agent: z.any().optional(),
+    agentId: z.string().optional(),
+  }),
 }) as any;
 
 // 定义工具输出类型
@@ -49,88 +53,218 @@ export const agentStorageTool = createTool({
   inputSchema: AgentInput,
   outputSchema: AgentOutput,
   execute: async (context) => {
-    const input = context as unknown as AgentInputType;
+    const startTime = Date.now();
+    const toolId = 'agent-storage';
+    
     try {
-      switch (input.operation) {
-        case 'get':
-          return await getAgent(input.agentId!);
-        case 'getAll':
-          return await getAllAgents();
-        case 'create':
-          return await createAgent(input.agent);
-        case 'update':
-          return await updateAgent(input.agent);
-        case 'delete':
-          return await deleteAgent(input.agentId!);
-        default:
-          return {
-            success: false,
-            error: '不支持的操作',
+      // 记录请求 - 添加更多详细信息
+      logger.tool.info(toolId, '开始执行智能体存储工具', { context });
+      logger.tool.request(toolId, context);
+      
+      // 使用any类型断言避免TypeScript错误
+      const anyContext = context as any;
+      
+      // 打印请求的完整结构，帮助调试
+      console.log('完整请求对象:', JSON.stringify(anyContext, null, 2));
+      console.log('请求类型:', typeof anyContext);
+      console.log('请求属性:', Object.keys(anyContext));
+      
+      if (anyContext.data) {
+        console.log('data属性类型:', typeof anyContext.data);
+        console.log('data属性值:', JSON.stringify(anyContext.data, null, 2));
+      } else {
+        console.log('context中不存在data属性');
+        // 检查是否顶层包含operation
+        if (anyContext.operation) {
+          console.log('发现顶层operation属性, 考虑将整个context作为data使用');
+          // 将整个context视为data对象
+          const typedContext = {
+            data: anyContext
           };
+          logger.tool.debug(toolId, `尝试将整个context作为data使用`, typedContext);
+          return await handleAgentOperation(typedContext, startTime, toolId);
+        }
       }
+      
+      // 使用类型断言处理context对象
+      const typedContext = anyContext;
+      
+      if (!typedContext.data) {
+        const error = {
+          success: false,
+          error: '缺少必要的data参数',
+        };
+        logger.tool.error(toolId, '缺少必要的data参数', { error, context });
+        logger.tool.response(toolId, error, Date.now() - startTime);
+        return error;
+      }
+      
+      return await handleAgentOperation(typedContext, startTime, toolId);
     } catch (error) {
-      console.error('智能体存储工具执行失败:', error);
-      return {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : '未知错误';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      const result = {
         success: false,
-        error: '智能体存储工具执行失败',
+        error: `智能体存储工具执行失败: ${errorMessage}`,
       };
+      
+      logger.tool.error(toolId, '智能体存储工具执行失败', { 
+        error: errorMessage, 
+        stack: errorStack,
+        duration
+      });
+      logger.tool.response(toolId, result, duration);
+      
+      return result;
     }
   },
 }) as Tool;
 
+// 单独处理智能体操作的函数，以减少重复代码
+async function handleAgentOperation(typedContext: any, startTime: number, toolId: string) {
+  const input = typedContext.data;
+  logger.tool.debug(toolId, `执行操作: ${input.operation}`, input);
+  
+  let result;
+  switch (input.operation) {
+    case 'get':
+      logger.tool.debug(toolId, `获取智能体: ${input.agentId}`);
+      result = await getAgent(input.agentId!);
+      break;
+    case 'getAll':
+      logger.tool.debug(toolId, '获取所有智能体');
+      result = await getAllAgents();
+      break;
+    case 'create':
+      logger.tool.debug(toolId, '创建智能体', { agent: input.agent });
+      result = await createAgent(input.agent);
+      break;
+    case 'update':
+      logger.tool.debug(toolId, `更新智能体: ${input.agent?.id}`, { agent: input.agent });
+      result = await updateAgent(input.agent);
+      break;
+    case 'delete':
+      logger.tool.debug(toolId, `删除智能体: ${input.agentId}`);
+      result = await deleteAgent(input.agentId!);
+      break;
+    default:
+      result = {
+        success: false,
+        error: `不支持的操作: ${input.operation}`,
+      };
+      logger.tool.error(toolId, `不支持的操作: ${input.operation}`);
+  }
+  
+  // 记录响应
+  const duration = Date.now() - startTime;
+  logger.tool.response(toolId, result, duration);
+  
+  if (!result.success) {
+    logger.tool.error(toolId, `操作失败: ${result.error}`, { input, result });
+  } else {
+    logger.tool.info(toolId, `操作成功: ${input.operation}`, { 
+      duration, 
+      dataSize: result.data ? JSON.stringify(result.data).length : 0 
+    });
+  }
+  
+  return result;
+}
+
 // 获取单个智能体
 const getAgent = async (agentId: string): Promise<AgentOutputType> => {
+  const toolId = 'agent-storage';
+  const startTime = Date.now();
+  
   try {
+    logger.tool.debug(toolId, `开始查询智能体: ${agentId}`);
     const [agent] = await db.select().from(agents).where(eq(agents.id, agentId)).limit(1);
+    
     if (!agent) {
-      return {
+      const result = {
         success: false,
-        error: '找不到指定的智能体',
+        error: `找不到指定的智能体: ${agentId}`,
       };
+      logger.tool.warn(toolId, result.error);
+      return result;
     }
+    
+    logger.tool.debug(toolId, `成功获取智能体: ${agentId}`, { 
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: true,
       data: agent,
     };
   } catch (error) {
-    console.error('获取智能体失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    logger.tool.error(toolId, `获取智能体失败: ${agentId}`, { 
+      error: errorMessage,
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: false,
-      error: '获取智能体失败',
+      error: `获取智能体失败: ${errorMessage}`,
     };
   }
 };
 
 // 获取所有智能体
 const getAllAgents = async (): Promise<AgentOutputType> => {
+  const toolId = 'agent-storage';
+  const startTime = Date.now();
+  
   try {
+    logger.tool.debug(toolId, '开始获取所有智能体');
     const allAgents = await db.select().from(agents);
+    
+    logger.tool.debug(toolId, `成功获取所有智能体，共 ${allAgents.length} 个`, { 
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: true,
       data: allAgents,
     };
   } catch (error) {
-    console.error('获取所有智能体失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    logger.tool.error(toolId, '获取所有智能体失败', { 
+      error: errorMessage,
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: false,
-      error: '获取所有智能体失败',
+      error: `获取所有智能体失败: ${errorMessage}`,
     };
   }
 };
 
 // 创建智能体
 const createAgent = async (agent: Partial<Agent>): Promise<AgentOutputType> => {
+  const toolId = 'agent-storage';
+  const startTime = Date.now();
+  
   if (!agent || !agent.name) {
+    const error = '缺少必要的智能体信息';
+    logger.tool.warn(toolId, error, { agent });
     return {
       success: false,
-      error: '缺少必要的智能体信息',
+      error,
     };
   }
 
   try {
+    logger.tool.debug(toolId, '开始创建智能体', { agentName: agent.name });
+    
     const now = Math.floor(Date.now() / 1000);
+    const agentId = agent.id || `agent-${Date.now()}`;
     const newAgent = {
-      id: agent.id || `agent-${now}-${Math.random().toString(36).substr(2, 9)}`,
+      id: agentId,
       name: agent.name,
       description: agent.description ?? null,
       instructions: agent.instructions ?? null,
@@ -143,33 +277,53 @@ const createAgent = async (agent: Partial<Agent>): Promise<AgentOutputType> => {
       updatedAt: now,
     } as Agent;
 
+    logger.tool.debug(toolId, `准备插入智能体: ${agentId}`, { newAgent });
     await db.insert(agents).values(newAgent);
+    
+    logger.tool.info(toolId, `成功创建智能体: ${agentId}`, { 
+      duration: Date.now() - startTime,
+      agent: newAgent
+    });
     
     return {
       success: true,
       data: newAgent,
     };
   } catch (error) {
-    console.error('创建智能体失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    logger.tool.error(toolId, '创建智能体失败', { 
+      error: errorMessage, 
+      agent,
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: false,
-      error: '创建智能体失败',
+      error: `创建智能体失败: ${errorMessage}`,
     };
   }
 };
 
 // 更新智能体
 const updateAgent = async (agent: Partial<Agent>): Promise<AgentOutputType> => {
+  const toolId = 'agent-storage';
+  const startTime = Date.now();
+  
   if (!agent || !agent.id) {
+    const error = '缺少必要的智能体信息或ID';
+    logger.tool.warn(toolId, error, { agent });
     return {
       success: false,
-      error: '缺少必要的智能体信息或ID',
+      error,
     };
   }
 
   try {
+    logger.tool.debug(toolId, `开始更新智能体: ${agent.id}`);
+    
     const existingAgent = await getAgent(agent.id);
     if (!existingAgent.success || !existingAgent.data) {
+      logger.tool.warn(toolId, `更新失败，智能体不存在: ${agent.id}`);
       return existingAgent;
     }
 
@@ -181,41 +335,86 @@ const updateAgent = async (agent: Partial<Agent>): Promise<AgentOutputType> => {
       updatedAt: now,
     } as Agent;
 
+    logger.tool.debug(toolId, `准备更新智能体: ${agent.id}`, { 
+      before: existingAgent.data,
+      after: updatedAgent
+    });
+    
     await db.update(agents)
       .set(updatedAgent)
       .where(eq(agents.id, agent.id));
 
+    logger.tool.info(toolId, `成功更新智能体: ${agent.id}`, { 
+      duration: Date.now() - startTime
+    });
+    
     return {
       success: true,
       data: updatedAgent,
     };
   } catch (error) {
-    console.error('更新智能体失败:', error);
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    logger.tool.error(toolId, `更新智能体失败: ${agent.id}`, { 
+      error: errorMessage,
+      agent,
+      duration: Date.now() - startTime 
+    });
+    
     return {
       success: false,
-      error: '更新智能体失败',
+      error: `更新智能体失败: ${errorMessage}`,
     };
   }
 };
 
 // 删除智能体
 const deleteAgent = async (agentId: string): Promise<AgentOutputType> => {
-  try {
-    const agent = await getAgent(agentId);
-    if (!agent.success) {
-      return agent;
-    }
-
-    await db.delete(agents).where(eq(agents.id, agentId));
-    return {
-      success: true,
-      data: agent.data,
-    };
-  } catch (error) {
-    console.error('删除智能体失败:', error);
+  const toolId = 'agent-storage';
+  const startTime = Date.now();
+  
+  if (!agentId) {
+    const error = '缺少智能体ID';
+    logger.tool.warn(toolId, error);
     return {
       success: false,
-      error: '删除智能体失败',
+      error,
+    };
+  }
+
+  try {
+    logger.tool.debug(toolId, `开始删除智能体: ${agentId}`);
+    
+    // 先检查智能体是否存在
+    const existingAgent = await getAgent(agentId);
+    if (!existingAgent.success) {
+      logger.tool.warn(toolId, `删除失败，智能体不存在: ${agentId}`);
+      return existingAgent;
+    }
+
+    logger.tool.debug(toolId, `智能体存在，准备删除: ${agentId}`, { 
+      agent: existingAgent.data
+    });
+    
+    await db.delete(agents).where(eq(agents.id, agentId));
+
+    logger.tool.info(toolId, `成功删除智能体: ${agentId}`, { 
+      duration: Date.now() - startTime
+    });
+    
+    return {
+      success: true,
+      data: { id: agentId, deleted: true },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : '未知错误';
+    logger.tool.error(toolId, `删除智能体失败: ${agentId}`, { 
+      error: errorMessage,
+      duration: Date.now() - startTime 
+    });
+    
+    return {
+      success: false,
+      error: `删除智能体失败: ${errorMessage}`,
     };
   }
 };
@@ -396,3 +595,6 @@ export const agentLogsTool = createTool({
     }
   },
 }) as Tool;
+
+// 重新导出debugTool
+export { debugTool };

@@ -1,3 +1,241 @@
+# Mastrax
+
+Mastra extension package for Lumos Studio.
+
+## 开发说明
+
+### 安装
+
+```bash
+# 使用npm
+npm install
+
+# 或使用bun
+bun install
+```
+
+### 运行开发服务器
+
+```bash
+# 使用npm
+npm run dev
+
+# 或使用bun
+bun run dev
+```
+
+## 工具API参考
+
+### 智能体存储工具 (agent-storage)
+
+用于管理本地智能体，包括创建、更新、删除和获取操作。
+
+#### 请求格式
+
+所有请求必须包含一个`data`对象，内部包含`operation`字段和其他必要参数：
+
+```json
+{
+  "data": {
+    "operation": "操作类型",
+    "agent": {}, // 对于create/update操作提供
+    "agentId": "agent-id" // 对于get/delete操作提供
+  }
+}
+```
+
+#### 操作类型
+
+1. **创建智能体** (`create`)
+
+```json
+{
+  "data": {
+    "operation": "create",
+    "agent": {
+      "name": "智能体名称",
+      "description": "智能体描述",
+      "instructions": "智能体指令",
+      "model": "gpt-4-turbo",
+      "type": "general",
+      "categories": ["类别1", "类别2"]
+    }
+  }
+}
+```
+
+2. **更新智能体** (`update`)
+
+```json
+{
+  "data": {
+    "operation": "update",
+    "agent": {
+      "id": "agent-id",
+      "name": "新的名称",
+      "description": "新的描述"
+    }
+  }
+}
+```
+
+3. **获取单个智能体** (`get`)
+
+```json
+{
+  "data": {
+    "operation": "get",
+    "agentId": "agent-id"
+  }
+}
+```
+
+4. **获取所有智能体** (`getAll`)
+
+```json
+{
+  "data": {
+    "operation": "getAll"
+  }
+}
+```
+
+5. **删除智能体** (`delete`)
+
+```json
+{
+  "data": {
+    "operation": "delete",
+    "agentId": "agent-id"
+  }
+}
+```
+
+### 调试工具 (debug-tool)
+
+用于系统调试和诊断问题。
+
+#### 请求格式
+
+```json
+{
+  "data": {
+    "action": "操作类型",
+    "params": {} // 可选参数
+  }
+}
+```
+
+#### 操作类型
+
+1. **获取系统信息** (`info`)
+
+```json
+{
+  "data": {
+    "action": "info"
+  }
+}
+```
+
+2. **测试API连接** (`test-api`)
+
+```json
+{
+  "data": {
+    "action": "test-api",
+    "params": {
+      "endpoint": "agent-storage" // 或其他端点
+    }
+  }
+}
+```
+
+3. **获取日志** (`get-logs`)
+
+```json
+{
+  "data": {
+    "action": "get-logs",
+    "params": {
+      "limit": 10,
+      "type": "AGENT" // 可选过滤日志类型
+    }
+  }
+}
+```
+
+4. **检查请求内容** (`inspect-request`)
+
+```json
+{
+  "data": {
+    "action": "inspect-request",
+    "params": {
+      "any_custom_param": "value"
+    }
+  }
+}
+```
+
+5. **健康检查** (`health-check`)
+
+```json
+{
+  "data": {
+    "action": "health-check"
+  }
+}
+```
+
+6. **API格式检查** (`inspect-api-format`)
+
+用于诊断API请求格式问题，分析传入参数结构。
+
+```json
+{
+  "data": {
+    "action": "inspect-api-format"
+  }
+}
+```
+
+## 常见问题
+
+### 错误："缺少必要的data参数"
+
+这个错误通常是因为请求格式不正确。确保所有请求都包含一个`data`对象，例如：
+
+错误的格式：
+```json
+{
+  "operation": "create",
+  "agent": {}
+}
+```
+
+正确的格式：
+```json
+{
+  "data": {
+    "operation": "create",
+    "agent": {}
+  }
+}
+```
+
+### 其他问题
+
+如果遇到其他问题，可以使用debug-tool工具的inspect-api-format功能来诊断API请求格式问题：
+
+```json
+{
+  "data": {
+    "action": "inspect-api-format"
+  }
+}
+```
+
 # Mastra Integration for Tauri
 
 This directory contains the Mastra framework implementation that is integrated with the Tauri desktop application.

@@ -1,12 +1,19 @@
 {
-  "version": "7",
+  "version": "5",
   "dialect": "sqlite",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1742823616925,
+      "version": "5",
+      "when": 1711266417210,
       "tag": "0000_spicy_silvermane",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1743686400000,
+      "tag": "0001_white_silver_centurion",
       "breakpoints": true
     }
   ]

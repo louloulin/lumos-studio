@@ -4,6 +4,7 @@ import { weatherWorkflow } from "./workflows";
 import { agents } from "./agents";
 import { logger } from "./logging";
 import { v4 as uuidv4 } from 'uuid';
+import { initDatabase } from "./db";
 
 // 添加日志扩展
 if (!logger.http) {
@@ -14,6 +15,17 @@ if (!logger.http) {
     error: (message: string, metadata?: Record<string, any>) => logger.error(message, metadata)
   };
 }
+
+// 初始化数据库
+initDatabase().then(success => {
+  if (success) {
+    logger.info('数据库初始化成功，应用可以正常使用');
+  } else {
+    logger.error('数据库初始化失败，应用可能无法正常工作');
+  }
+}).catch(error => {
+  logger.error('数据库初始化过程中发生错误', { error });
+});
 
 // 创建请求处理中间件
 function createRequestMiddleware() {

@@ -2,11 +2,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Send, RefreshCw } from 'lucide-react';
+import { Send, RefreshCw, FileUp, Paintbrush2 } from 'lucide-react';
 import { chatService, ChatNode } from './ChatService';
 import { useToast } from './ui/use-toast';
 import { MastraAPI } from '../api/mastra'; // 导入Mastra API
 import Markdown from './Markdown';
+import { Dialog, DialogContent, DialogTrigger } from './ui/dialog';
+import ArtifactsTab from './ArtifactsTab';
+import { VoiceRecorder } from './VoiceRecorder';
+import { SpeechPlayer } from './SpeechPlayer';
 
 // 定义消息类型
 interface Message {
@@ -15,6 +19,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  image?: string;
 }
 
 // 定义智能体类型
@@ -42,6 +47,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showArtifacts, setShowArtifacts] = useState(false);
   
   // 处理滚动事件，决定是否应该自动滚动
   const handleScroll = () => {
@@ -445,6 +451,135 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     }
   };
 
+  // 处理白板内容分享到对话
+  const handleShareArtifact = (artifactData: any) => {
+    if (artifactData.type === 'canvas') {
+      // 分享画布图像
+      const userMessageContent = '[分享画布内容]';
+      
+      // 添加用户消息到聊天服务
+      (async () => {
+        try {
+          // 保存文本消息到聊天服务
+          const userNode = await chatService.addUserMessage(sessionId, userMessageContent);
+          
+          // 更新当前节点
+          setCurrentNodeId(userNode.id);
+          
+          // 更新消息列表
+          const userMessage: Message = {
+            id: userNode.id,
+            role: 'user',
+            content: userMessageContent,
+            timestamp: userNode.timestamp,
+            image: artifactData.dataUrl
+          };
+          
+          setMessages(prev => [...prev, userMessage]);
+          
+          // 设置输入中状态
+          setIsTyping(true);
+          
+          // 创建一个临时消息表示正在加载
+          const tempId = Date.now().toString();
+          const tempMessage: Message = {
+            id: tempId,
+            role: 'assistant',
+            content: '',
+            timestamp: new Date(),
+            isStreaming: true
+          };
+          
+          setMessages(prev => [...prev, tempMessage]);
+          
+          // 准备消息历史
+          const mastraMessages = [
+            ...messages
+              .filter(msg => !msg.isStreaming)
+              .map(msg => ({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.content
+              })),
+            { role: 'user', content: userMessageContent + "\n[图片内容]" }
+          ];
+          
+          // 获取要使用的智能体ID
+          const activeAgentId = selectedAgent?.id || 'generalAssistant';
+          
+          // 使用API获取回复
+          try {
+            // 使用普通API，因为图片处理复杂
+            const response = await MastraAPI.generate(activeAgentId, {
+              messages: mastraMessages,
+              options: {
+                temperature: 0.7,
+                max_tokens: 2048
+              }
+            });
+            
+            // 添加助手回复到聊天服务
+            const assistantNode = await chatService.addAssistantResponse(sessionId, response.text);
+            
+            // 更新消息列表
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === tempId 
+                  ? {
+                      id: assistantNode.id,
+                      role: 'assistant',
+                      content: response.text,
+                      timestamp: assistantNode.timestamp,
+                      isStreaming: false
+                    } 
+                  : msg
+              )
+            );
+            
+            // 更新当前节点
+            setCurrentNodeId(assistantNode.id);
+            
+          } catch (error) {
+            console.error('Error handling canvas image:', error);
+            // 更新错误消息
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === tempId 
+                  ? {
+                      ...msg,
+                      content: '抱歉，处理图像时出错了。请稍后再试。',
+                      isStreaming: false
+                    } 
+                  : msg
+              )
+            );
+            
+            toast({
+              title: '处理图像失败',
+              description: '无法获取智能体对图像的响应，请稍后再试。',
+              variant: 'destructive',
+            });
+          } finally {
+            setIsTyping(false);
+          }
+        } catch (error) {
+          console.error('Error processing shared canvas:', error);
+          setIsTyping(false);
+          toast({
+            title: '处理画布内容失败',
+            description: '无法处理分享的画布内容，请稍后再试。',
+            variant: 'destructive',
+          });
+        }
+      })();
+    } else if (artifactData.type === 'text') {
+      // 分享文本内容
+      setInputValue(artifactData.content);
+    }
+    
+    // 关闭白板对话框
+    setShowArtifacts(false);
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* 消息区域 */}
@@ -482,12 +617,34 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                     : 'bg-muted'
                 } max-w-[85%]`}
               >
-                <Markdown>
-                  {message.content}
-                </Markdown>
-                <div
-                  className={`text-xs mt-1 opacity-70 text-right`}
-                >
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex-1 w-full">
+                    <Markdown>
+                      {message.content}
+                    </Markdown>
+                  </div>
+                  {message.role === 'assistant' && !message.isStreaming && (
+                    <SpeechPlayer
+                      text={message.content}
+                      agentId={selectedAgent?.id || 'generalAssistant'}
+                      className="opacity-70 hover:opacity-100 flex-shrink-0 ml-2"
+                    />
+                  )}
+                </div>
+
+                {/* 如果有图片，显示图片 */}
+                {message.image && (
+                  <div className="mt-2">
+                    <img 
+                      src={message.image} 
+                      alt="Shared content" 
+                      className="max-w-full rounded-md" 
+                      style={{ maxHeight: '300px' }}
+                    />
+                  </div>
+                )}
+                
+                <div className="text-xs mt-1 opacity-70 text-right">
                   {message.timestamp.toLocaleTimeString()}
                 </div>
               </div>
@@ -536,7 +693,34 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
           </Button>
         </div>
         
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-between mt-2">
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm">
+              <FileUp size={16} className="mr-1" />
+              上传文件
+            </Button>
+            
+            <Dialog open={showArtifacts} onOpenChange={setShowArtifacts}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Paintbrush2 size={16} className="mr-1" />
+                  白板
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl h-[80vh]">
+                <ArtifactsTab 
+                  onShareArtifact={handleShareArtifact}
+                />
+              </DialogContent>
+            </Dialog>
+            
+            {/* 添加语音输入按钮 */}
+            <VoiceRecorder 
+              onTranscription={(text) => setInputValue(prev => prev + text)}
+              agentId={selectedAgent?.id || 'generalAssistant'}
+            />
+          </div>
+          
           <Button variant="ghost" size="sm" onClick={clearConversation}>
             <RefreshCw size={16} className="mr-1" />
             清除对话

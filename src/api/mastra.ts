@@ -554,50 +554,112 @@ export const MastraAPI = {
     }
   },
   
-  // 使用智能体的语音识别能力将音频转换为文本
-  async listen(agentName: string, audioBase64: string): Promise<string> {
+  /**
+   * 将音频转为文本
+   * @param agentId 智能体 ID
+   * @param audioBase64 音频 Base64 编码
+   * @returns 转换的文本
+   */
+  async listen(agentId: string, audioBase64: string): Promise<string> {
+    // 检查音频数据是否有效
+    if (!audioBase64 || audioBase64.length < 100) {
+      console.warn('[MastraAPI] 无效的音频数据');
+      return "音频数据无效，请重新录音";
+    }
+    
+    // 日志输出音频大小，用于调试
+    console.log(`[MastraAPI] listen: 收到音频数据，大小: ${audioBase64.length} 字符`);
+
     try {
-      console.log(`[MastraAPI] Requesting speech recognition for agent ${agentName}`);
-      
-      // 尝试使用Mastra客户端的语音API
-      const client = await getClient();
-      const agent = client.getAgent(agentName || 'agent');
-      
+      // 尝试使用智能体的API进行语音识别
       try {
-        // 如果智能体支持语音识别API
-        if (agent && (agent as any).listen) {
-          const transcript = await (agent as any).listen({
-            audio: audioBase64,
-            options: {
-              language: 'zh-CN'
+        console.log('[MastraAPI] listen: 尝试使用Mastra客户端API');
+        const client = await getClient();
+        if (client) {
+          console.log('[MastraAPI] listen: 尝试使用execute调用');
+          // 使用Tool API方式调用
+          const agentsTool = client.getTool('agents');
+          if (agentsTool) {
+            const response = await agentsTool.execute({
+              data: {
+                agentId,
+                operation: 'execute',
+                call: {
+                  name: "listen",
+                  args: [audioBase64]
+                }
+              }
+            });
+            
+            if (response && response.success) {
+              console.log('[MastraAPI] listen: 转录成功', response);
+              if (typeof response.data === 'string') {
+                return response.data;
+              } else if (response.data && typeof response.data.result === 'string') {
+                return response.data.result;
+              } else if (response.data && response.data.text) {
+                return response.data.text;
+              }
+              return JSON.stringify(response.data);
+            } else {
+              console.warn('[MastraAPI] listen: 工具调用失败', response);
+              throw new Error(response?.error || '调用语音识别失败');
             }
-          });
-          console.log('[MastraAPI] Success: Used agent listen API');
-          return transcript;
+          }
         }
-        
-        // 尝试使用Tauri后端转换
-        const result = await invoke('speech_to_text', { 
-          audio: audioBase64,
-          agentName
-        });
-        
-        if (result && typeof result === 'string') {
-          console.log('[MastraAPI] Success: Used Tauri backend STT');
-          return result;
-        }
-        
-        // 返回模拟结果
-        console.log('[MastraAPI] Using mock transcription result');
-        return "这是通过Mastra语音服务转录的文本。在实际项目中，这里应该从Mastra语音API获取真实的转录结果。";
       } catch (error) {
-        console.error('[MastraAPI] Agent listen API failed:', error);
-        // 返回模拟结果
-        return "语音识别失败，请重试或使用文本输入。";
+        console.warn('[MastraAPI] listen: 客户端API失败，尝试后备方法', error);
+        // 如果智能体API失败，继续尝试后备方法
       }
+
+      // 尝试使用 Tauri 后端进行语音转文本
+      if (window.__TAURI__) {
+        try {
+          console.log('[MastraAPI] listen: 尝试使用Tauri后端');
+          // @ts-ignore
+          const { invoke } = window.__TAURI__;
+          const response = await invoke("speech_to_text", {
+            base64Audio: audioBase64,
+          });
+          console.log('[MastraAPI] listen: Tauri转录成功', response);
+          return response;
+        } catch (error) {
+          console.warn('[MastraAPI] listen: Tauri后端失败', error);
+          // 如果Tauri API失败，继续尝试后备方法
+        }
+      }
+
+      // 尝试使用浏览器的语音识别API (Web Speech API)
+      if (window.webkitSpeechRecognition || (window as any).SpeechRecognition) {
+        console.log('[MastraAPI] listen: 尝试使用浏览器语音识别API');
+        
+        // 由于现在已经有录制好的音频，我们不能直接使用SpeechRecognition
+        // 这里只是一个提示，提醒用户应用可能需要直接集成浏览器语音识别
+        console.warn('[MastraAPI] listen: 浏览器语音识别API可用，但需要直接从麦克风录制');
+      }
+      
+      console.error('[MastraAPI] listen: 所有语音识别方法均失败');
+      
+      // 检查Mastra服务是否运行
+      if (!await this.isRunning()) {
+        return "Mastra服务未运行，无法进行语音识别。请启动服务或使用文本输入。";
+      }
+      
+      // 返回友好的错误信息
+      return "语音识别失败，请重试或使用文本输入。";
     } catch (error) {
-      console.error('[MastraAPI] Speech recognition failed:', error);
-      throw error;
+      console.error('[MastraAPI] listen: 捕获到异常:', error);
+      
+      // 根据错误类型返回不同的错误消息
+      if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('network'))) {
+        return "网络连接错误，请检查您的网络连接后重试。";
+      } else if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        return "无法访问麦克风，请在浏览器中允许麦克风访问权限。";
+      } else if (error instanceof Error && error.message.includes('timeout')) {
+        return "语音识别请求超时，请检查网络连接后重试。";
+      }
+      
+      return "语音识别时发生错误，请重试或使用文本输入。";
     }
   },
 

@@ -1,6 +1,7 @@
 import { MastraAPI } from './mastra';
 import { toolService, Tool } from './ToolService';
 import { v4 as uuidv4 } from 'uuid';
+import { Message } from '../services/types';
 
 /**
  * 工作流服务类
@@ -860,14 +861,6 @@ module.exports = {
     const resolvedPrompt = this.resolveVariablesInString(prompt || '', executionRecord.variables);
     
     try {
-      // 这里应该调用实际的AI服务API
-      // 由于这是一个示例，我们创建一个模拟响应
-      const mockResponse = `这是来自 ${model} 的响应。
-系统提示: ${resolvedPrompt}
-温度: ${temperature || 0.7}
-      
-这是一个模拟的AI响应，在实际实现中，这里应该是调用真实AI服务API获取的响应内容。`;
-      
       // 添加AI执行日志
       this.addExecutionLog(executionRecord, {
         id: uuidv4(),
@@ -882,7 +875,56 @@ module.exports = {
         }
       });
       
-      return { success: true, data: { response: mockResponse } };
+      // 导入Mastra服务
+      const { generate } = await import('../services/mastra');
+      
+      // 构建消息列表
+      const messages: Message[] = [
+        {
+          role: 'system',
+          content: resolvedPrompt
+        }
+      ];
+      
+      // 调用AI服务生成回复
+      const response = await generate(model, messages, {
+        temperature: temperature || 0.7
+      });
+      
+      // 从响应中提取文本内容
+      let responseText = '';
+      
+      // 安全地提取响应内容
+      if (response) {
+        try {
+          // 尝试不同的可能格式
+          if (typeof response === 'string') {
+            responseText = response;
+          } else if (typeof response === 'object') {
+            const resp = response as any;
+            
+            if (resp.message?.content) {
+              responseText = resp.message.content;
+            } else if (resp.text) {
+              responseText = resp.text;
+            } else if (resp.content) {
+              responseText = resp.content;
+            } else if (resp.choices?.[0]?.message?.content) {
+              responseText = resp.choices[0].message.content;
+            } else if (resp.choices?.[0]?.text) {
+              responseText = resp.choices[0].text;
+            } else {
+              // 如果无法从已知格式中获取，尝试转为JSON字符串
+              responseText = JSON.stringify(response);
+            }
+          }
+        } catch (err) {
+          console.error('Error extracting AI response:', err);
+          responseText = '处理AI响应时发生错误';
+        }
+      }
+      
+      return { success: true, data: { response: responseText } };
     } catch (error) {
       throw new Error(`AI执行失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }

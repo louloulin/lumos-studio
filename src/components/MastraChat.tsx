@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Send } from 'lucide-react';
-import { chatService } from './ChatService';
+import { Send, RefreshCw } from 'lucide-react';
+import { chatService, ChatNode } from './ChatService';
+import { useToast } from './ui/use-toast';
+import { MastraAPI } from '../api/mastra'; // 导入Mastra API
+import Markdown from './Markdown';
 
 // 定义消息类型
 interface Message {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: Date;
+  isStreaming?: boolean;
+}
+
+// 定义智能体类型
+interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  avatar?: string;
 }
 
 // 定义组件属性
@@ -23,126 +35,480 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [currentNodeId, setCurrentNodeId] = useState<string>('');
+  const [chatTree, setChatTree] = useState<ChatNode | null>(null);
+  const { toast } = useToast();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = useState(true);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // 获取会话信息
-  useEffect(() => {
-    const session = chatService.getSession(sessionId);
-    if (session) {
-      // 如果会话存在但没有初始消息，添加一条欢迎消息
-      if (messages.length === 0) {
-        setMessages([
-          {
-            id: '1',
-            content: `你好！我是${session.name}，有什么我可以帮助你的吗？`,
-            role: 'assistant',
-            timestamp: new Date()
-          }
-        ]);
-      }
+  // 处理滚动事件，决定是否应该自动滚动
+  const handleScroll = () => {
+    if (!scrollContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
+    // 如果用户滚动到距离底部50px以内，则自动滚动到底部
+    // 如果用户向上滚动，则停止自动滚动
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 50;
+    setShouldScrollToBottom(isNearBottom);
+  };
+  
+  // 滚动到底部的函数
+  const scrollToBottom = useCallback(() => {
+    if (shouldScrollToBottom && messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ 
+        behavior: isTyping ? 'auto' : 'smooth',
+        block: 'end'
+      });
     }
-  }, [sessionId, messages.length]);
+  }, [shouldScrollToBottom, isTyping]);
+  
+  // 当消息更新或有新消息时，决定是否滚动到底部
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+  
+  // 检查Mastra服务是否运行
+  useEffect(() => {
+    const checkMastraService = async () => {
+      try {
+        const isRunning = await MastraAPI.isRunning();
+        if (!isRunning) {
+          toast({
+            title: 'Mastra服务未运行',
+            description: '无法连接到Mastra服务，请确保服务已启动。',
+            variant: 'destructive',
+          });
+        } else {
+          console.log('Mastra服务运行正常');
+        }
+      } catch (error) {
+        console.error('Error checking Mastra service:', error);
+        toast({
+          title: 'Mastra服务检查失败',
+          description: '检查Mastra服务时出错，请确保服务已正确配置。',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    checkMastraService();
+  }, [toast]);
+  
+  // 从API获取智能体信息
+  useEffect(() => {
+    const fetchAgent = async () => {
+      try {
+        // 从Mastra获取智能体列表
+        const agentNames = await MastraAPI.getAgents();
+        console.log('Available agents:', agentNames);
+        
+        // 如果找到匹配的智能体，使用它
+        if (agentNames.includes(agentId)) {
+          const agent: Agent = {
+            id: agentId,
+            name: agentId,
+            description: `Mastra智能体: ${agentId}`,
+            avatar: undefined
+          };
+          setSelectedAgent(agent);
+          console.log(`使用Mastra智能体: ${agentId}`);
+        } else if (agentNames.length > 0) {
+          // 如果找不到指定的智能体但有其他智能体，使用第一个可用的智能体
+          const firstAgent = agentNames[0];
+          const agent: Agent = {
+            id: firstAgent,
+            name: firstAgent,
+            description: `Mastra智能体: ${firstAgent}`,
+            avatar: undefined
+          };
+          setSelectedAgent(agent);
+          console.log(`找不到${agentId}，使用可用的Mastra智能体: ${firstAgent}`);
+        } else {
+          // 如果没有可用的智能体，使用通用助手
+          toast({
+            title: '未找到智能体',
+            description: `找不到名为 "${agentId}" 的智能体，使用通用助手替代。`,
+            variant: 'destructive',
+          });
+          
+          const defaultAgent: Agent = {
+            id: 'generalAssistant',
+            name: '通用助手',
+            description: '我是一个智能助手，可以回答您的问题和提供帮助。',
+            avatar: undefined
+          };
+          setSelectedAgent(defaultAgent);
+          console.log('未找到指定智能体，使用默认通用助手');
+        }
+      } catch (error) {
+        console.error('Error fetching agent:', error);
+        toast({
+          title: '获取智能体信息失败',
+          description: '无法加载智能体数据，请稍后再试。',
+          variant: 'destructive',
+        });
+        
+        // 使用通用助手作为备选
+        const defaultAgent: Agent = {
+          id: 'generalAssistant',
+          name: '通用助手',
+          description: '我是一个智能助手，可以回答您的问题和提供帮助。',
+          avatar: undefined
+        };
+        setSelectedAgent(defaultAgent);
+      }
+    };
+    
+    fetchAgent();
+  }, [agentId, toast]);
+  
+  // 获取对话历史
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      try {
+        // 从聊天服务获取会话数据
+        const session = await chatService.getSession(sessionId);
+        
+        if (!session) {
+          // 如果会话不存在，创建新会话
+          await chatService.createSession(
+            selectedAgent?.name || '新对话', 
+            agentId
+          );
+          setMessages([]);
+          return;
+        }
+      
+        // 获取当前节点ID
+        setCurrentNodeId(session.currentNodeId);
+        
+        // 获取对话历史
+        const history = await chatService.getChatHistory(sessionId);
+        
+        // 转换为消息格式
+        const chatMessages: Message[] = history.map(node => ({
+          id: node.id,
+          role: node.role,
+          content: node.text,
+          timestamp: node.timestamp
+        }));
+        
+        setMessages(chatMessages);
+        
+        // 获取完整对话树
+        const tree = await chatService.getChatTree(sessionId);
+        setChatTree(tree);
+      } catch (error) {
+        console.error('Error fetching chat history:', error);
+        toast({
+          title: '获取对话历史失败',
+          description: '无法加载对话历史，请稍后再试。',
+          variant: 'destructive',
+        });
+      }
+    };
+    
+    if (sessionId && selectedAgent) {
+      fetchChatHistory();
+    }
+  }, [sessionId, agentId, selectedAgent, toast]);
 
-  // 处理发送消息
+  // 发送消息
   const handleSubmit = async () => {
     if (!inputValue.trim()) return;
 
-    // 添加用户消息
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputValue,
-      role: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
-    setIsTyping(true);
-
     try {
-      // 模拟AI响应延迟
-      setTimeout(() => {
-        // 添加AI响应
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          content: `这是对"${inputValue}"的回复。在实际应用中，这里会调用AI服务获取真实回复。`,
-          role: 'assistant',
-          timestamp: new Date()
-        };
-
-        setMessages(prev => [...prev, aiMessage]);
+      // 添加用户消息到状态
+      const userMessageContent = inputValue.trim();
+      
+      // 清空输入框
+      setInputValue('');
+      
+      // 添加用户消息到聊天服务
+      const userNode = await chatService.addUserMessage(sessionId, userMessageContent);
+      
+      // 更新当前节点
+      setCurrentNodeId(userNode.id);
+      
+      // 更新消息列表
+      const userMessage: Message = {
+        id: userNode.id,
+        role: 'user',
+        content: userMessageContent,
+        timestamp: userNode.timestamp
+      };
+      
+      setMessages(prev => [...prev, userMessage]);
+      
+      // 设置输入中状态
+      setIsTyping(true);
+      
+      // 创建一个临时消息表示正在加载
+      const tempId = Date.now().toString();
+      const tempMessage: Message = {
+        id: tempId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isStreaming: true
+      };
+      
+      setMessages(prev => [...prev, tempMessage]);
+      
+      // 准备消息历史
+      const mastraMessages = messages
+        .filter(msg => !msg.isStreaming)
+        .map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        }));
+      
+      // 添加当前用户消息
+      mastraMessages.push({ role: 'user', content: userMessageContent });
+      
+      // 获取要使用的智能体ID
+      const activeAgentId = selectedAgent?.id || 'generalAssistant';
+      console.log(`使用智能体 ${activeAgentId} 生成回复`);
+      
+      // 使用流式API获取回复
+      try {
+        let fullResponse = '';
+        let streamChunks = [];
+        
+        for await (const chunk of MastraAPI.streamGenerate(activeAgentId, {
+          messages: mastraMessages,
+          options: {
+            temperature: 0.7,
+            max_tokens: 2048
+          }
+        })) {
+          // 收集流式块
+          streamChunks.push(chunk);
+          fullResponse += chunk;
+          
+          // 批量更新以获得更流畅的体验，每3个块或50ms更新一次
+          if (streamChunks.length >= 3) {
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === tempId 
+                  ? { ...msg, content: fullResponse } 
+                  : msg
+              )
+            );
+            streamChunks = [];
+            
+            // 给UI时间渲染
+            await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+        
+        // 确保显示完整的响应
+        if (streamChunks.length > 0) {
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? { ...msg, content: fullResponse } 
+                : msg
+            )
+          );
+        }
+        
+        // 生成完成后，添加最终消息到聊天服务
+        const assistantNode = await chatService.addAssistantResponse(sessionId, fullResponse);
+        
+        // 更新消息，移除流式标记
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === tempId 
+              ? { 
+                  id: assistantNode.id,
+                  role: 'assistant',
+                  content: fullResponse,
+                  timestamp: assistantNode.timestamp,
+                  isStreaming: false
+                } 
+              : msg
+          )
+        );
+        
+        // 更新当前节点
+        setCurrentNodeId(assistantNode.id);
+        
+        // 更新对话树
+        const updatedTree = await chatService.getChatTree(sessionId);
+        setChatTree(updatedTree);
+      } catch (error) {
+        console.error('Error in stream generation:', error);
+        
+        // 如果流式生成失败，尝试非流式API
+        try {
+          console.log('Falling back to non-streaming API');
+          const response = await MastraAPI.generate(activeAgentId, {
+            messages: mastraMessages,
+            options: {
+              temperature: 0.7,
+              max_tokens: 2048
+            }
+          });
+          
+          // 添加助手回复到聊天服务
+          const assistantNode = await chatService.addAssistantResponse(sessionId, response.text);
+          
+          // 更新消息列表
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? {
+                    id: assistantNode.id,
+                    role: 'assistant',
+                    content: response.text,
+                    timestamp: assistantNode.timestamp,
+                    isStreaming: false
+                  } 
+                : msg
+            )
+          );
+          
+          // 更新当前节点
+          setCurrentNodeId(assistantNode.id);
+          
+          // 更新对话树
+          const updatedTree = await chatService.getChatTree(sessionId);
+          setChatTree(updatedTree);
+        } catch (generateError) {
+          console.error('Error in normal generation:', generateError);
+          // 更新错误消息
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === tempId 
+                ? {
+                    ...msg,
+                    content: '抱歉，生成回复时出错了。请稍后再试。',
+                    isStreaming: false
+                  } 
+                : msg
+            )
+          );
+          
+          toast({
+            title: '生成回复失败',
+            description: '无法获取智能体响应，请稍后再试。',
+            variant: 'destructive',
+          });
+        }
+      } finally {
         setIsTyping(false);
-
-        // 更新会话最后一条消息
-        chatService.updateSession(sessionId, {
-          lastMessage: aiMessage.content,
-          lastUpdated: new Date()
-        });
-      }, 1000);
+      }
     } catch (error) {
-      console.error('获取AI回复失败', error);
+      console.error('Error sending message:', error);
       setIsTyping(false);
+      toast({
+        title: '发送消息失败',
+        description: '消息发送失败，请稍后再试。',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // 清除对话
+  const clearConversation = async () => {
+    if (window.confirm('确定要清除当前对话吗？此操作不可撤销。')) {
+      try {
+        // 创建新会话
+        const newSession = await chatService.createSession(
+          selectedAgent?.name || '新对话', 
+          agentId
+        );
+        
+        // 更新状态
+        setMessages([]);
+        setCurrentNodeId(newSession.currentNodeId);
+        
+        // 获取对话树
+        const tree = await chatService.getChatTree(newSession.id);
+        setChatTree(tree);
+        
+        toast({
+          title: '对话已清除',
+          description: '已成功清除对话历史。',
+        });
+      } catch (error) {
+        console.error('Error clearing conversation:', error);
+        toast({
+          title: '清除对话失败',
+          description: '无法清除对话，请稍后再试。',
+          variant: 'destructive',
+        });
+      }
     }
   };
 
   return (
     <div className="flex flex-col h-full">
       {/* 消息区域 */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        {messages.map(message => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.role === 'user' ? 'justify-end' : 'justify-start'
-            }`}
-          >
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-auto p-4 space-y-4"
+        onScroll={handleScroll}
+      >
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 text-center text-gray-500">
+            <Avatar className="h-16 w-16 mb-4">
+              {selectedAgent?.avatar ? (
+                <AvatarImage src={selectedAgent.avatar} alt={selectedAgent.name} />
+              ) : null}
+              <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                {selectedAgent?.name?.substring(0, 2) || 'AI'}
+              </AvatarFallback>
+            </Avatar>
+            <h3 className="text-xl font-medium mb-2">{selectedAgent?.name || '智能助手'}</h3>
+            <p className="max-w-sm">{selectedAgent?.description || '我是一个智能助手，可以回答您的问题和提供帮助。'}</p>
+            <p className="mt-4 text-sm">发送消息开始对话</p>
+          </div>
+        ) : (
+          messages.map(message => (
             <div
-              className={`flex items-start max-w-[80%] ${
-                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+              key={message.id}
+              className={`flex ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
               }`}
             >
-              <Avatar className={message.role === 'user' ? 'ml-2' : 'mr-2'}>
-                <AvatarFallback>
-                  {message.role === 'user' ? '👤' : '🤖'}
-                </AvatarFallback>
-              </Avatar>
               <div
                 className={`p-3 rounded-lg ${
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-muted'
-                }`}
+                } max-w-[85%]`}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <Markdown>
+                  {message.content}
+                </Markdown>
                 <div
-                  className={`text-xs mt-1 ${
-                    message.role === 'user'
-                      ? 'text-primary-foreground/70'
-                      : 'text-muted-foreground'
-                  }`}
+                  className={`text-xs mt-1 opacity-70 text-right`}
                 >
                   {message.timestamp.toLocaleTimeString()}
                 </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
         
         {isTyping && (
           <div className="flex justify-start">
-            <div className="flex items-start">
-              <Avatar className="mr-2">
-                <AvatarFallback>🤖</AvatarFallback>
-              </Avatar>
-              <div className="p-3 rounded-lg bg-muted">
-                <div className="flex space-x-1">
-                  <div className="w-2 h-2 rounded-full bg-current animate-bounce" />
-                  <div className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:0.2s]" />
-                  <div className="w-2 h-2 rounded-full bg-current animate-bounce [animation-delay:0.4s]" />
-                </div>
+            <div className="p-3 rounded-lg bg-muted">
+              <div className="flex space-x-2">
+                <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 rounded-full bg-primary/50 animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
             </div>
           </div>
         )}
+        
+        {/* 用于自动滚动的引用 */}
+        <div ref={messagesEndRef} className="h-px" />
       </div>
 
       {/* 输入区域 */}
@@ -167,6 +533,13 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             size="icon"
           >
             <Send className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        <div className="flex justify-end mt-2">
+          <Button variant="ghost" size="sm" onClick={clearConversation}>
+            <RefreshCw size={16} className="mr-1" />
+            清除对话
           </Button>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SmartAgentGallery from '../components/SmartAgentGallery';
 import * as SessionService from '../services/session';
+import { Agent } from '../api/types';
 
 // 默认智能体列表
 const defaultAgents = [
@@ -31,14 +32,48 @@ const defaultAgents = [
   }
 ];
 
+// 默认智能体对象接口
+interface DefaultAgent {
+  id: string;
+  name: string;
+  description: string;
+  categories: string[];
+}
+
 const SmartAgentsPage: React.FC = () => {
   const navigate = useNavigate();
-  const [agents, setAgents] = useState(defaultAgents);
+  const [agents, setAgents] = useState<Agent[]>(defaultAgents as unknown as Agent[]);
 
   // 获取智能体列表
   useEffect(() => {
     // 这里可以添加从API获取智能体列表的代码
     // 为了演示，我们使用默认列表
+  }, []);
+
+  // 获取智能体列表
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        // 导入AgentService
+        const { AgentService } = await import('../api/AgentService');
+        const agentService = new AgentService();
+        
+        // 获取所有智能体
+        const allAgents = await agentService.getAllAgents();
+        
+        if (allAgents && allAgents.length > 0) {
+          setAgents(allAgents);
+        } else {
+          console.log('没有找到智能体，使用默认列表');
+          // 如果没有找到智能体，保留默认列表
+        }
+      } catch (error) {
+        console.error('获取智能体列表失败:', error);
+        // 出错时保留默认列表
+      }
+    };
+    
+    fetchAgents();
   }, []);
 
   // 处理开始对话

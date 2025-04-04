@@ -127,13 +127,13 @@ export const setActiveSessionId = (sessionId: string): void => {
 /**
  * 添加或更新会话
  * @param session 会话对象
- * @returns 更新后的会话列表
+ * @returns 操作是否成功
  */
-export const upsertSession = (session: Session): Session[] => {
+export const upsertSession = (session: Session): boolean => {
   try {
     if (!session || !session.id) {
       console.error('[StorageService] 尝试更新无效会话:', session);
-      return getSessions();
+      return false;
     }
     
     const sessions = getSessions();
@@ -160,10 +160,10 @@ export const upsertSession = (session: Session): Session[] => {
     }
     
     saveSessions(sessions);
-    return sessions;
+    return true;
   } catch (error) {
     console.error('[StorageService] 更新会话时发生错误:', error);
-    return getSessions();
+    return false;
   }
 };
 

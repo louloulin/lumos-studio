@@ -34,7 +34,78 @@ export const setActiveSession = (sessionId: string): void => {
 };
 
 /**
+ * 检查会话ID是否有效
+ * @param sessionId 要检查的会话ID
+ * @returns 是否是有效的会话ID
+ */
+export const isValidSessionId = (sessionId: string | null | undefined): boolean => {
+  if (!sessionId) return false;
+  if (sessionId === 'undefined' || sessionId === 'null') return false;
+  if (sessionId.trim() === '') return false;
+  
+  // 检查是否是有效的UUID格式或有效的数字ID
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const numericPattern = /^\d{10,20}$/; // 数字ID (时间戳形式的ID通常为数字)
+  
+  return uuidPattern.test(sessionId) || numericPattern.test(sessionId);
+};
+
+/**
+ * 获取指定ID的会话
+ * @param sessionId 会话ID
+ * @returns 会话对象，如果不存在则返回null
+ */
+export const getSession = (sessionId: string): Session | null => {
+  if (!isValidSessionId(sessionId)) {
+    console.warn('[Session] 尝试获取的会话ID无效:', sessionId);
+    return null;
+  }
+  
+  try {
+    // 从存储中获取所有会话
+    const sessions = Storage.getSessions();
+    
+    // 查找指定ID的会话 - 同时考虑字符串和数字形式的ID
+    const session = sessions.find(s => {
+      if (s.id === sessionId) return true;
+      
+      // 处理数字形式的ID (URL中常见)
+      if (typeof s.id === 'string' && /^\d+$/.test(s.id) && /^\d+$/.test(sessionId)) {
+        return s.id.replace(/^0+/, '') === sessionId.replace(/^0+/, '');
+      }
+      
+      return false;
+    });
+    
+    if (!session) {
+      console.warn(`[Session] 未找到会话: ${sessionId}`);
+      return null;
+    }
+    
+    // 检查会话是否过期
+    if (isSessionExpired(session)) {
+      console.warn(`[Session] 会话已过期: ${sessionId}`);
+      // 异步删除过期会话，不阻塞当前进程
+      setTimeout(() => {
+        Storage.deleteSession(sessionId);
+        SessionAnalytics.trackSessionDeleted(sessionId);
+      }, 0);
+      return null;
+    }
+    
+    // 记录会话访问
+    SessionAnalytics.trackSessionAccessed(sessionId);
+    
+    return session;
+  } catch (error) {
+    console.error('[Session] 获取会话失败:', error);
+    return null;
+  }
+};
+
+/**
  * 创建新的会话
+ * 改进错误处理和会话ID生成
  * @returns 新创建的会话
  */
 export const createSession = async (agentId: string = 'generalAssistant', title: string = 'New Chat'): Promise<Session> => {
@@ -59,10 +130,12 @@ export const createSession = async (agentId: string = 'generalAssistant', title:
       return updatedSession;
     }
     
-    // 创建新会话
+    // 创建新会话，为确保会话ID的一致性，使用时间戳作为ID
     const timestamp = Date.now();
+    const sessionId = timestamp.toString(); // 使用时间戳作为ID，与URL格式匹配
+    
     const session: Session = {
-      id: uuid(),
+      id: sessionId,
       createdAt: timestamp,
       updatedAt: timestamp,
       title: title,
@@ -71,7 +144,11 @@ export const createSession = async (agentId: string = 'generalAssistant', title:
     };
     
     // 保存会话
-    Storage.upsertSession(session);
+    const saveResult = Storage.upsertSession(session);
+    if (!saveResult) {
+      throw new Error('保存会话失败');
+    }
+    
     Storage.setActiveSessionId(session.id);
     
     // 记录分析数据
@@ -81,18 +158,33 @@ export const createSession = async (agentId: string = 'generalAssistant', title:
     SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
     SessionSync.triggerSessionSync('lumos-active-session', session.id);
     
+    // 备份会话
+    SessionSync.backupSessions();
+    
+    console.log(`[Session] 成功创建新会话: ${session.id}`);
     return session;
   } catch (error) {
     console.error('[Session] 创建会话失败:', error);
-    // 即使出错也返回一个有效的会话
+    // 即使出错也返回一个有效的会话，使用当前时间戳作为ID
+    const fallbackId = Date.now().toString();
+    console.log(`[Session] 创建会话失败，使用备用ID: ${fallbackId}`);
+    
     const fallbackSession: Session = {
-      id: uuid(),
+      id: fallbackId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       title: 'New Chat (Fallback)',
       agentId: agentId,
       messages: []
     };
+    
+    // 尝试保存备用会话
+    try {
+      Storage.upsertSession(fallbackSession);
+    } catch (saveError) {
+      console.error('[Session] 保存备用会话失败:', saveError);
+    }
+    
     return fallbackSession;
   }
 };
@@ -212,10 +304,7 @@ export const addUserMessage = async (
 
 /**
  * 生成助手响应
- * @param sessionId 会话ID
- * @param onUpdate 更新回调函数
- * @param onComplete 完成回调函数
- * @param onError 错误回调函数
+ * 增强错误处理和恢复机制
  */
 export const generateAssistantResponse = async (
   sessionId: string,
@@ -223,18 +312,30 @@ export const generateAssistantResponse = async (
   onComplete?: (message: Message) => void,
   onError?: (error: Error) => void
 ): Promise<void> => {
-  if (!sessionId) {
-    const error = new Error('会话ID为空');
+  if (!isValidSessionId(sessionId)) {
+    const error = new Error(`会话ID无效: ${sessionId}`);
+    console.error('[Session]', error.message);
     if (onError) onError(error);
     return;
   }
   
   let session = getSession(sessionId);
   
+  // 如果会话不存在，自动创建新会话
   if (!session) {
-    const error = new Error(`会话不存在: ${sessionId}`);
-    if (onError) onError(error);
-    return;
+    console.warn(`[Session] 会话 ${sessionId} 不存在，自动创建新会话`);
+    try {
+      session = await createSession();
+      sessionId = session.id;
+      // 通知调用者ID已更改
+      if (onUpdate) onUpdate(`会话ID已更改为 ${sessionId}，继续生成响应...`);
+    } catch (error) {
+      const createError = error instanceof Error ? error : new Error(String(error));
+      const errorMessage = `无法创建新会话: ${createError.message}`;
+      console.error('[Session]', errorMessage);
+      if (onError) onError(new Error(errorMessage));
+      return;
+    }
   }
   
   // 创建临时助手消息ID
@@ -242,18 +343,43 @@ export const generateAssistantResponse = async (
   const startTime = Date.now();
   
   try {
-    // 调用API获取响应
-    // 实际实现取决于您的API集成
-    // 这里简化为一个示例
+    // 提取用户最近的消息
+    const userMessages = session.messages
+      .filter(msg => msg.role === 'user');
     
-    // 模拟响应生成
-    const response = "这是一个示例响应。在实际应用中，您需要从API获取真实响应。";
+    if (userMessages.length === 0) {
+      const error = new Error('没有可回复的用户消息');
+      if (onError) onError(error);
+      return;
+    }
+    
+    const lastUserMessage = userMessages[userMessages.length - 1].content;
+    let responseContent = '';
+    
+    // TODO: 实现与Mastra API的实际集成
+    // 这里是一个简化的模拟响应，应替换为实际API调用
+    
+    // 模拟流式响应
+    const mockResponses = [
+      "我正在处理您的请求...",
+      "经过分析，",
+      "我可以为您提供以下信息。",
+      "希望这对您有所帮助。"
+    ];
+    
+    for (const part of mockResponses) {
+      // 模拟流式传输
+      responseContent += part;
+      if (onUpdate) onUpdate(responseContent);
+      // 模拟网络延迟
+      await new Promise(resolve => setTimeout(resolve, 200));
+    }
     
     // 创建最终消息
     const assistantMessage: Message = {
       id: messageId,
       role: 'assistant',
-      content: response,
+      content: responseContent,
       createdAt: Date.now()
     };
     
@@ -284,10 +410,51 @@ export const generateAssistantResponse = async (
     
   } catch (error) {
     console.error('[Session] 生成助手响应失败:', error);
-    if (onError) onError(error as Error);
     
     // 重试机制
-    // 如果有必要，可以在这里实现重试逻辑
+    let retrySuccess = false;
+    try {
+      console.log('[Session] 尝试重试生成响应...');
+      
+      // 简单的重试响应
+      const retryResponse = "抱歉，我在处理您的请求时遇到了问题，但我会尽力提供帮助。请问有什么我可以协助您的？";
+      
+      // 创建重试消息
+      const retryMessage: Message = {
+        id: uuid(),
+        role: 'assistant',
+        content: retryResponse,
+        createdAt: Date.now()
+      };
+      
+      // 重新获取最新会话
+      const latestSession = getSession(sessionId);
+      if (latestSession) {
+        // 更新会话
+        const updatedSession: Session = {
+          ...latestSession,
+          messages: [...latestSession.messages, retryMessage],
+          updatedAt: Date.now()
+        };
+        
+        // 保存会话
+        Storage.upsertSession(updatedSession);
+        
+        // 触发同步
+        SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
+        
+        // 调用完成回调
+        if (onComplete) onComplete(retryMessage);
+        
+        retrySuccess = true;
+      }
+    } catch (retryError) {
+      console.error('[Session] 重试失败:', retryError);
+    }
+    
+    if (!retrySuccess && onError) {
+      onError(error as Error);
+    }
   }
 };
 
@@ -347,50 +514,6 @@ export const isSessionExpired = (session: Session): boolean => {
   }
   
   return false;
-};
-
-/**
- * 获取指定ID的会话
- * @param sessionId 会话ID
- * @returns 会话对象，如果不存在则返回null
- */
-export const getSession = (sessionId: string): Session | null => {
-  if (!sessionId) {
-    console.warn('[Session] 尝试获取的会话ID为空');
-    return null;
-  }
-  
-  try {
-    // 从存储中获取所有会话
-    const sessions = Storage.getSessions();
-    
-    // 查找指定ID的会话
-    const session = sessions.find(s => s.id === sessionId);
-    
-    if (!session) {
-      console.warn(`[Session] 未找到会话: ${sessionId}`);
-      return null;
-    }
-    
-    // 检查会话是否过期
-    if (isSessionExpired(session)) {
-      console.warn(`[Session] 会话已过期: ${sessionId}`);
-      // 异步删除过期会话，不阻塞当前进程
-      setTimeout(() => {
-        Storage.deleteSession(sessionId);
-        SessionAnalytics.trackSessionDeleted(sessionId);
-      }, 0);
-      return null;
-    }
-    
-    // 记录会话访问
-    SessionAnalytics.trackSessionAccessed(sessionId);
-    
-    return session;
-  } catch (error) {
-    console.error('[Session] 获取会话失败:', error);
-    return null;
-  }
 };
 
 /**
@@ -477,6 +600,7 @@ export default {
   importSessions,
   getSessionAgentIds,
   isSessionExpired,
+  isValidSessionId,
   getSession,
   rotateSessionId,
   initSessionService

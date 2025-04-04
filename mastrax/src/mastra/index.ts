@@ -2,9 +2,9 @@ import { Mastra } from "@mastra/core";
 import { createLogger } from "@mastra/core/logger";
 import { weatherWorkflow } from "./workflows";
 import { agents } from "./agents";
-import { logger } from "./logging";
+import logger from "./logging";
 import { v4 as uuidv4 } from 'uuid';
-import { initDatabase } from "./db";
+import { initDatabaseSync, getDatabaseStatus } from "./db";
 
 // 添加日志扩展
 if (!logger.http) {
@@ -16,16 +16,9 @@ if (!logger.http) {
   };
 }
 
-// 初始化数据库
-initDatabase().then(success => {
-  if (success) {
-    logger.info('数据库初始化成功，应用可以正常使用');
-  } else {
-    logger.error('数据库初始化失败，应用可能无法正常工作');
-  }
-}).catch(error => {
-  logger.error('数据库初始化过程中发生错误', { error });
-});
+// 同步初始化数据库 - 确保在服务器启动前完成
+const dbInitialized = initDatabaseSync();
+logger.info('数据库初始化状态', { initialized: dbInitialized });
 
 // 创建请求处理中间件
 function createRequestMiddleware() {
@@ -142,3 +135,4 @@ export * from "./workflows";
 export * from "./agents";
 export * from "./logging";
 export * from "./tools";
+export { getDatabaseStatus } from "./db";

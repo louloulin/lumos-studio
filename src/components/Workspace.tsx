@@ -71,13 +71,45 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
   const [runningWorkflowId, setRunningWorkflowId] = useState<string | null>(null);
   const [workflowView, setWorkflowView] = useState<'list' | 'editor' | 'run'>('list');
   
-  // 从URL获取初始视图
+  // 从URL获取初始视图和会话信息
   useEffect(() => {
     // 如果接收到currentPage属性，使用它来设置活动视图
     if (currentPage) {
       switch (currentPage) {
         case 'chat':
           setActiveView('chat');
+          // 检查URL中是否有sessionId参数，如果有则使用它
+          const urlParams = new URLSearchParams(window.location.search);
+          const sessionId = urlParams.get('sessionId');
+          const agentId = urlParams.get('agentId');
+          const agentName = urlParams.get('name');
+          
+          if (sessionId) {
+            console.log("从URL获取到sessionId:", sessionId);
+            // 如果URL中有sessionId，检查会话是否存在
+            const session = sessions.find(s => s.id === sessionId);
+            if (session) {
+              // 如果会话存在，选中它
+              setSelectedSessionId(sessionId);
+            } else {
+              console.log("会话不存在，可能需要创建一个新会话");
+              // 如果会话不存在，可能是因为刷新了页面，这里可以尝试重新获取会话数据
+              // 或者直接使用默认会话
+              if (sessions.length > 0) {
+                setSelectedSessionId(sessions[0].id);
+              }
+            }
+          } else if (agentId && agentName) {
+            // 如果有agentId和name参数，先检查是否已存在相同智能体的会话
+            const existingSession = sessions.find(s => s.agentId === agentId);
+            if (existingSession) {
+              // 如果存在，直接使用该会话
+              setSelectedSessionId(existingSession.id);
+            } else {
+              // 否则创建新会话
+              createNewSession(agentId, decodeURIComponent(agentName));
+            }
+          }
           break;
         case 'agents':
           setActiveView('agent-manager');
@@ -94,7 +126,37 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           break;
       }
     }
-  }, [currentPage]);
+  }, [currentPage, sessions, window.location.search]);
+
+  // 监听自定义会话打开事件
+  useEffect(() => {
+    const handleOpenSession = (event: CustomEvent) => {
+      const { sessionId } = event.detail;
+      if (sessionId) {
+        setSelectedSessionId(sessionId);
+        setActiveView('chat');
+        
+        // 更新URL以反映当前会话，但不重新加载页面
+        const url = new URL(window.location.href);
+        url.pathname = '/workspace/chat';
+        url.searchParams.set('sessionId', sessionId);
+        window.history.pushState({}, '', url.toString());
+        
+        // 如果是移动设备，关闭侧边栏
+        if (isMobile) {
+          setMobileSidebarOpen(false);
+        }
+      }
+    };
+
+    // 添加事件监听器
+    window.addEventListener('open-session', handleOpenSession as EventListener);
+
+    // 清除事件监听器
+    return () => {
+      window.removeEventListener('open-session', handleOpenSession as EventListener);
+    };
+  }, [isMobile]);
 
   // 更新路由导航逻辑
   const navigateTo = (view: ViewType, id?: string) => {

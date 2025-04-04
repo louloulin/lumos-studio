@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { PenTool, ArrowRight, Settings, MessageSquare, Bot } from 'lucide-react';
+import AgentModels from '../components/AgentModels';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -17,8 +18,8 @@ const HomePage: React.FC = () => {
         </Button>
       </header>
 
-      {/* 主要内容区域 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      {/* 功能卡片区域 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-6">
         {/* 工作流卡片 */}
         <Card className="overflow-hidden flex flex-col">
           <CardHeader className="pb-2">
@@ -123,6 +124,12 @@ const HomePage: React.FC = () => {
             </Button>
           </CardFooter>
         </Card>
+      </div>
+
+      {/* 智能体模型区域 */}
+      <div className="mb-4">
+        <h2 className="text-xl font-bold mb-4">智能体</h2>
+        <AgentModels />
       </div>
     </div>
   );

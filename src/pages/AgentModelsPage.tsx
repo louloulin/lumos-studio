@@ -1,0 +1,126 @@
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Settings, Download, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { chatService } from '../components/ChatService';
+
+// 智能体类型定义
+interface AgentModel {
+  id: string;
+  name: string;
+  description: string;
+  imageUrl?: string;
+}
+
+// 默认智能体列表
+const agentModels: AgentModel[] = [
+  {
+    id: 'creative-writer',
+    name: '创意写作',
+    description: '帮助创作文章、小说、诗歌等创意内容，提供写作灵感和建议。'
+  },
+  {
+    id: 'gpt-4',
+    name: '通用助手',
+    description: '可以回答各种问题的AI助手'
+  },
+  {
+    id: 'code-assistant',
+    name: '代码助手',
+    description: '帮助解决编程和开发问题'
+  },
+  {
+    id: 'math-solver',
+    name: '数学助手',
+    description: '解答数学问题和计算'
+  }
+];
+
+const AgentModelsPage: React.FC = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState<string | null>(null);
+
+  // 处理开始对话
+  const handleStartChat = async (agentId: string, agentName: string) => {
+    try {
+      setLoading(agentId);
+      
+      // 检查是否有已存在的相同智能体的会话
+      const existingSessions = chatService.getSessions();
+      const existingSession = existingSessions.find(s => s.agentId === agentId);
+      
+      let sessionId;
+      
+      if (existingSession) {
+        // 如果存在相同智能体的会话，使用它
+        sessionId = existingSession.id;
+        console.log("使用现有会话:", sessionId);
+      } else {
+        // 否则创建新会话
+        const session = await chatService.createSession(agentName, agentId);
+        sessionId = session.id;
+        console.log("创建新会话:", sessionId);
+      }
+      
+      // 发送一个自定义事件，让Workspace组件知道需要打开特定会话
+      // 确保在导航前先发送事件
+      console.log("发送open-session事件，sessionId:", sessionId);
+      const event = new CustomEvent('open-session', { 
+        detail: { sessionId: sessionId } 
+      });
+      window.dispatchEvent(event);
+      
+      // 直接导航到工作区聊天页面
+      navigate(`/workspace/chat?sessionId=${sessionId}`);
+    } catch (error) {
+      console.error('创建会话失败:', error);
+      alert('创建会话失败，请重试');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  return (
+    <div className="container py-6">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold">智能体</h1>
+        <p className="text-muted-foreground">管理和使用自定义智能体</p>
+      </header>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {agentModels.map(agent => (
+          <Card key={agent.id} className="flex flex-col">
+            <CardHeader>
+              <CardTitle>{agent.name}</CardTitle>
+              <CardDescription>
+                {agent.description}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow">
+              {/* 可以添加更多内容，如示例问题等 */}
+            </CardContent>
+            <CardFooter className="border-t pt-4">
+              <Button 
+                className="w-full" 
+                onClick={() => handleStartChat(agent.id, agent.name)}
+                disabled={loading === agent.id}
+              >
+                {loading === agent.id ? (
+                  '处理中...' 
+                ) : (
+                  <>
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    开始对话
+                  </>
+                )}
+              </Button>
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default AgentModelsPage; 

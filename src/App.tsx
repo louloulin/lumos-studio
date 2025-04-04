@@ -18,6 +18,7 @@ import HomePage from './pages/HomePage'
 import AgentsPage from './pages/AgentsPage'
 import AgentCreationPage from './pages/AgentCreationPage'
 import AgentMarketPage from './pages/AgentMarketPage'
+import SmartAgentsPage from './pages/SmartAgentsPage'
 import WorkflowListPage from './pages/WorkflowListPage'
 import WorkflowEditorPage from './pages/WorkflowEditorPage'
 import WorkflowRunPage from './pages/WorkflowRunPage'
@@ -36,6 +37,7 @@ function Main() {
     // Get the current route/page from URL
     const [currentPage, setCurrentPage] = useState(() => {
         const path = window.location.pathname;
+        if (path.includes('/workspace/chat')) return 'chat';
         if (path.includes('/chat')) return 'chat';
         if (path.includes('/agents')) return 'agents';
         if (path.includes('/whiteboard')) return 'whiteboard';
@@ -49,7 +51,8 @@ function Main() {
     useEffect(() => {
         const handleRouteChange = () => {
             const path = window.location.pathname;
-            if (path.includes('/chat')) setCurrentPage('chat');
+            if (path.includes('/workspace/chat')) setCurrentPage('chat');
+            else if (path.includes('/chat')) setCurrentPage('chat');
             else if (path.includes('/agents')) setCurrentPage('agents');
             else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
             else if (path.includes('/workflow')) setCurrentPage('workflow');
@@ -58,8 +61,21 @@ function Main() {
             else setCurrentPage('home');
         };
         
+        // Listen for popstate (back/forward browser navigation)
         window.addEventListener('popstate', handleRouteChange);
-        return () => window.removeEventListener('popstate', handleRouteChange);
+        
+        // Also run the handler on URL changes that happen programmatically
+        const originalPushState = window.history.pushState;
+        window.history.pushState = function() {
+            // @ts-ignore
+            originalPushState.apply(this, arguments);
+            handleRouteChange();
+        };
+        
+        return () => {
+            window.removeEventListener('popstate', handleRouteChange);
+            window.history.pushState = originalPushState;
+        };
     }, []);
 
     return (
@@ -183,7 +199,8 @@ export default function App() {
                             <Route path="/" element={<Main />} />
                             <Route path="/whiteboard" element={<Main />} />
                             <Route path="/chat" element={<Main />} />
-                            <Route path="/agents" element={<Main />} />
+                            <Route path="/workspace/chat" element={<Main />} />
+                            <Route path="/agents" element={<SmartAgentsPage />} />
                             <Route path="/agents/create" element={<AgentCreationPage />} />
                             <Route path="/agents/market" element={<AgentMarketPage />} />
                             <Route path="/tools" element={<ToolsPage />} />

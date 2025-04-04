@@ -10,7 +10,7 @@ import * as path from 'path';
 // 定义调试工具的输入类型
 const DebugToolInput = z.object({
   data: z.object({
-    action: z.enum(['info', 'test-api', 'get-logs', 'inspect-request', 'health-check', 'inspect-api-format']),
+    action: z.enum(['info', 'test-api', 'get-logs', 'inspect-request', 'health-check', 'inspect-api-format', 'db-health']),
     params: z.any().optional(),
   }),
 });
@@ -84,6 +84,8 @@ export const debugTool = createTool({
           return healthCheck();
         case 'inspect-api-format':
           return inspectApiFormat(context);
+        case 'db-health':
+          return await checkDatabaseHealth();
         default:
           return {
             success: false,
@@ -104,7 +106,7 @@ export const debugTool = createTool({
       };
     }
   },
-}) as Tool;
+}) as unknown as Tool;
 
 // 新功能：检查API格式，分析传入的参数结构
 const inspectApiFormat = async (originalContext: any) => {
@@ -451,4 +453,58 @@ const healthCheck = async () => {
       }
     };
   }
-}; 
+};
+
+// 在inspectApiFormat函数后添加新函数
+async function checkDatabaseHealth(): Promise<any> {
+  const toolId = 'debug-tool';
+  logger.tool.debug(toolId, '执行数据库健康检查');
+
+  try {
+    // 检查数据库连接
+    const tablesResult = await db.$client.execute("SELECT name FROM sqlite_master WHERE type='table'");
+    const tableNames = tablesResult.rows.map(row => row.name);
+    
+    // 检查所需表是否存在
+    const requiredTables = ['agents', 'agent_logs'];
+    const missingTables = requiredTables.filter(table => !tableNames.includes(table));
+    
+    if (missingTables.length > 0) {
+      return {
+        status: 'warning',
+        message: `数据库连接正常，但缺少表: ${missingTables.join(', ')}`,
+        tables: tableNames,
+        databaseFile: db.$client.url,
+        missingTables
+      };
+    }
+    
+    // 尝试查询agents表
+    try {
+      const agentsCount = await db.select({ count: sql`count(*)` }).from(agents);
+      
+      return {
+        status: 'healthy',
+        message: '数据库连接正常，所有表存在',
+        agentsCount: agentsCount[0]?.count || 0,
+        tables: tableNames,
+        databaseFile: db.$client.url
+      };
+    } catch (queryError) {
+      return {
+        status: 'error',
+        message: '数据库表存在但查询失败',
+        error: queryError instanceof Error ? queryError.message : String(queryError),
+        tables: tableNames,
+        databaseFile: db.$client.url
+      };
+    }
+  } catch (error) {
+    return {
+      status: 'error',
+      message: '数据库连接失败',
+      error: error instanceof Error ? error.message : String(error),
+      databaseFile: db.$client.url
+    };
+  }
+} 

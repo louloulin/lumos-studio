@@ -13,6 +13,9 @@ import { VoiceRecorder } from './VoiceRecorder';
 import { SpeechPlayer } from './SpeechPlayer';
 import * as SessionService from '../services/session';
 import { Session } from '../services/types';
+import { v4 as uuid } from 'uuid';
+import SessionAnalytics from '../services/sessionAnalytics';
+import SessionSync from '../services/sessionSync';
 
 // 定义消息类型
 interface Message {
@@ -178,38 +181,97 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
   useEffect(() => {
     const fetchChatHistory = async () => {
       try {
-        // 从聊天服务获取会话数据
-        const session = await chatService.getSession(sessionId);
+        let sessionData = null;
+        let sessionHistoryFound = false;
         
-        if (!session) {
-          // 如果会话不存在，创建新会话
-          await chatService.createSession(
-            selectedAgent?.name || '新对话', 
-            agentId
-          );
-          setMessages([]);
-          return;
+        // 从SessionService获取会话
+        try {
+          // 使用新添加的getSession函数
+          const sessionFromService = SessionService.getSession(sessionId);
+          
+          if (sessionFromService) {
+            console.log(`[MastraChat] 从SessionService获取到会话: ${sessionId}`);
+            setSession(sessionFromService);
+            sessionData = sessionFromService;
+            // 如果有消息，直接展示
+            if (sessionFromService.messages && sessionFromService.messages.length > 0) {
+              const chatMessages: Message[] = sessionFromService.messages.map(msg => ({
+                id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+                role: msg.role as 'user' | 'assistant' | 'system',
+                content: msg.content || '',
+                timestamp: msg.createdAt ? new Date(msg.createdAt as number) : new Date()
+              }));
+              setMessages(chatMessages);
+              sessionHistoryFound = true;
+            }
+          }
+        } catch (sessionServiceErr) {
+          console.warn(`[MastraChat] 从SessionService获取会话失败: ${sessionServiceErr}`);
         }
-      
-        // 获取当前节点ID
-        setCurrentNodeId(session.currentNodeId);
         
-        // 获取对话历史
-        const history = await chatService.getChatHistory(sessionId);
+        // 如果SessionService没有找到会话历史，尝试从chatService获取
+        if (!sessionHistoryFound) {
+          try {
+            // 从聊天服务获取会话数据
+            const chatSession = await chatService.getSession(sessionId);
+            
+            if (chatSession) {
+              // 获取当前节点ID
+              setCurrentNodeId(chatSession.currentNodeId);
+              
+              // 获取对话历史
+              const history = await chatService.getChatHistory(sessionId);
+              
+              // 转换为消息格式
+              const chatMessages: Message[] = history.map(node => ({
+                id: node.id,
+                role: node.role,
+                content: node.text,
+                timestamp: node.timestamp
+              }));
+              
+              setMessages(chatMessages);
+              
+              // 获取完整对话树
+              const tree = await chatService.getChatTree(sessionId);
+              setChatTree(tree);
+              sessionHistoryFound = true;
+            }
+          } catch (chatServiceErr) {
+            console.warn(`[MastraChat] 从ChatService获取会话失败: ${chatServiceErr}`);
+          }
+        }
         
-        // 转换为消息格式
-        const chatMessages: Message[] = history.map(node => ({
-          id: node.id,
-          role: node.role,
-          content: node.text,
-          timestamp: node.timestamp
-        }));
-        
-        setMessages(chatMessages);
-        
-        // 获取完整对话树
-        const tree = await chatService.getChatTree(sessionId);
-        setChatTree(tree);
+        // 如果两个服务都没有找到会话，创建新会话
+        if (!sessionHistoryFound) {
+          console.log(`[MastraChat] 未找到会话 ${sessionId}，创建新会话`);
+          try {
+            // 首先尝试使用SessionService创建会话
+            const newSession = SessionService.createSession(selectedAgent?.id || 'generalAssistant', selectedAgent?.name || '新对话');
+            setSession(newSession);
+            console.log(`[MastraChat] 使用SessionService创建新会话: ${newSession.id}`);
+          } catch (createSessionErr) {
+            console.warn(`[MastraChat] 使用SessionService创建会话失败: ${createSessionErr}`);
+            
+            // 如果SessionService创建失败，尝试使用chatService创建
+            try {
+              await chatService.createSession(
+                selectedAgent?.name || '新对话', 
+                selectedAgent?.id || 'generalAssistant'
+              );
+              console.log(`[MastraChat] 使用chatService创建新会话`);
+            } catch (createChatSessionErr) {
+              console.error(`[MastraChat] 无法创建会话: ${createChatSessionErr}`);
+              toast({
+                title: '创建会话失败',
+                description: '无法创建新的会话，请刷新页面或重新启动应用。',
+                variant: 'destructive',
+              });
+            }
+          }
+          
+          setMessages([]);
+        }
       } catch (error) {
         console.error('Error fetching chat history:', error);
         toast({
@@ -225,10 +287,49 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
     }
   }, [sessionId, agentId, selectedAgent, toast]);
 
+  // 在fetchChatHistory函数中，集成会话同步订阅
+  useEffect(() => {
+    // 订阅会话同步事件，当会话在其他标签页更新时更新UI
+    let unsubscribe: (() => void) | null = null;
+    
+    if (sessionId) {
+      unsubscribe = SessionSync.subscribeToSessionSync((detail) => {
+        if (detail.key === 'lumos-chat-sessions') {
+          console.log('[MastraChat] 检测到会话数据更新，刷新会话');
+          // 重新获取会话
+          const updatedSession = SessionService.getSession(sessionId);
+          if (updatedSession) {
+            setSession(updatedSession);
+            // 更新消息列表
+            const chatMessages = updatedSession.messages.map(msg => ({
+              id: msg.id || `msg-${Date.now()}-${Math.random()}`,
+              role: msg.role as 'user' | 'assistant' | 'system',
+              content: msg.content || '',
+              timestamp: msg.createdAt ? new Date(msg.createdAt as number) : new Date()
+            }));
+            setMessages(chatMessages);
+          }
+        } else if (detail.key === 'lumos-active-session' && detail.newValue === sessionId) {
+          console.log('[MastraChat] 当前会话被设置为活跃会话');
+          // 可以在此添加额外处理逻辑
+        }
+      });
+    }
+    
+    // 在组件卸载时取消订阅
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [sessionId]);
+
   // 发送消息
   const handleSubmit = async () => {
     if (!inputValue.trim() || isLoading || !session) return;
     
+    const startTime = Date.now(); // 记录开始时间
+
     try {
       // 清空输入框和设置加载状态
       const userMessage = inputValue.trim();
@@ -250,7 +351,10 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       }
       
       // 添加用户消息到会话
-      const updatedSession = SessionService.addUserMessage(sessionId, userMessage);
+      const updatedSessionPromise = SessionService.addUserMessage(sessionId, userMessage);
+      
+      // 使用await等待Promise解析
+      const updatedSession = await updatedSessionPromise;
       
       if (!updatedSession) {
         console.error('[MastraChat] 添加用户消息失败');
@@ -347,6 +451,23 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       const onComplete = (updatedSession: Session) => {
         console.log(`[MastraChat] 生成完成, 新会话长度: ${updatedSession.messages.length}`);
         
+        // 计算响应时间
+        const responseTime = Date.now() - startTime;
+        console.log(`[MastraChat] 响应时间: ${responseTime}ms`);
+        
+        // 记录消息分析数据
+        const lastAssistantMessage = updatedSession.messages
+          .filter(msg => msg.role === 'assistant')
+          .pop();
+          
+        if (lastAssistantMessage) {
+          SessionAnalytics.trackMessageAdded(
+            sessionId, 
+            lastAssistantMessage,
+            responseTime
+          );
+        }
+        
         // 移除临时消息并添加完整的助手消息
         setMessages(prevMessages => {
           // 过滤掉所有临时消息
@@ -378,9 +499,6 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
                   isStreaming: false
                 }
               ];
-            } else {
-              console.log(`[MastraChat] 跳过添加重复消息`);
-              return filteredMessages;
             }
           }
           
@@ -388,6 +506,28 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         });
         
         setIsLoading(false);
+        setSession(updatedSession);
+        
+        // 更新会话ID，增强安全性
+        // 这里仅在完成重要操作（如添加敏感信息）后执行轮换
+        if (updatedSession.messages.length > 0 && updatedSession.messages.length % 5 === 0) {
+          try {
+            const rotatedSession = SessionService.rotateSessionId(sessionId);
+            if (rotatedSession) {
+              console.log(`[MastraChat] 会话ID已轮换: ${sessionId} -> ${rotatedSession.id}`);
+              // 由于ID已更改，需要更新URL
+              const newUrl = window.location.pathname + '?sessionId=' + rotatedSession.id;
+              window.history.replaceState({}, '', newUrl);
+              // 更新组件状态中的会话
+              setSession(rotatedSession);
+            }
+          } catch (rotateError) {
+            console.error('[MastraChat] 轮换会话ID失败:', rotateError);
+          }
+        }
+        
+        // 备份会话
+        SessionSync.backupSessions();
       };
       
       // 错误回调
@@ -422,7 +562,6 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       // 使用会话服务生成响应
       await SessionService.generateAssistantResponse(
         sessionId,
-        undefined,
         onUpdate,
         onComplete,
         onError

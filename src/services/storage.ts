@@ -38,26 +38,21 @@ export const getSessions = (): Session[] => {
  */
 export const saveSessions = (sessions: Session[]): void => {
   try {
-    // 验证会话格式
+    // 验证参数
     if (!Array.isArray(sessions)) {
-      console.error('[StorageService] 会话数据不是数组');
+      console.error('[StorageService] 保存会话失败: sessions 不是数组');
       return;
     }
     
-    // 确保每个会话都有必要的属性
-    const validSessions = sessions.filter(session => {
-      if (!session || typeof session !== 'object') {
-        console.warn('[StorageService] 跳过无效的会话数据:', session);
-        return false;
-      }
-      
-      if (!session.id) {
-        console.warn('[StorageService] 跳过缺少ID的会话');
-        return false;
-      }
-      
-      return true;
-    });
+    // 过滤有效的会话
+    const validSessions = sessions.filter(session => 
+      session && typeof session === 'object' && session.id && 
+      typeof session.id === 'string'
+    );
+    
+    if (validSessions.length !== sessions.length) {
+      console.warn(`[StorageService] 过滤了 ${sessions.length - validSessions.length} 个无效会话`);
+    }
     
     // 确保不会存储太多会话，最多保留30个
     const MAX_SESSIONS = 30;
@@ -69,57 +64,47 @@ export const saveSessions = (sessions: Session[]): void => {
         }).slice(0, MAX_SESSIONS)
       : validSessions;
     
-    // 设置重试次数
-    let retries = 0;
-    const MAX_RETRIES = 3;
-    
-    const attemptSave = () => {
-      try {
-        localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessionsToSave));
-        console.log(`[StorageService] 成功保存 ${sessionsToSave.length} 个会话`);
-      } catch (saveError) {
-        if (retries < MAX_RETRIES) {
-          retries++;
-          console.warn(`[StorageService] 保存失败，重试 (${retries}/${MAX_RETRIES}):`, saveError);
-          
-          // 如果是存储空间不足，尝试清理一些会话
-          if (sessionsToSave.length > 5) {
-            console.warn(`[StorageService] 尝试通过减少会话数量来保存`);
-            // 只保留最近的5个会话
-            const reducedSessions = sessionsToSave
-              .sort((a, b) => {
-                const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
-                const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
-                return bTime - aTime;
-              })
-              .slice(0, 5);
-            localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(reducedSessions));
-            console.log(`[StorageService] 保存了最新的5个会话作为备选方案`);
-          }
-        } else {
-          // 最后一次尝试 - 只保存一个会话
-          try {
-            const latestSession = sessionsToSave
-              .sort((a, b) => {
-                const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
-                const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
-                return bTime - aTime;
-              })[0];
-            
-            if (latestSession) {
-              localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify([latestSession]));
-              console.log(`[StorageService] 保存了最新会话作为最后的备选方案`);
-            }
-          } catch (finalError) {
-            console.error('[StorageService] 所有尝试都失败:', finalError);
-          }
-        }
+    // 尝试保存到本地存储
+    try {
+      localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessionsToSave));
+      console.log(`[StorageService] 保存了 ${sessionsToSave.length} 个会话到本地存储`);
+    } catch (storageError) {
+      console.error('[StorageService] 保存会话到本地存储失败:', storageError);
+      
+      // 如果是存储空间不足，尝试清理一些会话
+      if (sessionsToSave.length > 5) {
+        console.warn(`[StorageService] 尝试通过减少会话数量来保存`);
+        // 只保留最近的5个会话
+        const reducedSessions = sessionsToSave
+          .sort((a, b) => {
+            const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+            const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+            return bTime - aTime;
+          })
+          .slice(0, 5);
+        localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(reducedSessions));
+        console.log(`[StorageService] 保存了最新的5个会话作为备选方案`);
       }
-    };
-    
-    attemptSave();
+      
+      // 最后一次尝试 - 只保存一个会话
+      try {
+        const latestSession = sessionsToSave
+          .sort((a, b) => {
+            const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+            const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+            return bTime - aTime;
+          })[0];
+        
+        if (latestSession) {
+          localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify([latestSession]));
+          console.log(`[StorageService] 保存了最新会话作为最后的备选方案`);
+        }
+      } catch (finalError) {
+        console.error('[StorageService] 所有尝试都失败:', finalError);
+      }
+    }
   } catch (error) {
-    console.error('[StorageService] 保存会话时发生错误:', error);
+    console.error('[StorageService] 保存会话时发生未知错误:', error);
   }
 };
 

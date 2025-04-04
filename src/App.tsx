@@ -29,6 +29,7 @@ import WorkflowPage from './pages/WorkflowPage'
 import PluginMarketPage from './pages/PluginMarketPage'
 import { pluginManager } from './plugins/PluginManager'
 import { registerCorePlugins } from './plugins'
+import { SessionService } from './services'
 
 // The Window interface is now defined in window.d.ts
 
@@ -180,6 +181,12 @@ export default function App() {
         };
         
         initPlugins();
+    }, []);
+
+    // 初始化会话服务
+    useEffect(() => {
+        SessionService.initSessionService();
+        console.log('会话服务已初始化');
     }, []);
 
     if (!initialized) {

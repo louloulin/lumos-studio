@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { MessageSquare } from 'lucide-react';
-import { chatService } from './ChatService';
+import * as SessionService from '../services/session';
 import { useNavigate } from 'react-router-dom';
 
 // 智能体类型定义
@@ -49,20 +49,23 @@ const AgentModels: React.FC<AgentModelsProps> = ({ className = '' }) => {
       setLoading(agentId);
       
       // 检查是否有已存在的相同智能体的会话
-      const existingSessions = chatService.getSessions();
-      const existingSession = existingSessions.find(s => s.agentId === agentId);
+      const sessions = SessionService.getSessions();
+      const existingSession = sessions.find((s: { agentId: string }) => s.agentId === agentId);
       
       let sessionId;
       
       if (existingSession) {
         // 如果存在相同智能体的会话，使用它
         sessionId = existingSession.id;
-        console.log("使用现有会话:", sessionId);
+        console.log("[SessionService] 使用现有会话:", sessionId);
+        
+        // 设置为活跃会话
+        SessionService.setActiveSession(sessionId);
       } else {
         // 否则创建新会话
-        const session = await chatService.createSession(agentName, agentId);
+        const session = SessionService.createSession(agentId, agentName);
         sessionId = session.id;
-        console.log("创建新会话:", sessionId);
+        console.log("[SessionService] 创建新会话:", sessionId);
       }
       
       // 发送一个自定义事件，让Workspace组件知道需要打开特定会话

@@ -2,6 +2,8 @@ import { v4 as uuid } from 'uuid';
 import { Agent, Message, Session, GenerateConfig } from './types';
 import * as ChatService from './chat';
 import * as Storage from './storage';
+import SessionSync from './sessionSync';
+import SessionAnalytics from './sessionAnalytics';
 
 /**
  * 获取会话列表
@@ -32,75 +34,65 @@ export const setActiveSession = (sessionId: string): void => {
 };
 
 /**
- * 创建新会话
- * @param agentId 智能体ID
- * @param title 会话标题
+ * 创建新的会话
  * @returns 新创建的会话
  */
-export const createSession = (agentId: string, title: string = '新会话'): Session => {
+export const createSession = async (agentId: string = 'generalAssistant', title: string = 'New Chat'): Promise<Session> => {
   try {
-    console.log(`[SessionService] 开始创建新会话, agentId: ${agentId}, title: ${title}`);
+    console.log('[Session] 创建新会话');
     
-    // 检查是否有空会话
+    // 检查是否有可重用的空会话
     const sessions = Storage.getSessions();
-    const emptySession = sessions.find(s => s.messages.length === 0);
+    const emptySession = sessions.find(s => 
+      s.messages.length === 0 || (s.messages.length === 1 && s.messages[0].role === 'system')
+    );
     
-    // 如果有空会话，复用它而不是创建新会话
-    if (emptySession) {
-      console.log(`[SessionService] 发现空会话 ${emptySession.id}，复用而不是创建新会话`);
-      const updatedSession = ChatService.updateSessionTitle({...emptySession, agentId}, title);
+    if (emptySession && !isSessionExpired(emptySession)) {
+      console.log(`[Session] 重用空会话: ${emptySession.id}`);
+      // 更新时间戳
+      const updatedSession = {
+        ...emptySession,
+        updatedAt: Date.now()
+      };
       Storage.upsertSession(updatedSession);
-      Storage.setActiveSessionId(updatedSession.id);
+      SessionAnalytics.trackSessionAccessed(updatedSession.id);
       return updatedSession;
     }
     
-    // 创建全新会话
-    const sessionId = uuid(); // 预先生成ID，确保一致性
-    const session = ChatService.createSession(agentId, title);
-    
-    // 确保session不为null
-    if (!session) {
-      console.error('[SessionService] ChatService.createSession返回null或undefined');
-      // 创建备选会话
-      const fallbackSession: Session = {
-        id: sessionId,
-        title: title || '新会话',
-        agentId: agentId || 'generalAssistant',
-        messages: [],
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      };
-      Storage.upsertSession(fallbackSession);
-      Storage.setActiveSessionId(fallbackSession.id);
-      return fallbackSession;
-    }
-    
-    console.log(`[SessionService] 会话创建成功: ${session.id}`);
-    
-    // 持久化会话
-    Storage.upsertSession(session);
-    Storage.setActiveSessionId(session.id);
-    return session;
-  } catch (error) {
-    console.error('[SessionService] 创建会话失败:', error);
-    
-    // 确保即使发生错误也能返回有效会话
-    const fallbackSession: Session = {
+    // 创建新会话
+    const timestamp = Date.now();
+    const session: Session = {
       id: uuid(),
-      title: title || '新会话',
-      agentId: agentId || 'generalAssistant',
-      messages: [],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      title: title,
+      agentId: agentId,
+      messages: []
     };
     
-    try {
-      Storage.upsertSession(fallbackSession);
-      Storage.setActiveSessionId(fallbackSession.id);
-    } catch (storageError) {
-      console.error('[SessionService] 存储备用会话失败:', storageError);
-    }
+    // 保存会话
+    Storage.upsertSession(session);
+    Storage.setActiveSessionId(session.id);
     
+    // 记录分析数据
+    SessionAnalytics.trackSessionCreated(session.id);
+    
+    // 触发同步
+    SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
+    SessionSync.triggerSessionSync('lumos-active-session', session.id);
+    
+    return session;
+  } catch (error) {
+    console.error('[Session] 创建会话失败:', error);
+    // 即使出错也返回一个有效的会话
+    const fallbackSession: Session = {
+      id: uuid(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      title: 'New Chat (Fallback)',
+      agentId: agentId,
+      messages: []
+    };
     return fallbackSession;
   }
 };
@@ -151,47 +143,69 @@ export const clearSessionMessages = (sessionId: string): Session | null => {
  * @param content 消息内容
  * @returns 更新后的会话
  */
-export const addUserMessage = (sessionId: string, content: string): Session | null => {
+export const addUserMessage = async (
+  sessionId: string,
+  content: string
+): Promise<Session | null> => {
   try {
-    console.log(`[SessionService] 添加用户消息到会话 ${sessionId}`);
-    const sessions = Storage.getSessions();
-    let session = sessions.find(s => s.id === sessionId);
-    
-    // 如果会话不存在，创建一个新会话
-    if (!session) {
-      console.warn(`[SessionService] 会话 ${sessionId} 不存在，创建新会话`);
-      session = createSession('generalAssistant', '新会话');
-      if (!session) {
-        throw new Error(`无法为消息创建会话: ${content}`);
-      }
+    if (!sessionId) {
+      console.error('[Session] 添加用户消息失败: 会话ID为空');
+      return null;
     }
     
-    // 创建用户消息
-    const message: Message = {
-      id: uuid(),
-      role: 'user',
-      content,
-      createdAt: Date.now(),
-    };
+    let session = getSession(sessionId);
     
-    // 防止重复消息
+    // 如果会话不存在，创建新会话
+    if (!session) {
+      console.log('[Session] 会话不存在，创建新会话');
+      session = await createSession();
+      sessionId = session.id;
+    }
+    
+    // 检查是否是重复消息
     const isDuplicate = session.messages.some(
       msg => msg.role === 'user' && msg.content === content
     );
     
     if (isDuplicate) {
-      console.warn(`[SessionService] 检测到重复消息，跳过添加`);
+      console.log('[Session] 跳过重复的用户消息');
       return session;
     }
     
+    // 创建用户消息
+    const userMessage: Message = {
+      id: uuid(),
+      role: 'user',
+      content,
+      createdAt: Date.now()
+    };
+    
     // 更新会话
-    const updatedSession = ChatService.addMessage(session, message);
+    const updatedSession: Session = {
+      ...session,
+      messages: [...session.messages, userMessage],
+      updatedAt: Date.now()
+    };
+    
+    // 如果是第一条消息，设置会话标题
+    if (session.messages.length === 0 || (session.messages.length === 1 && session.messages[0].role === 'system')) {
+      // 使用用户消息的前20个字符作为标题
+      const titlePreview = content.substring(0, 20);
+      updatedSession.title = titlePreview + (content.length > 20 ? '...' : '');
+    }
+    
+    // 保存会话
     Storage.upsertSession(updatedSession);
     
-    console.log(`[SessionService] 用户消息已添加，会话现在有 ${updatedSession.messages.length} 条消息`);
+    // 记录消息分析
+    SessionAnalytics.trackMessageAdded(sessionId, userMessage);
+    
+    // 触发同步
+    SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
+    
     return updatedSession;
   } catch (error) {
-    console.error('[SessionService] 添加用户消息失败:', error);
+    console.error('[Session] 添加用户消息失败:', error);
     return null;
   }
 };
@@ -199,149 +213,82 @@ export const addUserMessage = (sessionId: string, content: string): Session | nu
 /**
  * 生成助手响应
  * @param sessionId 会话ID
- * @param config 生成配置
- * @param onMessageUpdate 消息更新回调
- * @param onComplete 完成回调
- * @param onError 错误回调
+ * @param onUpdate 更新回调函数
+ * @param onComplete 完成回调函数
+ * @param onError 错误回调函数
  */
 export const generateAssistantResponse = async (
   sessionId: string,
-  config?: GenerateConfig,
-  onMessageUpdate?: (content: string) => void,
-  onComplete?: (session: Session) => void,
+  onUpdate?: (content: string) => void,
+  onComplete?: (message: Message) => void,
   onError?: (error: Error) => void
 ): Promise<void> => {
-  console.log(`[SessionService] 为会话 ${sessionId} 生成助手响应`);
+  if (!sessionId) {
+    const error = new Error('会话ID为空');
+    if (onError) onError(error);
+    return;
+  }
   
-  const sessions = Storage.getSessions();
-  const session = sessions.find(s => s.id === sessionId);
+  let session = getSession(sessionId);
   
   if (!session) {
-    const errorMsg = `会话不存在: ${sessionId}`;
-    console.error(`[SessionService] ${errorMsg}`);
-    if (onError) onError(new Error(errorMsg));
+    const error = new Error(`会话不存在: ${sessionId}`);
+    if (onError) onError(error);
     return;
   }
   
-  if (session.messages.length === 0) {
-    const errorMsg = `会话 ${sessionId} 没有消息，无法生成响应`;
-    console.warn(`[SessionService] ${errorMsg}`);
-    if (onError) onError(new Error(errorMsg));
-    return;
+  // 创建临时助手消息ID
+  const messageId = uuid();
+  const startTime = Date.now();
+  
+  try {
+    // 调用API获取响应
+    // 实际实现取决于您的API集成
+    // 这里简化为一个示例
+    
+    // 模拟响应生成
+    const response = "这是一个示例响应。在实际应用中，您需要从API获取真实响应。";
+    
+    // 创建最终消息
+    const assistantMessage: Message = {
+      id: messageId,
+      role: 'assistant',
+      content: response,
+      createdAt: Date.now()
+    };
+    
+    // 更新会话
+    const updatedSession: Session = {
+      ...session,
+      messages: [...session.messages, assistantMessage],
+      updatedAt: Date.now()
+    };
+    
+    // 保存会话
+    Storage.upsertSession(updatedSession);
+    
+    // 计算响应时间
+    const responseTime = Date.now() - startTime;
+    
+    // 记录消息分析
+    SessionAnalytics.trackMessageAdded(sessionId, assistantMessage, responseTime);
+    
+    // 触发同步
+    SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
+    
+    // 调用完成回调
+    if (onComplete) onComplete(assistantMessage);
+    
+    // 备份会话
+    SessionSync.backupSessions();
+    
+  } catch (error) {
+    console.error('[Session] 生成助手响应失败:', error);
+    if (onError) onError(error as Error);
+    
+    // 重试机制
+    // 如果有必要，可以在这里实现重试逻辑
   }
-  
-  // 创建一个标记，防止重复处理完成事件
-  let isCompleted = false;
-  let inProgress = true;
-  let retryCount = 0;
-  const MAX_RETRIES = 2;
-  
-  // 设置超时保护，确保响应最终完成
-  const timeoutId = setTimeout(() => {
-    if (inProgress && !isCompleted) {
-      console.warn(`[SessionService] 响应生成超时，强制完成`);
-      isCompleted = true;
-      inProgress = false;
-      
-      // 创建一个超时响应消息
-      const timeoutMessage: Message = {
-        id: uuid(),
-        role: 'assistant',
-        content: '抱歉，响应生成超时。请尝试再次发送您的问题。',
-        createdAt: Date.now(),
-      };
-      
-      // 将超时消息添加到会话
-      const updatedSession = ChatService.addMessage(session, timeoutMessage);
-      Storage.upsertSession(updatedSession);
-      
-      if (onComplete) {
-        onComplete(updatedSession);
-      }
-    }
-  }, 60000); // 60秒超时
-  
-  const tryGenerate = async () => {
-    try {
-      await ChatService.generateResponse(
-        session,
-        config,
-        (content) => {
-          if (onMessageUpdate && !isCompleted) onMessageUpdate(content);
-        },
-        (message) => {
-          clearTimeout(timeoutId);
-          
-          // 防止重复处理完成事件
-          if (isCompleted) {
-            console.log('[SessionService] 忽略重复的完成回调');
-            return;
-          }
-          
-          isCompleted = true;
-          inProgress = false;
-          
-          try {
-            // 如果生成的消息为空，添加一个提示
-            if (!message.content || message.content.trim() === '') {
-              message.content = '抱歉，我无法为此生成回复。请尝试用不同的方式提问。';
-            }
-            
-            // 将生成的消息添加到会话
-            const updatedSession = ChatService.addMessage(session, message);
-            Storage.upsertSession(updatedSession);
-            
-            // 确保我们只触发一次onComplete回调
-            if (onComplete) {
-              console.log('[SessionService] 调用onComplete回调');
-              onComplete(updatedSession);
-            }
-          } catch (err) {
-            console.error('[SessionService] 处理完成回调时出错:', err);
-            if (onError && !isCompleted) onError(err instanceof Error ? err : new Error('处理完成回调时出错'));
-          }
-        },
-        (error) => {
-          console.error('[SessionService] 生成响应错误:', error);
-          
-          if (retryCount < MAX_RETRIES) {
-            retryCount++;
-            console.log(`[SessionService] 重试生成响应 (${retryCount}/${MAX_RETRIES})`);
-            return tryGenerate();
-          }
-          
-          clearTimeout(timeoutId);
-          
-          if (!isCompleted) {
-            isCompleted = true;
-            inProgress = false;
-            
-            if (onError) onError(error);
-          }
-        }
-      );
-    } catch (error) {
-      console.error('[SessionService] 生成响应出现异常:', error);
-      
-      if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        console.log(`[SessionService] 重试生成响应 (${retryCount}/${MAX_RETRIES})`);
-        return tryGenerate();
-      }
-      
-      clearTimeout(timeoutId);
-      
-      if (!isCompleted) {
-        isCompleted = true;
-        inProgress = false;
-        
-        if (onError) onError(error instanceof Error ? error : new Error('生成响应失败'));
-      }
-    }
-  };
-  
-  // 开始生成响应
-  await tryGenerate();
 };
 
 /**
@@ -371,6 +318,151 @@ export const getSessionAgentIds = (): string[] => {
   return Array.from(agentIdsSet);
 };
 
+/**
+ * 检查会话是否已过期
+ * @param session 要检查的会话
+ * @returns 如果会话已过期则返回true，否则返回false
+ */
+export const isSessionExpired = (session: Session): boolean => {
+  if (!session) return true;
+  
+  const now = Date.now();
+  const lastUpdated = session.updatedAt || session.createdAt || now;
+  
+  // 会话闲置超过7天视为过期
+  const IDLE_TIMEOUT = 7 * 24 * 60 * 60 * 1000; // 7天
+  // 会话存在超过30天视为绝对过期
+  const ABSOLUTE_TIMEOUT = 30 * 24 * 60 * 60 * 1000; // 30天
+  
+  // 检查闲置超时
+  if (now - Number(lastUpdated) > IDLE_TIMEOUT) {
+    console.log(`[Session] 会话 ${session.id} 已闲置超过7天，被标记为过期`);
+    return true;
+  }
+  
+  // 检查绝对超时
+  if (now - Number(session.createdAt) > ABSOLUTE_TIMEOUT) {
+    console.log(`[Session] 会话 ${session.id} 已存在超过30天，被标记为绝对过期`);
+    return true;
+  }
+  
+  return false;
+};
+
+/**
+ * 获取指定ID的会话
+ * @param sessionId 会话ID
+ * @returns 会话对象，如果不存在则返回null
+ */
+export const getSession = (sessionId: string): Session | null => {
+  if (!sessionId) {
+    console.warn('[Session] 尝试获取的会话ID为空');
+    return null;
+  }
+  
+  try {
+    // 从存储中获取所有会话
+    const sessions = Storage.getSessions();
+    
+    // 查找指定ID的会话
+    const session = sessions.find(s => s.id === sessionId);
+    
+    if (!session) {
+      console.warn(`[Session] 未找到会话: ${sessionId}`);
+      return null;
+    }
+    
+    // 检查会话是否过期
+    if (isSessionExpired(session)) {
+      console.warn(`[Session] 会话已过期: ${sessionId}`);
+      // 异步删除过期会话，不阻塞当前进程
+      setTimeout(() => {
+        Storage.deleteSession(sessionId);
+        SessionAnalytics.trackSessionDeleted(sessionId);
+      }, 0);
+      return null;
+    }
+    
+    // 记录会话访问
+    SessionAnalytics.trackSessionAccessed(sessionId);
+    
+    return session;
+  } catch (error) {
+    console.error('[Session] 获取会话失败:', error);
+    return null;
+  }
+};
+
+/**
+ * 轮换会话ID以提高安全性
+ * 此函数在进行重要操作后调用，如权限更改
+ * 
+ * @param sessionId 当前会话ID
+ * @returns 更新后的会话，如果会话不存在则返回null
+ */
+export const rotateSessionId = (sessionId: string): Session | null => {
+  try {
+    // 获取当前会话
+    const session = getSession(sessionId);
+    
+    // 如果会话不存在，返回null
+    if (!session) {
+      console.warn(`[Session] 无法轮换ID: 会话不存在 (${sessionId})`);
+      return null;
+    }
+    
+    // 生成新的会话ID
+    const newSessionId = uuid();
+    console.log(`[Session] 轮换会话ID: ${sessionId} -> ${newSessionId}`);
+    
+    // 创建更新后的会话对象
+    const updatedSession: Session = {
+      ...session,
+      id: newSessionId,
+      updatedAt: Date.now()
+    };
+    
+    // 保存更新后的会话
+    Storage.upsertSession(updatedSession);
+    
+    // 如果当前会话是活跃会话，更新活跃会话ID
+    const activeSessionId = Storage.getActiveSessionId();
+    if (activeSessionId === sessionId) {
+      Storage.setActiveSessionId(newSessionId);
+    }
+    
+    // 删除旧会话
+    Storage.deleteSession(sessionId);
+    
+    // 记录会话访问
+    SessionAnalytics.trackSessionAccessed(newSessionId);
+    
+    // 触发同步
+    SessionSync.triggerSessionSync('lumos-chat-sessions', Storage.getSessions());
+    SessionSync.triggerSessionSync('lumos-active-session', Storage.getActiveSessionId());
+    
+    return updatedSession;
+  } catch (error) {
+    console.error('[Session] 轮换会话ID失败:', error);
+    return null;
+  }
+};
+
+/**
+ * 初始化会话服务
+ * 在应用启动时调用一次
+ */
+export const initSessionService = (): void => {
+  try {
+    // 初始化会话同步
+    SessionSync.initSessionSync();
+    
+    console.log('[Session] 会话服务已初始化');
+  } catch (error) {
+    console.error('[Session] 初始化会话服务失败:', error);
+  }
+};
+
 export default {
   getSessions,
   getActiveSession,
@@ -384,4 +476,8 @@ export default {
   exportSessions,
   importSessions,
   getSessionAgentIds,
+  isSessionExpired,
+  getSession,
+  rotateSessionId,
+  initSessionService
 }; 

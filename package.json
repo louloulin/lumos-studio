@@ -15,6 +15,7 @@
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "types:check": "tsc --noEmit",
+    "test": "vitest run",
     "dex": "concurrently \"cd mastrax && mastra dev\" \"bun run dev\""
   },
   "dependencies": {
@@ -99,6 +100,7 @@
     "@testing-library/react": "^14.0.0",
     "@types/gtag.js": "^0.0.13",
     "@types/highlight.js": "^10.1.0",
+    "@types/jsdom": "^21.1.7",
     "@types/lodash": "^4.14.197",
     "@types/node": "^20.2.5",
     "@types/react": "^18.2.8",
@@ -109,12 +111,14 @@
     "autoprefixer": "^10.4.14",
     "clsx": "^2.1.1",
     "drizzle-kit": "^0.30.5",
+    "jsdom": "^26.0.0",
     "postcss": "^8.4.25",
     "shadcn": "2.4.0-canary.17",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^3.4.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.1.1"
   }
 }

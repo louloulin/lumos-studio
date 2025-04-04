@@ -21,7 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Agent } from '@/api/types';
-import { chatService } from '../components/ChatService';
+import * as SessionService from '../services/session';
 
 const AgentsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -86,34 +86,34 @@ const AgentsPage: React.FC = () => {
       }
 
       // 检查是否已存在相同智能体的会话
-      let existingSessions: {id: string, agentId: string}[] = [];
+      let sessionId;
       try {
-        const sessions = await chatService.getSessions();
-        // 确保sessions是一个数组
-        existingSessions = Array.isArray(sessions) ? sessions : [];
-        if (!Array.isArray(sessions)) {
-          console.warn('chatService.getSessions()未返回数组:', sessions);
+        // 使用 SessionService 而不是 chatService
+        const sessions = SessionService.getSessions();
+        
+        // 查找是否已存在该智能体的会话
+        const existingSession = sessions.find((s: { agentId: string }) => s.agentId === agentId);
+        
+        if (existingSession) {
+          // 如果存在相同智能体的会话，使用它
+          sessionId = existingSession.id;
+          console.log("[SessionService] 使用现有会话:", sessionId);
+          
+          // 设置为活跃会话
+          SessionService.setActiveSession(sessionId);
+        } else {
+          // 创建新会话
+          const session = SessionService.createSession(agentId, agent.name);
+          sessionId = session.id;
+          console.log("[SessionService] 创建新会话:", sessionId);
         }
       } catch (error) {
-        console.warn('获取会话列表失败:', error);
-        existingSessions = [];
-      }
-      
-      // 使用安全的查找方式
-      const existingSession = existingSessions.length > 0 ? 
-        existingSessions.find(s => s.agentId === agentId) : undefined;
-      
-      let sessionId;
-      
-      if (existingSession) {
-        // 如果存在相同智能体的会话，使用它
-        sessionId = existingSession.id;
-        console.log("使用现有会话:", sessionId);
-      } else {
-        // 创建新会话
-        const session = await chatService.createSession(agent.name, agentId);
+        console.error('[SessionService] 会话操作失败:', error);
+        
+        // 创建备用会话
+        const session = SessionService.createSession(agentId, agent.name);
         sessionId = session.id;
-        console.log("创建新会话:", sessionId);
+        console.log("[SessionService] 创建备用会话:", sessionId);
       }
       
       // 发送一个自定义事件，让Workspace组件知道需要打开特定会话

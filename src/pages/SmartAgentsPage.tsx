@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import SmartAgentGallery from '../components/SmartAgentGallery';
-import { chatService } from '../components/ChatService';
+import * as SessionService from '../services/session';
 
 // 默认智能体列表
 const defaultAgents = [
@@ -45,7 +45,7 @@ const SmartAgentsPage: React.FC = () => {
   const handleStartChat = async (agentId: string, agentName: string) => {
     try {
       // 直接创建新会话
-      const session = await chatService.createSession(agentName, agentId);
+      const session = SessionService.createSession(agentId, agentName);
       
       // 创建完会话后直接导航到会话页面
       navigate('/');

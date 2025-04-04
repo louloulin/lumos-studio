@@ -86,8 +86,22 @@ const AgentsPage: React.FC = () => {
       }
 
       // 检查是否已存在相同智能体的会话
-      const existingSessions = chatService.getSessions();
-      const existingSession = existingSessions.find(s => s.agentId === agentId);
+      let existingSessions: {id: string, agentId: string}[] = [];
+      try {
+        const sessions = await chatService.getSessions();
+        // 确保sessions是一个数组
+        existingSessions = Array.isArray(sessions) ? sessions : [];
+        if (!Array.isArray(sessions)) {
+          console.warn('chatService.getSessions()未返回数组:', sessions);
+        }
+      } catch (error) {
+        console.warn('获取会话列表失败:', error);
+        existingSessions = [];
+      }
+      
+      // 使用安全的查找方式
+      const existingSession = existingSessions.length > 0 ? 
+        existingSessions.find(s => s.agentId === agentId) : undefined;
       
       let sessionId;
       
@@ -114,7 +128,7 @@ const AgentsPage: React.FC = () => {
       navigate(`/workspace/chat?sessionId=${sessionId}`);
     } catch (error) {
       console.error('创建会话失败:', error);
-      alert('创建会话失败，请重试');
+      alert(`创建会话失败: ${error instanceof Error ? error.message : '未知错误'}`);
     }
   };
 

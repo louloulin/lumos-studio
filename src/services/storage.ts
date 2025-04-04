@@ -38,9 +38,88 @@ export const getSessions = (): Session[] => {
  */
 export const saveSessions = (sessions: Session[]): void => {
   try {
-    localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    // 验证会话格式
+    if (!Array.isArray(sessions)) {
+      console.error('[StorageService] 会话数据不是数组');
+      return;
+    }
+    
+    // 确保每个会话都有必要的属性
+    const validSessions = sessions.filter(session => {
+      if (!session || typeof session !== 'object') {
+        console.warn('[StorageService] 跳过无效的会话数据:', session);
+        return false;
+      }
+      
+      if (!session.id) {
+        console.warn('[StorageService] 跳过缺少ID的会话');
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // 确保不会存储太多会话，最多保留30个
+    const MAX_SESSIONS = 30;
+    const sessionsToSave = validSessions.length > MAX_SESSIONS
+      ? validSessions.sort((a, b) => {
+          const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+          const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+          return bTime - aTime;
+        }).slice(0, MAX_SESSIONS)
+      : validSessions;
+    
+    // 设置重试次数
+    let retries = 0;
+    const MAX_RETRIES = 3;
+    
+    const attemptSave = () => {
+      try {
+        localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessionsToSave));
+        console.log(`[StorageService] 成功保存 ${sessionsToSave.length} 个会话`);
+      } catch (saveError) {
+        if (retries < MAX_RETRIES) {
+          retries++;
+          console.warn(`[StorageService] 保存失败，重试 (${retries}/${MAX_RETRIES}):`, saveError);
+          
+          // 如果是存储空间不足，尝试清理一些会话
+          if (sessionsToSave.length > 5) {
+            console.warn(`[StorageService] 尝试通过减少会话数量来保存`);
+            // 只保留最近的5个会话
+            const reducedSessions = sessionsToSave
+              .sort((a, b) => {
+                const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+                const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+                return bTime - aTime;
+              })
+              .slice(0, 5);
+            localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(reducedSessions));
+            console.log(`[StorageService] 保存了最新的5个会话作为备选方案`);
+          }
+        } else {
+          // 最后一次尝试 - 只保存一个会话
+          try {
+            const latestSession = sessionsToSave
+              .sort((a, b) => {
+                const aTime = typeof a.updatedAt === 'number' ? a.updatedAt : 0;
+                const bTime = typeof b.updatedAt === 'number' ? b.updatedAt : 0;
+                return bTime - aTime;
+              })[0];
+            
+            if (latestSession) {
+              localStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify([latestSession]));
+              console.log(`[StorageService] 保存了最新会话作为最后的备选方案`);
+            }
+          } catch (finalError) {
+            console.error('[StorageService] 所有尝试都失败:', finalError);
+          }
+        }
+      }
+    };
+    
+    attemptSave();
   } catch (error) {
-    console.error('Failed to save sessions to localStorage:', error);
+    console.error('[StorageService] 保存会话时发生错误:', error);
   }
 };
 
@@ -66,26 +145,41 @@ export const setActiveSessionId = (sessionId: string): void => {
  * @returns 更新后的会话列表
  */
 export const upsertSession = (session: Session): Session[] => {
-  const sessions = getSessions();
-  const index = sessions.findIndex(s => s.id === session.id);
-  
-  if (index !== -1) {
-    // 更新已存在的会话
-    sessions[index] = {
+  try {
+    if (!session || !session.id) {
+      console.error('[StorageService] 尝试更新无效会话:', session);
+      return getSessions();
+    }
+    
+    const sessions = getSessions();
+    const index = sessions.findIndex(s => s.id === session.id);
+    
+    // 创建会话的深拷贝，避免引用问题
+    const sessionCopy = JSON.parse(JSON.stringify({
       ...session,
-      updatedAt: Date.now(),
-    };
-  } else {
-    // 添加新会话
-    sessions.push({
-      ...session,
+      // 确保消息数组存在
+      messages: Array.isArray(session.messages) ? session.messages : [],
+      // 确保时间戳是数字
       createdAt: session.createdAt || Date.now(),
       updatedAt: Date.now(),
-    });
+    }));
+    
+    if (index !== -1) {
+      // 更新已存在的会话
+      sessions[index] = sessionCopy;
+      console.log(`[StorageService] 更新会话 ${session.id}, 消息数: ${sessionCopy.messages.length}`);
+    } else {
+      // 添加新会话
+      console.log(`[StorageService] 创建新会话 ${session.id}`);
+      sessions.push(sessionCopy);
+    }
+    
+    saveSessions(sessions);
+    return sessions;
+  } catch (error) {
+    console.error('[StorageService] 更新会话时发生错误:', error);
+    return getSessions();
   }
-  
-  saveSessions(sessions);
-  return sessions;
 };
 
 /**

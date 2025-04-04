@@ -229,23 +229,23 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
             if (chatSession) {
               // 获取当前节点ID
               setCurrentNodeId(chatSession.currentNodeId);
-              
-              // 获取对话历史
+        
+        // 获取对话历史
               const history = await chatService.getChatHistory(validSessionId);
-              
-              // 转换为消息格式
-              const chatMessages: Message[] = history.map(node => ({
-                id: node.id,
-                role: node.role,
-                content: node.text,
-                timestamp: node.timestamp
-              }));
-              
-              setMessages(chatMessages);
-              
-              // 获取完整对话树
+        
+        // 转换为消息格式
+        const chatMessages: Message[] = history.map(node => ({
+          id: node.id,
+          role: node.role,
+          content: node.text,
+          timestamp: node.timestamp
+        }));
+        
+        setMessages(chatMessages);
+        
+        // 获取完整对话树
               const tree = await chatService.getChatTree(validSessionId);
-              setChatTree(tree);
+        setChatTree(tree);
               sessionHistoryFound = true;
             }
           } catch (chatServiceErr) {
@@ -257,14 +257,17 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         if (!sessionHistoryFound) {
           console.log(`[MastraChat] 未找到会话，创建新会话`);
           try {
-            // 首先尝试使用SessionService创建会话
-            const agentToUse = selectedAgent?.id || 'generalAssistant';
+            // 使用组件传入的agentId参数而不是默认值
+            const agentToUse = agentId || (selectedAgent?.id || 'generalAssistant');
             const titleToUse = selectedAgent?.name || '新对话';
             
             console.log(`[MastraChat] 正在创建新会话，智能体: ${agentToUse}, 标题: ${titleToUse}`);
             
             // 确保await等待Promise解析
-            const newSession = await SessionService.createSession(agentToUse, titleToUse);
+            const newSession = await SessionService.createSession(
+              agentToUse,
+              titleToUse
+            );
             
             if (!newSession) {
               throw new Error('创建会话返回空结果');
@@ -387,7 +390,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         
         try {
           const newSession = await SessionService.createSession(
-            selectedAgent?.id || 'generalAssistant',
+            agentId || (selectedAgent?.id || 'generalAssistant'),
             selectedAgent?.name || '新对话'
           );
           
@@ -592,12 +595,12 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         ]);
         
         setIsLoading(false);
-        
-        toast({
+          
+          toast({
           title: '生成响应失败',
           description: error.message,
-          variant: 'destructive',
-        });
+            variant: 'destructive',
+          });
       };
       
       // 使用会话服务生成响应
@@ -813,9 +816,9 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
       // Otherwise, add the message to our accumulator
       return [...acc, current];
     }, []);
-    
-    return (
-      <div
+
+  return (
+      <div 
         className="flex-1 p-4 space-y-4 overflow-y-auto"
         ref={scrollContainerRef}
         onScroll={handleScroll}
@@ -852,16 +855,16 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
               >
                 {message.isStreaming ? (
                   <div>
-                    {message.content}
+                      {message.content}
                     <span className="animate-pulse inline-block ml-1">▋</span>
                   </div>
                 ) : (
                   <Markdown>{message.content}</Markdown>
                 )}
-                {message.role === 'assistant' && !message.isStreaming && (
+                  {message.role === 'assistant' && !message.isStreaming && (
                   <div className="flex items-center justify-end mt-2">
-                    <SpeechPlayer 
-                      text={message.content} 
+                    <SpeechPlayer
+                      text={message.content}
                       agentId={selectedAgent?.id || 'generalAssistant'}
                     />
                   </div>

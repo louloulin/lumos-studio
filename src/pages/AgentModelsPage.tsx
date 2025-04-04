@@ -61,7 +61,7 @@ const AgentModelsPage: React.FC = () => {
         SessionService.setActiveSession(sessionId);
       } else {
         // 否则创建新会话
-        const session = SessionService.createSession(agentId, agentName);
+        const session = await SessionService.createSession(agentId, agentName);
         sessionId = session.id;
         console.log("[SessionService] 创建新会话:", sessionId);
       }

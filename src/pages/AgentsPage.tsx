@@ -103,7 +103,7 @@ const AgentsPage: React.FC = () => {
           SessionService.setActiveSession(sessionId);
         } else {
           // 创建新会话
-          const session = SessionService.createSession(agentId, agent.name);
+          const session = await SessionService.createSession(agentId, agent.name);
           sessionId = session.id;
           console.log("[SessionService] 创建新会话:", sessionId);
         }
@@ -111,7 +111,7 @@ const AgentsPage: React.FC = () => {
         console.error('[SessionService] 会话操作失败:', error);
         
         // 创建备用会话
-        const session = SessionService.createSession(agentId, agent.name);
+        const session = await SessionService.createSession(agentId, agent.name);
         sessionId = session.id;
         console.log("[SessionService] 创建备用会话:", sessionId);
       }

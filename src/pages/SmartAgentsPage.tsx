@@ -44,8 +44,8 @@ const SmartAgentsPage: React.FC = () => {
   // 处理开始对话
   const handleStartChat = async (agentId: string, agentName: string) => {
     try {
-      // 直接创建新会话
-      const session = SessionService.createSession(agentId, agentName);
+      // 直接创建新会话 - 添加await，因为这是一个异步函数
+      const session = await SessionService.createSession(agentId, agentName);
       
       // 创建完会话后直接导航到会话页面
       navigate('/');

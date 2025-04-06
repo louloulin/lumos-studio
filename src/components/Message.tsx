@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Message, SessionType } from '@/shared/types'
+import { SessionType } from '@/shared/types'
+import { Message } from '../types/chat'
 import { useAtomValue, useSetAtom } from 'jotai'
 import {
     showMessageTimestampAtom,
@@ -73,6 +74,9 @@ export default function MessageComponent(props: Props) {
         if (showModelName && props.msg.role === 'assistant') {
             tips.push(`model: ${props.msg.model || 'unknown'}`)
         }
+        if (props.msg.role === 'assistant' && props.msg.agentName) {
+            tips.push(`agent: ${props.msg.agentName}`)
+        }
     }
 
     if (showMessageTimestamp && msg.timestamp !== undefined) {
@@ -115,6 +119,29 @@ export default function MessageComponent(props: Props) {
         </span>
     )
 
+    const getAvatarUrl = () => {
+        if (msg.role === 'assistant') {
+            if (msg.agentAvatar) {
+                return msg.agentAvatar;
+            }
+            return currentSessionPicUrl;
+        }
+        return null;
+    }
+
+    const getNameLabel = () => {
+        if (msg.role === 'assistant' && msg.agentName) {
+            return (
+                <div className="text-xs font-medium text-muted-foreground mb-1">
+                    {msg.agentName}
+                </div>
+            );
+        }
+        return null;
+    }
+
+    const avatarUrl = getAvatarUrl();
+
     return (
         <div
             ref={ref}
@@ -137,9 +164,9 @@ export default function MessageComponent(props: Props) {
             <div className="flex gap-4 flex-nowrap">
                 <div className="mt-2">
                     {msg.role === 'assistant' && (
-                        currentSessionPicUrl ? (
+                        avatarUrl ? (
                             <Avatar className="h-7 w-7">
-                                <AvatarImage src={currentSessionPicUrl} />
+                                <AvatarImage src={avatarUrl} />
                                 <AvatarFallback>
                                     <Bot className="h-4 w-4" />
                                 </AvatarFallback>
@@ -171,6 +198,7 @@ export default function MessageComponent(props: Props) {
                     )}
                 </div>
                 <div className="flex-1 w-0 pr-4">
+                    {getNameLabel()}
                     <div 
                         className={cn('msg-content', { 'msg-content-small': small })}
                         style={small ? { fontSize: '0.875rem' } : {}}

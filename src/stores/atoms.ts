@@ -4,6 +4,7 @@ import { atomWithStorage } from 'jotai/utils'
 import { focusAtom } from 'jotai-optics'
 import * as defaults from '@/shared/defaults'
 import { StorageKey } from '../storage'
+import { Session } from '../types/chat'
 
 // 使用localStorage作为同步存储
 const syncStorage = {
@@ -42,8 +43,76 @@ export const saveIntervalAtom = focusAtom(settingsAtom, (optic) => optic.prop('s
 // 添加回toastsAtom，用于Toast消息
 export const toastsAtom = atom<Toast[]>([])
 
-// 保留sessionsAtom的空实现以解决构建错误
-export const sessionsAtom = atom<any[]>([])
+/**
+ * 所有会话的原子状态
+ */
+export const sessionsAtom = atom<Session[]>([])
+
+/**
+ * 当前活跃会话ID的原子状态
+ */
+export const currentSessionIdAtom = atom<string | null>(null)
+
+/**
+ * 派生的当前活跃会话状态
+ */
+export const currentSessionAtom = atom(
+  (get) => {
+    const sessionId = get(currentSessionIdAtom)
+    const sessions = get(sessionsAtom)
+    return sessions.find((s) => s.id === sessionId) || null
+  }
+)
+
+/**
+ * 当前会话消息的派生状态
+ */
+export const currentMessagesAtom = atom(
+  (get) => {
+    const session = get(currentSessionAtom)
+    return session?.messages || []
+  }
+)
+
+/**
+ * 当前会话默认智能体ID
+ */
+export const currentDefaultAgentIdAtom = atom(
+  (get) => {
+    const session = get(currentSessionAtom)
+    return session?.defaultAgentId || null
+  }
+)
+
+/**
+ * 当前会话所有智能体IDs
+ */
+export const currentAgentIdsAtom = atom(
+  (get) => {
+    const session = get(currentSessionAtom)
+    return session?.agentIds || []
+  }
+)
+
+/**
+ * 是否显示智能体选择器
+ */
+export const showAgentSelectorAtom = atom(false)
+
+/**
+ * 是否正在生成回复
+ */
+export const isGeneratingAtom = atom(false)
+
+/**
+ * 智能体列表加载状态
+ */
+export const agentsLoadingAtom = atom(false)
+
+/**
+ * 智能体列表
+ */
+export const agentsListAtom = atom<any[]>([])
 
 // 主题
 export const activeThemeAtom = atom<'light' | 'dark'>('light')

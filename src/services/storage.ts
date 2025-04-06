@@ -109,6 +109,67 @@ export const saveSessions = (sessions: Session[]): void => {
 };
 
 /**
+ * 保存单个会话到本地存储
+ * @param session 要保存的会话
+ */
+export const saveSession = (session: Session): void => {
+  if (!session || !session.id) {
+    console.error('[StorageService] 尝试保存无效会话:', session);
+    return;
+  }
+  
+  const sessions = getSessions();
+  const index = sessions.findIndex(s => s.id === session.id);
+  
+  if (index !== -1) {
+    // 更新会话
+    sessions[index] = session;
+  } else {
+    // 添加新会话
+    sessions.push(session);
+  }
+  
+  saveSessions(sessions);
+};
+
+/**
+ * 保存多个会话到本地存储
+ * 比单独调用saveSession更高效，适用于批量操作
+ * @param sessions 要保存的会话列表
+ */
+export const saveMultipleSessions = (sessions: Session[]): void => {
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    console.warn('[StorageService] 尝试保存空的会话列表');
+    return;
+  }
+  
+  // 获取现有会话
+  const existingSessions = getSessions();
+  const sessionMap = new Map<string, Session>();
+  
+  // 创建会话ID映射
+  existingSessions.forEach(session => {
+    sessionMap.set(session.id, session);
+  });
+  
+  // 更新或添加新会话
+  sessions.forEach(session => {
+    if (session && session.id) {
+      sessionMap.set(session.id, {
+        ...session,
+        updatedAt: Date.now()
+      });
+    }
+  });
+  
+  // 转换回数组并保存
+  const updatedSessions = Array.from(sessionMap.values());
+  saveSessions(updatedSessions);
+  
+  console.log(`[StorageService] 批量保存了 ${sessions.length} 个会话`);
+};
+
+/**
  * 获取当前活跃会话ID
  * @returns 活跃会话ID
  */
@@ -249,6 +310,8 @@ export const saveSettings = (settings: Record<string, any>): void => {
 export default {
   getSessions,
   saveSessions,
+  saveSession,
+  saveMultipleSessions,
   getActiveSessionId,
   setActiveSessionId,
   upsertSession,

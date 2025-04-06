@@ -26,8 +26,8 @@ export interface LocalMessage {
 
 // Mastra消息类型
 export interface MastraMessage {
-  role: string;
-  content: string | MessageContent[];
+  role: 'user' | 'assistant' | 'system';
+  content: string;
 }
 
 // 智能体生成请求
@@ -142,4 +142,78 @@ export interface MastraClient {
   getAgent(agentName: string): Agent;
   getTools(): Promise<Record<string, any>>;
   getTool(toolId: string): Tool;
+}
+
+/**
+ * Mastra 智能体摘要信息
+ */
+export interface AgentSummary {
+  id: string;
+  name: string;
+  description?: string;
+  avatar?: string;
+  model?: string;
+  type?: string;
+  isInstalled?: boolean;
+}
+
+/**
+ * Mastra 智能体详细信息
+ */
+export interface AgentDetails extends AgentSummary {
+  systemPrompt?: string;
+  welcomeMessage?: string;
+  temperature?: number;
+  maxTokens?: number;
+  compatibleModels?: string[];
+  tags?: string[];
+  category?: string;
+  examples?: Array<{ input: string; output: string }>;
+  creator?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+/**
+ * 生成响应选项
+ */
+export interface GenerateOptions {
+  messages: MastraMessage[];
+  temperature?: number;
+  maxTokens?: number;
+  model?: string;
+  stop?: string[];
+}
+
+/**
+ * 生成响应结果
+ */
+export interface GenerateResult {
+  content: string;
+  model?: string;
+  tokensUsed?: number;
+}
+
+/**
+ * 智能体创建请求
+ */
+export interface CreateAgentRequest {
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  model?: string;
+  temperature?: number;
+  avatar?: string;
+  type?: string;
+}
+
+/**
+ * API错误响应
+ */
+export interface ApiError {
+  error: {
+    code: string;
+    message: string;
+    details?: any;
+  };
 } 

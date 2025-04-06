@@ -17,6 +17,8 @@ import platform from '@/packages/platform'
 import { throttle } from 'lodash'
 import { countWord } from '@/packages/word-count'
 import { estimateTokensFromMessages } from '@/packages/token'
+import * as Storage from '../services/storage'
+import * as MastraAPI from '../api/mastra'
 
 export function create(newSession: Session) {
     const store = getDefaultStore()
@@ -94,10 +96,10 @@ export async function copy(source: Session) {
     })
 }
 
-export function getSession(sessionId: string) {
+export function getSession(sessionId: string): Session | null {
     const store = getDefaultStore()
     const sessions = store.get(atoms.sessionsAtom)
-    return sessions.find((s) => s.id === sessionId)
+    return sessions.find((s) => s.id === sessionId) || null
 }
 
 export function insertMessage(sessionId: string, msg: Message) {
@@ -343,4 +345,301 @@ export function getCurrentSession() {
 export function getCurrentMessages() {
     const store = getDefaultStore()
     return store.get(atoms.currentMessageListAtom)
+}
+
+export function createSession(agentId: string, title: string = '新会话'): Session {
+    const store = getDefaultStore()
+    const newSession: Session = {
+        id: uuidv4(),
+        title,
+        defaultAgentId: agentId,
+        agentIds: [agentId],
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        agentContexts: {},
+    }
+    
+    store.set(atoms.sessionsAtom, (sessions) => [...sessions, newSession])
+    setActiveSession(newSession.id)
+    Storage.saveSession(newSession)
+    
+    return newSession
+}
+
+export function createMultiAgentSession(agentIds: string[], title: string = '多智能体对话'): Session {
+    if (!agentIds.length) {
+        throw new Error('至少需要一个智能体')
+    }
+    
+    const store = getDefaultStore()
+    const newSession: Session = {
+        id: uuidv4(),
+        title,
+        defaultAgentId: agentIds[0],
+        agentIds: [...agentIds],
+        messages: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        agentContexts: {},
+    }
+    
+    store.set(atoms.sessionsAtom, (sessions) => [...sessions, newSession])
+    setActiveSession(newSession.id)
+    Storage.saveSession(newSession)
+    
+    return newSession
+}
+
+export function setActiveSession(sessionId: string) {
+    const store = getDefaultStore()
+    store.set(atoms.currentSessionIdAtom, sessionId)
+    Storage.setActiveSessionId(sessionId)
+}
+
+export function updateSessionTitle(sessionId: string, title: string): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    title,
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function addMessage(sessionId: string, message: Omit<Message, 'id' | 'createdAt'>): Message {
+    const store = getDefaultStore()
+    const newMessage: Message = {
+        ...message,
+        id: uuidv4(),
+        createdAt: Date.now(),
+    }
+    
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    messages: [...s.messages, newMessage],
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+    
+    return newMessage
+}
+
+export function updateMessage(sessionId: string, messageId: string, updatedMessage: Partial<Message>) {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    messages: s.messages.map((m) =>
+                        m.id === messageId ? { ...m, ...updatedMessage } : m
+                    ),
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function addAgentToSession(sessionId: string, agentId: string): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                if (!s.agentIds.includes(agentId)) {
+                    return {
+                        ...s,
+                        agentIds: [...s.agentIds, agentId],
+                        updatedAt: Date.now(),
+                    }
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function removeAgentFromSession(sessionId: string, agentId: string): void {
+    const store = getDefaultStore()
+    const session = getSession(sessionId)
+    
+    if (session && session.defaultAgentId === agentId) {
+        console.warn('Cannot remove default agent from session')
+        return
+    }
+    
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    agentIds: s.agentIds.filter(id => id !== agentId),
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function setSessionDefaultAgent(sessionId: string, agentId: string): void {
+    const store = getDefaultStore()
+    const session = getSession(sessionId)
+    
+    if (session && !session.agentIds.includes(agentId)) {
+        addAgentToSession(sessionId, agentId)
+    }
+    
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    defaultAgentId: agentId,
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function setAgentSystemPrompt(sessionId: string, agentId: string, prompt: string): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    agentContexts: {
+                        ...s.agentContexts,
+                        [agentId]: {
+                            ...s.agentContexts?.[agentId],
+                            systemPrompt: prompt,
+                        },
+                    },
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function setAgentModelSettings(sessionId: string, agentId: string, settings: any): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    agentContexts: {
+                        ...s.agentContexts,
+                        [agentId]: {
+                            ...s.agentContexts?.[agentId],
+                            modelSettings: settings,
+                        },
+                    },
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+export function deleteSession(sessionId: string): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) => 
+        sessions.filter(s => s.id !== sessionId)
+    )
+    Storage.deleteSession(sessionId)
+}
+
+export function clearSessionMessages(sessionId: string): void {
+    const store = getDefaultStore()
+    store.set(atoms.sessionsAtom, (sessions) =>
+        sessions.map((s) => {
+            if (s.id === sessionId) {
+                return {
+                    ...s,
+                    messages: [],
+                    updatedAt: Date.now(),
+                }
+            }
+            return s
+        })
+    )
+    
+    const updatedSession = getSession(sessionId)
+    if (updatedSession) {
+        Storage.saveSession(updatedSession)
+    }
+}
+
+/**
+ * 获取特定会话中的特定消息
+ * @param sessionId 会话ID
+ * @param messageId 消息ID
+ * @returns 消息对象，如果找不到则返回undefined
+ */
+export function getMessage(sessionId: string, messageId: string) {
+    const session = getSession(sessionId);
+    if (!session) return undefined;
+    
+    return session.messages.find(m => m.id === messageId);
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Session, Message, Agent, GenerateConfig } from '../services/types';
-import { SessionService, MastraService } from '../services';
+import { SessionService, MastraAPI } from '../services';
 import { UseSessionResult } from '../types/session';
 
 /**
@@ -36,9 +36,22 @@ export const useSession = (sessionId: string): UseSessionResult => {
         
         // 加载智能体信息
         try {
-          const agentsList = await MastraService.getAgents();
-          const agentInfo = agentsList.find(a => a.id === targetSession.agentId);
-          setAgent(agentInfo || null);
+          // 使用MastraAPI获取智能体信息
+          const agentId = targetSession.agentId;
+          if (agentId) {
+            const agentInfo = await MastraAPI.getAgent(agentId);
+            if (agentInfo) {
+              setAgent({
+                id: agentInfo.id || agentId,
+                name: agentInfo.name || agentId,
+                description: agentInfo.description || '',
+                model: agentInfo.model || 'gpt-4',
+                instructions: agentInfo.instructions || agentInfo.systemPrompt || '',
+                temperature: agentInfo.temperature || 0.7,
+                maxTokens: agentInfo.maxTokens || 2000
+              });
+            }
+          }
         } catch (agentError) {
           console.error('Failed to load agent info:', agentError);
         }

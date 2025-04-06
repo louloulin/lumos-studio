@@ -1,10 +1,11 @@
-import MastraService from './mastra';
+import { MastraAPI } from '../api/mastra';
 import * as ChatService from './chat';
 import * as SessionService from './session';
 import * as StorageService from './storage';
 import SessionSync from './sessionSync';
 import SessionAnalytics from './sessionAnalytics';
 import * as types from './types';
+import * as MastraService from './mastra';
 
 // Helper function to safely check environment variables
 const getEnvVar = (key: string): string | undefined => {
@@ -30,6 +31,7 @@ console.log('[Services] 导出服务:', {
 const originalMastra = MastraService;
 
 export {
+  MastraAPI,
   MastraService,
   ChatService,
   SessionService,
@@ -41,6 +43,7 @@ export {
 
 // 默认导出所有服务
 export default {
+  MastraAPI,
   MastraService,
   ChatService,
   SessionService,

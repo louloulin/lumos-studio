@@ -1,7 +1,8 @@
 import { WorkflowService, Workflow, WorkflowNode, WorkflowEdge, WorkflowNodeType } from './WorkflowService';
 import { agentService } from './AgentService';
 import { toolService } from './ToolService';
-import { MastraAPI, Agent } from './MastraService';
+import { MastraAPI } from './mastra';
+import { Agent } from './types'; // Import Agent type from types file
 
 // 工作流执行状态
 export enum WorkflowExecutionStatus {
@@ -64,7 +65,7 @@ export class WorkflowExecutor {
   private workflow: Workflow;
   private state: WorkflowExecutionState;
   private callbacks: WorkflowExecutorCallbacks;
-  private mastraAPI: MastraAPI;
+  private mastraAPI: typeof MastraAPI; // Fix the type reference
   private executionPromise: Promise<WorkflowExecutionState> | null = null;
   private shouldPause: boolean = false;
   private shouldStop: boolean = false;
@@ -74,7 +75,7 @@ export class WorkflowExecutor {
   constructor(workflow: Workflow, callbacks: WorkflowExecutorCallbacks = {}) {
     this.workflow = workflow;
     this.callbacks = callbacks;
-    this.mastraAPI = new MastraAPI();
+    this.mastraAPI = MastraAPI; // Use the MastraAPI directly, not as a constructor
     
     // 初始化执行状态
     this.state = {
@@ -391,11 +392,13 @@ export class WorkflowExecutor {
     node: WorkflowNode, 
     input: any
   ): Promise<any> {
-    if (!node.config || !node.config.agentId) {
+    const agentId = node.type === WorkflowNodeType.AGENT ? 
+      (node as any).agentId || (node.aiConfig?.params?.agentId as string) : 
+      null;
+    
+    if (!agentId) {
       throw new Error('智能体节点缺少agentId配置');
     }
-    
-    const agentId = node.config.agentId;
     
     try {
       // 获取智能体对象
@@ -405,16 +408,6 @@ export class WorkflowExecutor {
         throw new Error(`找不到智能体: ${agentId}`);
       }
       
-      // 创建一个符合MastraAPI接口的Agent对象
-      const mastraAgent: Agent = {
-        id: agent.id,
-        name: agent.name,
-        description: agent.description || '',
-        model: agent.model || 'gpt-4o',
-        systemPrompt: agent.instructions || '',
-        tools: agent.tools || []
-      };
-      
       // 调用智能体处理输入
       const message = typeof input === 'string' ? input : JSON.stringify(input);
       
@@ -422,16 +415,22 @@ export class WorkflowExecutor {
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error('智能体执行超时')), 30000); // 30秒超时
       });
-      
+
+      // 使用MastraAPI的generate方法
       const result = await Promise.race([
-        this.mastraAPI.generateWithAgent(mastraAgent, {
-          message,
-          stream: false
+        this.mastraAPI.generate(agentId, {
+          messages: [
+            { role: 'user', content: message }
+          ],
+          options: {
+            temperature: agent.temperature || 0.7,
+            max_tokens: agent.maxTokens || 2000
+          }
         }),
         timeoutPromise
       ]);
       
-      return result.output;
+      return result.text;
     } catch (error) {
       console.error('执行智能体节点失败:', error);
       throw new Error(`执行智能体节点失败: ${error instanceof Error ? error.message : String(error)}`);
@@ -445,12 +444,15 @@ export class WorkflowExecutor {
     node: WorkflowNode, 
     input: any
   ): Promise<any> {
-    if (!node.config || !node.config.toolId) {
+    const toolId = node.type === WorkflowNodeType.TOOL ? 
+      (node as any).toolId || (node.aiConfig?.params?.toolId as string) : 
+      null;
+    
+    if (!toolId) {
       throw new Error('工具节点缺少toolId配置');
     }
     
-    const toolId = node.config.toolId;
-    const toolParams = node.config.params || {};
+    const toolParams = node.aiConfig?.params || {};
     
     try {
       // 构建工具参数
@@ -484,13 +486,16 @@ export class WorkflowExecutor {
     node: WorkflowNode, 
     input: any
   ): Promise<boolean> {
-    if (!node.config || !node.config.condition) {
+    const condition = node.type === WorkflowNodeType.CONDITION ? 
+      node.conditionConfig || node.aiConfig?.params?.condition : 
+      null;
+    
+    if (!condition) {
       throw new Error('条件节点缺少condition配置');
     }
     
     try {
-      // 简单的条件评估，未来可以改进为使用表达式引擎
-      const condition = node.config.condition;
+      // 处理不同类型的条件配置
       let result: boolean;
       
       if (typeof condition === 'string') {
@@ -516,6 +521,35 @@ export class WorkflowExecutor {
               break;
             case 'lessThan':
               result = Number(input) < Number(value);
+              break;
+            default:
+              result = false;
+          }
+        } else if ('type' in condition && 'leftOperand' in condition && 'operator' in condition && 'rightOperand' in condition) {
+          // 使用conditionConfig格式
+          const { leftOperand, operator, rightOperand } = condition;
+          const leftValue = typeof input === 'object' && leftOperand ? input[leftOperand] : input;
+          const rightValue = rightOperand;
+          
+          switch (operator) {
+            case 'equals':
+            case '==':
+              result = leftValue == rightValue;
+              break;
+            case 'notEquals':
+            case '!=':
+              result = leftValue != rightValue;
+              break;
+            case 'greaterThan':
+            case '>':
+              result = leftValue > rightValue;
+              break;
+            case 'lessThan':
+            case '<':
+              result = leftValue < rightValue;
+              break;
+            case 'contains':
+              result = String(leftValue).includes(String(rightValue));
               break;
             default:
               result = false;

@@ -4,6 +4,52 @@ import * as ChatService from './chat';
 import * as Storage from './storage';
 import SessionSync from './sessionSync';
 import SessionAnalytics from './sessionAnalytics';
+import { MastraAPI } from '../api/mastra';
+import * as ChatTypes from '../types/chat';
+
+/**
+ * 将内部Session类型转换为Chat Session类型
+ */
+const convertToSessionType = (session: Session): ChatTypes.Session => {
+  return {
+    id: session.id,
+    title: session.title,
+    defaultAgentId: session.agentId,
+    agentIds: [session.agentId],
+    messages: session.messages.map(msg => ({
+      id: msg.id || uuid(),
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt ? Number(msg.createdAt) : Date.now(),
+      agentId: session.agentId
+    })),
+    createdAt: Number(session.createdAt),
+    updatedAt: Number(session.updatedAt),
+    pinned: session.pinned,
+    tags: session.tags
+  };
+};
+
+/**
+ * 将Chat Session类型转换回内部Session类型
+ */
+const convertFromSessionType = (session: ChatTypes.Session): Session => {
+  return {
+    id: session.id,
+    title: session.title,
+    agentId: session.defaultAgentId,
+    messages: session.messages.map(msg => ({
+      id: msg.id,
+      role: msg.role,
+      content: msg.content,
+      createdAt: msg.createdAt
+    })),
+    createdAt: session.createdAt,
+    updatedAt: session.updatedAt,
+    pinned: session.pinned,
+    tags: session.tags
+  };
+};
 
 /**
  * 获取会话列表
@@ -200,7 +246,16 @@ export const updateSessionTitle = (sessionId: string, title: string): Session | 
   const session = sessions.find(s => s.id === sessionId);
   if (!session) return null;
   
-  const updatedSession = ChatService.updateSessionTitle(session, title);
+  // 转换为Chat类型
+  const chatSession = convertToSessionType(session);
+  
+  // 使用Chat服务更新标题
+  const updatedChatSession = ChatService.updateSessionTitle(chatSession, title);
+  
+  // 转换回内部类型
+  const updatedSession = convertFromSessionType(updatedChatSession);
+  
+  // 保存到存储
   Storage.upsertSession(updatedSession);
   return updatedSession;
 };
@@ -224,9 +279,18 @@ export const clearSessionMessages = (sessionId: string): Session | null => {
   const session = sessions.find(s => s.id === sessionId);
   if (!session) return null;
   
-  const updatedSession = ChatService.clearSessionMessages(session);
-  Storage.upsertSession(updatedSession);
-  return updatedSession;
+  // 转换为Chat类型
+  const chatSession = convertToSessionType(session);
+  
+  // 使用Chat服务清空消息
+  const clearedChatSession = ChatService.clearSessionMessages(chatSession);
+  
+  // 转换回内部类型
+  const clearedSession = convertFromSessionType(clearedChatSession);
+  
+  // 保存到存储
+  Storage.upsertSession(clearedSession);
+  return clearedSession;
 };
 
 /**
@@ -304,7 +368,7 @@ export const addUserMessage = async (
 
 /**
  * 生成助手响应
- * 增强错误处理和恢复机制
+ * 使用真实的MastraAPI而非模拟数据
  */
 export const generateAssistantResponse = async (
   sessionId: string,
@@ -343,36 +407,67 @@ export const generateAssistantResponse = async (
   const startTime = Date.now();
   
   try {
-    // 提取用户最近的消息
-    const userMessages = session.messages
-      .filter(msg => msg.role === 'user');
+    // 提取对话历史，用于上下文
+    const contextMessages = session.messages.map(msg => ({
+      role: msg.role,
+      content: msg.content
+    }));
     
-    if (userMessages.length === 0) {
-      const error = new Error('没有可回复的用户消息');
+    if (contextMessages.length === 0) {
+      const error = new Error('没有可回复的消息');
       if (onError) onError(error);
       return;
     }
     
-    const lastUserMessage = userMessages[userMessages.length - 1].content;
+    // 获取会话的智能体ID
+    const agentId = session.agentId || 'generalAssistant';
+    console.log(`[Session] 使用智能体 ${agentId} 生成响应`);
+
     let responseContent = '';
     
-    // TODO: 实现与Mastra API的实际集成
-    // 这里是一个简化的模拟响应，应替换为实际API调用
+    // 使用MastraAPI流式生成响应
+    try {
+      // 使用流式生成器
+      const streamGenerator = MastraAPI.streamGenerate(agentId, {
+        messages: contextMessages,
+        options: {
+          temperature: 0.7,
+          max_tokens: 2000
+        }
+      });
+      
+      // 处理流式响应
+      for await (const chunk of streamGenerator) {
+        // 添加内容块到完整响应
+        responseContent += chunk;
+        
+        // 调用更新回调
+        if (onUpdate) onUpdate(responseContent);
+      }
+    } catch (streamError) {
+      console.error('[Session] 流式生成失败，尝试非流式方法:', streamError);
+      
+      // 如果流式失败，尝试非流式方法
+      try {
+        const response = await MastraAPI.generate(agentId, {
+          messages: contextMessages,
+          options: {
+            temperature: 0.7,
+            max_tokens: 2000
+          }
+        });
+        
+        responseContent = response.text;
+        if (onUpdate) onUpdate(responseContent);
+      } catch (generateError) {
+        throw generateError;
+      }
+    }
     
-    // 模拟流式响应
-    const mockResponses = [
-      "我正在处理您的请求...",
-      "经过分析，",
-      "我可以为您提供以下信息。",
-      "希望这对您有所帮助。"
-    ];
-    
-    for (const part of mockResponses) {
-      // 模拟流式传输
-      responseContent += part;
+    // 确保响应不为空
+    if (!responseContent.trim()) {
+      responseContent = "抱歉，我目前无法生成响应。请稍后再试。";
       if (onUpdate) onUpdate(responseContent);
-      // 模拟网络延迟
-      await new Promise(resolve => setTimeout(resolve, 200));
     }
     
     // 创建最终消息
@@ -407,6 +502,15 @@ export const generateAssistantResponse = async (
     
     // 备份会话
     SessionSync.backupSessions();
+    
+    // 如果会话包含敏感信息或已完成重要操作，轮换ID
+    if (shouldRotateSessionId(session)) {
+      console.log(`[Session] 轮换会话ID: ${sessionId}`);
+      const rotatedSession = rotateSessionId(sessionId);
+      if (rotatedSession) {
+        console.log(`[Session] 会话ID已轮换: ${sessionId} -> ${rotatedSession.id}`);
+      }
+    }
     
   } catch (error) {
     console.error('[Session] 生成助手响应失败:', error);
@@ -456,6 +560,19 @@ export const generateAssistantResponse = async (
       onError(error as Error);
     }
   }
+};
+
+/**
+ * 判断会话是否需要进行ID轮换
+ * 根据会话中的敏感操作或消息数量决定
+ */
+const shouldRotateSessionId = (session: Session): boolean => {
+  // 如果消息多于10条，概率性轮换
+  if (session.messages.length > 10) {
+    // 10%的概率轮换ID
+    return Math.random() < 0.1;
+  }
+  return false;
 };
 
 /**

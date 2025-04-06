@@ -212,7 +212,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
       {
         id: '1',
         name: '通用助手',
-        agentId: 'gpt-4',
+        agentId: 'agent',
         lastMessage: '有什么我可以帮助你的？',
         lastUpdated: new Date(Date.now() - 1000 * 60 * 5),
         pinned: true
@@ -840,7 +840,7 @@ const Workspace: React.FC<WorkspaceProps> = ({ currentPage }) => {
           
           <div className="grid gap-4 py-4">
             {[
-              { id: 'gpt-4', name: '通用助手', description: '可以回答各种问题的AI助手' },
+              { id: 'agent', name: '通用助手', description: '可以回答各种问题的AI助手' },
               { id: 'code-assistant', name: '代码助手', description: '帮助解决编程和开发问题' },
               { id: 'creative-writer', name: '创意写作', description: '协助写作和内容创作' },
               { id: 'math-solver', name: '数学助手', description: '解答数学问题和计算' }

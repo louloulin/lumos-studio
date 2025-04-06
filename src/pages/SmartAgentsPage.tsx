@@ -7,7 +7,7 @@ import { Agent } from '../api/types';
 // 默认智能体列表
 const defaultAgents = [
   {
-    id: 'gpt-4',
+    id: 'agent',
     name: '通用助手',
     description: '可以回答各种问题的AI助手',
     categories: ['通用', '助手']

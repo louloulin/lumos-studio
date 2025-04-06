@@ -57,7 +57,7 @@ const AgentsPage: React.FC = () => {
       
       // 使用默认智能体
       const defaultAgent: Agent = {
-        id: 'general-assistant',
+        id: 'agent',
         name: '通用助手',
         description: '基础AI助手，可以回答问题和提供帮助。',
         systemAgent: true

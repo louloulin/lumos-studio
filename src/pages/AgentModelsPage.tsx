@@ -21,7 +21,7 @@ const agentModels: AgentModel[] = [
     description: '帮助创作文章、小说、诗歌等创意内容，提供写作灵感和建议。'
   },
   {
-    id: 'gpt-4',
+    id: 'agent',
     name: '通用助手',
     description: '可以回答各种问题的AI助手'
   },

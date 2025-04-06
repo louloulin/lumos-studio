@@ -42,7 +42,7 @@ interface AgentTemplate {
 // 示例模板
 const agentTemplates: AgentTemplate[] = [
   {
-    id: 'general-assistant',
+    id: 'agent',
     name: '通用助手',
     description: '一个通用型AI助手，可以回答各种问题，提供帮助和建议。',
     category: '基础',

@@ -165,7 +165,7 @@ const MastraChat: React.FC<MastraChatProps> = ({ sessionId, agentId }) => {
         
         // 使用通用助手作为备选
         const defaultAgent: Agent = {
-          id: 'generalAssistant',
+          id: 'agent',
           name: '通用助手',
           description: '我是一个智能助手，可以回答您的问题和提供帮助。',
           avatar: undefined

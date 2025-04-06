@@ -34,6 +34,9 @@ import { textToSpeech, speakWithWebSpeech } from './speech';
 
 // 读取环境变量的帮助函数
 function getEnv(key: string, defaultValue: string = ''): string {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || defaultValue;
+  }
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     return import.meta.env[key] || defaultValue;
   }
@@ -52,16 +55,28 @@ function getNumEnv(key: string, defaultValue: number): number {
 // Get the Mastra service URL from the environment variables or fallback to Tauri backend
 async function getMastraUrl(): Promise<string> {
   try {
+    console.log('[MastraAPI:getMastraUrl] 开始获取Mastra服务URL');
+    
+    // 记录环境变量信息
+    const envInfo = {
+      NODE_ENV: getEnv('NODE_ENV'),
+      VITE_MASTRA_API_URL: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_MASTRA_API_URL : undefined,
+      VITE_API_BASE_URL: typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_API_BASE_URL : undefined,
+      isBrowser: typeof window !== 'undefined',
+      hasTauri: typeof window !== 'undefined' && !!(window as any).__TAURI__
+    };
+    console.log('[MastraAPI:getMastraUrl] 环境信息:', envInfo);
+    
     // 如果在浏览器环境且使用Vite开发服务器，则使用相对URL，通过Vite代理访问
     if (typeof window !== 'undefined') {
-      console.log('使用Vite代理访问Mastra服务器: /api');
+      console.log('[MastraAPI:getMastraUrl] 检测到浏览器环境，使用Vite代理访问Mastra服务器: /api');
       return '/api'; // 使用相对路径，将通过Vite代理访问
     }
     
     // 检查环境变量中是否有API URL
     const envApiUrl = getEnv('VITE_MASTRA_API_URL', '');
     if (envApiUrl) {
-      console.log('Using Mastra URL from environment:', envApiUrl);
+      console.log('[MastraAPI:getMastraUrl] 使用环境变量中的Mastra URL:', envApiUrl);
       return envApiUrl;
     }
     
@@ -71,7 +86,9 @@ async function getMastraUrl(): Promise<string> {
     let lastError: any = null;
     
     // 先检查Tauri API是否已加载
-    await loadTauriAPI().catch(() => {});
+    await loadTauriAPI().catch((e) => {
+      console.warn('[MastraAPI:getMastraUrl] 加载Tauri API失败:', e);
+    });
 
     // 默认端口，如果所有尝试都失败
     const DEFAULT_PORT = 4111;
@@ -80,8 +97,11 @@ async function getMastraUrl(): Promise<string> {
       try {
         // 先检查 invoke 是否已准备好
         if (typeof invoke !== 'function') {
+          console.warn('[MastraAPI:getMastraUrl] Tauri invoke函数尚未初始化');
           throw new Error('Tauri invoke function not initialized yet');
         }
+        
+        console.log('[MastraAPI:getMastraUrl] 尝试从Tauri后端获取Mastra URL');
         
         // 使用Promise包装invoke调用，设置超时
         const timeout = getNumEnv('VITE_CONNECTION_TIMEOUT', 2000);
@@ -97,27 +117,35 @@ async function getMastraUrl(): Promise<string> {
         const url = await invokeWithTimeout(invoke, 'get_mastra_url');
         
         if (!url || typeof url !== 'string') {
+          console.error('[MastraAPI:getMastraUrl] Tauri后端返回无效URL:', url);
           throw new Error('Invalid URL returned from Tauri backend');
         }
         
+        console.log('[MastraAPI:getMastraUrl] 成功从Tauri后端获取URL:', url);
         return url;
       } catch (error) {
         lastError = error;
-        console.warn(`Failed to get Mastra service URL (attempt ${retries + 1}/${maxRetries}):`, error);
+        console.warn(`[MastraAPI:getMastraUrl] 获取Mastra服务URL失败 (尝试 ${retries + 1}/${maxRetries}):`, error);
         retries++;
         // 等待一小段时间后重试
         if (retries < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, 1000 * retries));
+          const waitTime = 1000 * retries;
+          console.log(`[MastraAPI:getMastraUrl] 等待${waitTime}ms后重试...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
     }
     
     // 所有重试都失败了
-    console.error('All attempts to get Mastra service URL failed:', lastError);
-    return `http://localhost:${DEFAULT_PORT}`; // 使用默认端口
+    console.error('[MastraAPI:getMastraUrl] 所有获取Mastra服务URL的尝试都失败:', lastError);
+    const fallbackUrl = `http://localhost:${DEFAULT_PORT}`;
+    console.log('[MastraAPI:getMastraUrl] 使用默认回退URL:', fallbackUrl);
+    return fallbackUrl; // 使用默认端口
   } catch (error) {
-    console.error('Failed to get Mastra service URL:', error);
-    return getEnv('VITE_API_BASE_URL', 'http://localhost:4111');
+    console.error('[MastraAPI:getMastraUrl] 获取Mastra服务URL时出现异常:', error);
+    const fallbackUrl = getEnv('VITE_API_BASE_URL', 'http://localhost:4111');
+    console.log('[MastraAPI:getMastraUrl] 使用最终回退URL:', fallbackUrl);
+    return fallbackUrl;
   }
 }
 
@@ -126,18 +154,34 @@ let mastraClient: MastraClient | null = null;
 
 // 获取Mastra客户端实例
 export async function getClient() {
+  console.log('[MastraAPI:getClient] 获取Mastra客户端实例');
+  
   if (!mastraClient) {
-    const baseUrl = await getMastraUrl();
-    mastraClient = new MastraClient({
-      baseUrl,
-      // 必须添加这些头部信息以确保与Mastra服务器的正常通信
-      // 这些头部将在预检请求(OPTIONS)中发送，因此Mastra服务器必须配置为允许它们
-      headers: {
+    console.log('[MastraAPI:getClient] 客户端实例不存在，创建新实例');
+    try {
+      const baseUrl = await getMastraUrl();
+      console.log('[MastraAPI:getClient] 使用基础URL创建客户端:', baseUrl);
+      
+      const headers = {
         'x-mastra-client-type': 'lumos-studio',
         'x-mastra-client-id': 'lumos-client'
-      }
-    });
+      };
+      console.log('[MastraAPI:getClient] 使用头信息:', headers);
+      
+      mastraClient = new MastraClient({
+        baseUrl,
+        headers
+      });
+      
+      console.log('[MastraAPI:getClient] 客户端实例创建成功');
+    } catch (error) {
+      console.error('[MastraAPI:getClient] 创建客户端实例失败:', error);
+      throw error;
+    }
+  } else {
+    console.log('[MastraAPI:getClient] 使用现有客户端实例');
   }
+  
   return mastraClient;
 }
 
@@ -427,44 +471,86 @@ export const MastraAPI = {
     request: AgentGenerateRequest
   ): AsyncGenerator<string, void, unknown> {
     try {
-      console.log('[MastraAPI] streamGenerate开始调用真实API:', {
+      console.log('[MastraAPI:streamGenerate] ======开始调用========', {
+        时间: new Date().toISOString(),
         agentName,
         messageCount: request.messages?.length || 0,
-        hasOptions: !!request.options
+        messagesPreview: request.messages?.map(m => ({ 
+          role: m.role, 
+          contentLength: m.content.length,
+          preview: m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '')
+        })),
+        options: request.options
       });
+      
+      // 检查是否存在MOCK配置
+      const useMock = getEnv('USE_MOCK_API') === 'true' || getEnv('VITE_USE_MOCK_API') === 'true';
+      
+      if (useMock) {
+        console.warn('[MastraAPI:streamGenerate] ⚠️ 检测到启用MOCK API配置，将使用模拟数据');
+        // 继续执行，但已标记了mock使用情况
+      }
       
       const client = await getClient();
       
       // 验证agentName是否有效
       if (!agentName) {
-        console.error('[MastraAPI] 错误: Agent name不能为空');
+        console.error('[MastraAPI:streamGenerate] 错误: Agent name不能为空');
         throw new Error('Agent name is required');
       }
       
       const baseUrl = await getMastraUrl();
-      console.log(`[MastraAPI] 使用服务URL: ${baseUrl}`);
+      console.log(`[MastraAPI:streamGenerate] 使用服务URL: ${baseUrl}, 智能体: ${agentName}`);
+      
+      // 尝试构建请求URL以进行调试
+      const requestUrl = `${baseUrl}/agents/${encodeURIComponent(agentName)}/stream`;
+      console.log(`[MastraAPI:streamGenerate] 将发送流式请求到: ${requestUrl}`);
       
       const agent = client.getAgent(agentName);
-      console.log(`[MastraAPI] 成功获取智能体: ${agentName}`);
+      console.log(`[MastraAPI:streamGenerate] 成功获取智能体实例: ${agentName}`);
       
       if (Array.isArray(request.messages)) {
         if (request.messages.length === 0) {
-          console.error('[MastraAPI] 错误: 消息数组不能为空');
+          console.error('[MastraAPI:streamGenerate] 错误: 消息数组不能为空');
           throw new Error("Messages array cannot be empty");
         }
         
         try {
-          // 记录请求信息用于调试
-          console.log(`[MastraAPI] 开始请求智能体: ${agentName}流式生成`, {
+          // 创建请求详情 - 用于网络调试
+          const requestDetails = {
+            url: requestUrl,
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'text/event-stream'
+            },
             messageCount: request.messages.length,
             firstMessageRole: request.messages[0]?.role,
             hasSystemMessage: request.messages.some(m => m.role === 'system'),
-            options: request.options
-          });
+            options: request.options || {}
+          };
+          
+          console.log(`[MastraAPI:streamGenerate] 准备发送请求:`, requestDetails);
           
           // 使用stream方法获取Response对象
-          console.log(`[MastraAPI] 发送流式请求...`);
+          console.log(`[MastraAPI:streamGenerate] 发送流式请求...`);
           const startTime = Date.now();
+          
+          // 拦截请求
+          try {
+            // 检查是否有拦截mock
+            const mockApiResponse = (window as any).__MOCK_MASTRA_API_RESPONSE__;
+            if (mockApiResponse) {
+              console.warn('[MastraAPI:streamGenerate] ⚠️ 检测到全局MOCK响应覆盖，将使用模拟数据');
+              yield* (async function* () {
+                yield '这是模拟数据，不是真实的API响应。请检查代码中的mock实现。\n';
+                yield '您可能需要删除模拟数据的代码或关闭开发环境中的模拟功能。';
+              })();
+              return;
+            }
+          } catch (e) {
+            // 忽略错误，继续正常流程
+          }
           
           const response = await (agent as any).stream({
             messages: request.messages,
@@ -472,14 +558,15 @@ export const MastraAPI = {
           });
           
           const responseTime = Date.now() - startTime;
-          console.log(`[MastraAPI] 收到初始流式响应, 耗时: ${responseTime}ms`);
+          console.log(`[MastraAPI:streamGenerate] 收到初始流式响应, 耗时: ${responseTime}ms, 状态:`, 
+            response?.status, response?.statusText);
           
           if (!response || !response.body) {
-            console.error('[MastraAPI] 错误: 流式响应无效', response);
+            console.error('[MastraAPI:streamGenerate] 错误: 流式响应无效', response);
             throw new Error('Stream response or body is null');
           }
           
-          console.log('[MastraAPI] 开始读取流式响应...');
+          console.log('[MastraAPI:streamGenerate] 开始读取流式响应...');
           // 获取reader
           const reader = response.body.getReader();
           const decoder = new TextDecoder();
@@ -492,7 +579,7 @@ export const MastraAPI = {
             const { done, value } = await reader.read();
             
             if (done) {
-              console.log(`[MastraAPI] 流式响应完成, 共接收${chunkCount}个数据块`);
+              console.log(`[MastraAPI:streamGenerate] 流式响应完成, 共接收${chunkCount}个数据块`);
               break;
             }
             
@@ -502,11 +589,11 @@ export const MastraAPI = {
             buffer += chunk;
             
             if (chunkCount === 1) {
-              console.log(`[MastraAPI] 收到首个数据块: ${chunk.substring(0, 100)}${chunk.length > 100 ? '...' : ''}`);
+              console.log(`[MastraAPI:streamGenerate] 收到首个数据块: ${chunk.substring(0, 100)}${chunk.length > 100 ? '...' : ''}`);
             }
             
             if (chunkCount % 10 === 0) {
-              console.log(`[MastraAPI] 已接收${chunkCount}个数据块, 当前文本长度: ${fullText.length}`);
+              console.log(`[MastraAPI:streamGenerate] 已接收${chunkCount}个数据块, 当前文本长度: ${fullText.length}`);
             }
             
             // 处理buffer中的数据
@@ -519,12 +606,12 @@ export const MastraAPI = {
               try {
                 // 检查是否是JSON格式的元数据
                 if (line.startsWith('f:') || line.startsWith('d:') || line.startsWith('e:')) {
-                  console.log('[MastraAPI] 收到元数据:', line);
+                  console.log('[MastraAPI:streamGenerate] 收到元数据:', line);
                   
                   // 检查是否是错误信息
                   if (line.startsWith('e:')) {
                     const errorData = line.substring(2);
-                    console.error('[MastraAPI] 流式响应错误:', errorData);
+                    console.error('[MastraAPI:streamGenerate] 流式响应错误:', errorData);
                     throw new Error(`Stream error: ${errorData}`);
                   }
                   
@@ -566,11 +653,11 @@ export const MastraAPI = {
                 }
                 
                 // 直接返回文本行
-                console.log('[MastraAPI] 纯文本行:', line.substring(0, 50) + (line.length > 50 ? '...' : ''));
+                console.log('[MastraAPI:streamGenerate] 纯文本行:', line.substring(0, 50) + (line.length > 50 ? '...' : ''));
                 fullText += line;
                 yield line;
               } catch (parseError) {
-                console.warn('[MastraAPI] 解析行内容时出错:', parseError, line.substring(0, 100));
+                console.warn('[MastraAPI:streamGenerate] 解析行内容时出错:', parseError, line.substring(0, 100));
                 yield line; // 出错时原样返回
               }
             }
@@ -578,20 +665,22 @@ export const MastraAPI = {
           
           // 处理剩余的buffer
           if (buffer.trim()) {
-            console.log('[MastraAPI] 处理剩余buffer:', buffer.substring(0, 100));
+            console.log('[MastraAPI:streamGenerate] 处理剩余buffer:', buffer.substring(0, 100));
             yield buffer;
           }
           
-          console.log(`[MastraAPI] 流式生成完成, 总文本长度: ${fullText.length}字符, 共${chunkCount}个数据块`);
+          const totalTime = Date.now() - startTime;
+          console.log(`[MastraAPI:streamGenerate] 流式生成完成, 总时间: ${totalTime}ms, 总文本长度: ${fullText.length}字符, 共${chunkCount}个数据块`);
+          console.log('[MastraAPI:streamGenerate] ======结束调用========');
           
         } catch (streamError) {
-          console.warn('[MastraAPI] 流式API调用失败, 错误详情:', streamError);
-          console.log('[MastraAPI] 尝试使用普通生成作为备选...');
+          console.warn('[MastraAPI:streamGenerate] 流式API调用失败, 错误详情:', streamError);
+          console.log('[MastraAPI:streamGenerate] 尝试使用普通生成作为备选...');
           
           // 如果流式API失败，回退到普通生成
           try {
             const generateStartTime = Date.now();
-            console.log('[MastraAPI] 发送普通生成请求...');
+            console.log('[MastraAPI:streamGenerate] 发送普通生成请求...');
             
             const result = await (agent as any).generate({
               messages: request.messages,
@@ -599,29 +688,29 @@ export const MastraAPI = {
             });
             
             const generateTime = Date.now() - generateStartTime;
-            console.log(`[MastraAPI] 普通生成请求完成, 耗时: ${generateTime}ms`);
+            console.log(`[MastraAPI:streamGenerate] 普通生成请求完成, 耗时: ${generateTime}ms`);
             
             if (result && typeof result.text === 'string') {
-              console.log(`[MastraAPI] 普通生成成功, 返回文本长度: ${result.text.length}`);
+              console.log(`[MastraAPI:streamGenerate] 普通生成成功, 返回文本长度: ${result.text.length}`);
               yield result.text;
             } else if (result && result.content) {
-              console.log(`[MastraAPI] 普通生成成功, 返回内容长度: ${result.content.length}`);
+              console.log(`[MastraAPI:streamGenerate] 普通生成成功, 返回内容长度: ${result.content.length}`);
               yield result.content;
             } else {
-              console.error('[MastraAPI] 普通生成失败: 响应格式无效', result);
+              console.error('[MastraAPI:streamGenerate] 普通生成失败: 响应格式无效', result);
               throw new Error('Failed to generate response: invalid format');
             }
           } catch (fallbackError) {
-            console.error('[MastraAPI] 普通生成也失败:', fallbackError);
+            console.error('[MastraAPI:streamGenerate] 普通生成也失败:', fallbackError);
             throw fallbackError;
           }
         }
       } else {
-        console.error('[MastraAPI] 错误: messages必须是数组');
+        console.error('[MastraAPI:streamGenerate] 错误: messages必须是数组');
         throw new Error("Messages must be an array");
       }
     } catch (error) {
-      console.error(`[MastraAPI] 从智能体${agentName}流式生成失败:`, error);
+      console.error(`[MastraAPI:streamGenerate] 从智能体${agentName}流式生成失败:`, error);
       throw error;
     }
   },

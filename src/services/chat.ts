@@ -5,6 +5,17 @@ import { getDefaultStore } from 'jotai';
 import * as atoms from '../stores/atoms';
 import * as sessionActions from '../stores/sessionActions';
 
+// Helper function to safely check environment variables
+const getEnvVar = (key: string): string | undefined => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key];
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key];
+  }
+  return undefined;
+};
+
 /**
  * 创建一个新的聊天会话
  * @param agentId 智能体ID
@@ -183,19 +194,41 @@ export async function sendMessageToAgent(
   onUpdate?: (content: string) => void,
 ): Promise<void> {
   try {
-    console.log(`[ChatService] 开始发送消息, sessionId: ${sessionId}, 指定智能体: ${agentId || '默认'}`);
+    console.log(`[ChatService:sendMessageToAgent] ======开始发送消息====== `, {
+      时间: new Date().toISOString(),
+      sessionId,
+      agentIdSpecified: !!agentId,
+      contentLength: content.length,
+      contentPreview: content.substring(0, 50) + (content.length > 50 ? '...' : '')
+    });
+    
+    // 检查环境变量和全局设置
+    try {
+      const envInfo = {
+        NODE_ENV: getEnvVar('NODE_ENV'),
+        USE_MOCK_API: getEnvVar('USE_MOCK_API') || getEnvVar('VITE_USE_MOCK_API'),
+        hasMockOverride: !!(window as any).__MOCK_MASTRA_API_RESPONSE__,
+      };
+      console.log('[ChatService:sendMessageToAgent] 环境信息:', envInfo);
+      
+      if (envInfo.USE_MOCK_API || envInfo.hasMockOverride) {
+        console.warn('[ChatService:sendMessageToAgent] ⚠️ 检测到MOCK配置，可能会返回模拟数据而非真实API响应');
+      }
+    } catch (e) {
+      // 忽略错误，继续处理
+    }
     
     const store = getDefaultStore();
     const session = sessionActions.getSession(sessionId);
     
     if (!session) {
-      console.error(`[ChatService] 错误: 找不到会话 ${sessionId}`);
+      console.error(`[ChatService:sendMessageToAgent] 错误: 找不到会话 ${sessionId}`);
       return;
     }
     
     // 如果未指定智能体，使用会话默认智能体
     const targetAgentId = agentId || session.defaultAgentId;
-    console.log(`[ChatService] 目标智能体ID: ${targetAgentId}`);
+    console.log(`[ChatService:sendMessageToAgent] 目标智能体ID: ${targetAgentId}`);
     
     // 添加用户消息
     const userMessage = sessionActions.addMessage(sessionId, {
@@ -205,20 +238,26 @@ export async function sendMessageToAgent(
     });
     
     // 记录日志
-    console.log(`[ChatService] 已添加用户消息`, { 
+    console.log(`[ChatService:sendMessageToAgent] 已添加用户消息`, { 
       sessionId, 
       messageId: userMessage.id,
       contentLength: content.length
     });
     
     // 获取智能体信息
-    console.log(`[ChatService] 开始获取智能体信息: ${targetAgentId}`);
+    console.log(`[ChatService:sendMessageToAgent] 开始获取智能体信息: ${targetAgentId}`);
     let agent;
     try {
+      console.time('获取智能体信息');
       agent = await MastraAPI.getAgent(targetAgentId);
-      console.log(`[ChatService] 获取智能体信息成功: ${agent?.name || targetAgentId}`);
+      console.timeEnd('获取智能体信息');
+      console.log(`[ChatService:sendMessageToAgent] 获取智能体信息成功:`, {
+        name: agent?.name || targetAgentId,
+        hasAvatar: !!agent?.avatar,
+        hasDescription: !!agent?.description
+      });
     } catch (error) {
-      console.error(`[ChatService] 获取智能体信息失败: ${targetAgentId}`, error);
+      console.error(`[ChatService:sendMessageToAgent] 获取智能体信息失败: ${targetAgentId}`, error);
     }
     
     // 创建助手消息
@@ -231,7 +270,7 @@ export async function sendMessageToAgent(
       generating: true,
     });
     
-    console.log(`[ChatService] 已创建助手消息占位符: ${assistantMessage.id}`);
+    console.log(`[ChatService:sendMessageToAgent] 已创建助手消息占位符: ${assistantMessage.id}`);
     
     try {
       // 构建上下文消息 - 只包含当前会话中与目标智能体相关的消息或无特定智能体的消息
@@ -250,105 +289,152 @@ export async function sendMessageToAgent(
           role: 'system',
           content: systemPrompt
         });
-        console.log(`[ChatService] 已添加系统提示, 长度: ${systemPrompt.length}`);
+        console.log(`[ChatService:sendMessageToAgent] 已添加系统提示, 长度: ${systemPrompt.length}`);
       }
       
       // 应用模型设置
       const modelSettings = session.agentContexts?.[targetAgentId]?.modelSettings || {};
       
-      console.log(`[ChatService] 构建请求上下文完成:`, { 
+      console.log(`[ChatService:sendMessageToAgent] 构建请求上下文完成:`, { 
         targetAgentId,
         contextMessagesCount: contextMessages.length,
-        hasSystemPrompt: !!systemPrompt,
+        hasSystemMessage: contextMessages.some(m => m.role === 'system'),
+        firstMessageRole: contextMessages[0]?.role,
         modelSettings
       });
       
+      // 输出前10条消息的简短预览，帮助调试
+      if (contextMessages.length > 0) {
+        const messagesPreview = contextMessages.slice(0, 10).map((m, i) => ({
+          index: i,
+          role: m.role,
+          contentLength: m.content.length,
+          preview: m.content.substring(0, 30) + (m.content.length > 30 ? '...' : '')
+        }));
+        console.log(`[ChatService:sendMessageToAgent] 上下文消息预览:`, messagesPreview);
+      }
+      
       let accumulatedText = '';
       let streamStartTime = Date.now();
+      let isFullyMockData = false;
       
-      // 使用MastraAPI的流式生成
+      // 检查是否有全局mock覆盖
       try {
-        console.log(`[ChatService] 开始调用MastraAPI.streamGenerate: ${targetAgentId}`);
-        
-        for await (const chunk of MastraAPI.streamGenerate(targetAgentId, {
-          messages: contextMessages,
-          options: modelSettings
-        })) {
-          // 第一个chunk收到的时间
-          if (accumulatedText === '') {
-            const timeToFirstToken = Date.now() - streamStartTime;
-            console.log(`[ChatService] 收到首个token, 耗时: ${timeToFirstToken}ms`);
-          }
+        if ((window as any).__FORCE_MOCK_CHAT_RESPONSE__) {
+          console.warn('[ChatService:sendMessageToAgent] ⚠️ 检测到强制使用MOCK响应设置');
+          accumulatedText = "这是模拟响应数据，不是真实的API调用结果。\n请检查代码中的mock实现或环境变量设置。";
+          isFullyMockData = true;
           
-          // 处理接收到的chunk
-          if (chunk) {
-            accumulatedText += chunk;
-            
-            // 记录进度
-            if (accumulatedText.length % 100 === 0) {
-              console.log(`[ChatService] 流式响应进度: ${accumulatedText.length}字符`);
-            }
-            
-            // 更新消息内容
-            sessionActions.updateMessage(sessionId, assistantMessage.id, {
-              content: accumulatedText,
-            });
-            
-            if (onUpdate) {
-              onUpdate(accumulatedText);
-            }
-          }
-        }
-        
-        const totalTime = Date.now() - streamStartTime;
-        console.log(`[ChatService] 流式生成完成, 总时间: ${totalTime}ms, 内容长度: ${accumulatedText.length}`);
-        
-      } catch (streamError) {
-        console.error('[ChatService] 流式生成失败, 错误详情:', streamError);
-        console.log('[ChatService] 尝试使用普通生成...');
-        
-        // 如果流式生成失败，尝试使用普通生成
-        try {
-          const fallbackStartTime = Date.now();
-          
-          const result = await MastraAPI.generate(targetAgentId, {
-            messages: contextMessages,
-            options: modelSettings
+          // 更新消息内容
+          sessionActions.updateMessage(sessionId, assistantMessage.id, {
+            content: accumulatedText,
           });
           
-          const fallbackTime = Date.now() - fallbackStartTime;
+          if (onUpdate) {
+            onUpdate(accumulatedText);
+          }
           
-          if (result && result.text) {
-            accumulatedText = result.text;
-            console.log(`[ChatService] 普通生成成功, 耗时: ${fallbackTime}ms, 长度: ${result.text.length}`);
+          // 延迟一下以模拟网络请求
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (e) {
+        // 忽略错误，继续正常流程
+      }
+      
+      // 使用MastraAPI的流式生成
+      if (!isFullyMockData) {
+        try {
+          console.log(`[ChatService:sendMessageToAgent] 开始调用MastraAPI.streamGenerate: ${targetAgentId}`);
+          console.time('流式生成');
+          
+          let chunkCount = 0;
+          for await (const chunk of MastraAPI.streamGenerate(targetAgentId, {
+            messages: contextMessages,
+            options: modelSettings
+          })) {
+            chunkCount++;
             
-            // 更新消息内容
-            sessionActions.updateMessage(sessionId, assistantMessage.id, {
-              content: accumulatedText,
+            // 第一个chunk收到的时间
+            if (accumulatedText === '') {
+              const timeToFirstToken = Date.now() - streamStartTime;
+              console.log(`[ChatService:sendMessageToAgent] 收到首个token, 耗时: ${timeToFirstToken}ms, 内容: ${chunk.substring(0, 50)}`);
+            }
+            
+            // 处理接收到的chunk
+            if (chunk) {
+              accumulatedText += chunk;
+              
+              // 记录进度
+              if (chunkCount % 10 === 0 || accumulatedText.length % 200 === 0) {
+                console.log(`[ChatService:sendMessageToAgent] 流式响应进度: 块数=${chunkCount}, 字符数=${accumulatedText.length}`);
+              }
+              
+              // 更新消息内容
+              sessionActions.updateMessage(sessionId, assistantMessage.id, {
+                content: accumulatedText,
+              });
+              
+              if (onUpdate) {
+                onUpdate(accumulatedText);
+              }
+            }
+          }
+          
+          console.timeEnd('流式生成');
+          const totalTime = Date.now() - streamStartTime;
+          console.log(`[ChatService:sendMessageToAgent] 流式生成完成! 总时间: ${totalTime}ms, 内容长度: ${accumulatedText.length}, 块数: ${chunkCount}`);
+          
+        } catch (streamError) {
+          console.error('[ChatService:sendMessageToAgent] 流式生成失败, 错误详情:', streamError);
+          console.log('[ChatService:sendMessageToAgent] 尝试使用普通生成...');
+          
+          // 如果流式生成失败，尝试使用普通生成
+          try {
+            const fallbackStartTime = Date.now();
+            console.time('普通生成');
+            
+            const result = await MastraAPI.generate(targetAgentId, {
+              messages: contextMessages,
+              options: modelSettings
             });
             
-            if (onUpdate) {
-              onUpdate(accumulatedText);
+            console.timeEnd('普通生成');
+            const fallbackTime = Date.now() - fallbackStartTime;
+            
+            if (result && result.text) {
+              accumulatedText = result.text;
+              console.log(`[ChatService:sendMessageToAgent] 普通生成成功, 耗时: ${fallbackTime}ms, 长度: ${result.text.length}`);
+              
+              // 更新消息内容
+              sessionActions.updateMessage(sessionId, assistantMessage.id, {
+                content: accumulatedText,
+              });
+              
+              if (onUpdate) {
+                onUpdate(accumulatedText);
+              }
+            } else {
+              console.error('[ChatService:sendMessageToAgent] 普通生成失败: 无效的响应格式', result);
+              throw new Error('生成结果无效');
             }
-          } else {
-            console.error('[ChatService] 普通生成失败: 无效的响应格式', result);
-            throw new Error('生成结果无效');
+          } catch (fallbackError) {
+            console.error('[ChatService:sendMessageToAgent] 普通生成也失败:', fallbackError);
+            throw fallbackError;
           }
-        } catch (fallbackError) {
-          console.error('[ChatService] 普通生成也失败:', fallbackError);
-          throw fallbackError;
         }
       }
       
       // 完成生成
-      console.log(`[ChatService] 更新消息状态为已完成生成`);
+      console.log(`[ChatService:sendMessageToAgent] 更新消息状态为已完成生成`);
       sessionActions.updateMessage(sessionId, assistantMessage.id, {
         content: accumulatedText,
         generating: false,
       });
       
+      console.log(`[ChatService:sendMessageToAgent] ======发送消息完成======`);
+      
     } catch (error) {
-      console.error(`[ChatService] 生成消息失败:`, error);
+      console.error(`[ChatService:sendMessageToAgent] 生成消息失败:`, error);
       
       // 统一错误处理
       sessionActions.updateMessage(sessionId, assistantMessage.id, {
@@ -359,7 +445,7 @@ export async function sendMessageToAgent(
     }
   } catch (outerError) {
     // 捕获最外层的错误，确保不会导致整个应用崩溃
-    console.error(`[ChatService] 发送消息过程中出现严重错误:`, outerError);
+    console.error(`[ChatService:sendMessageToAgent] 发送消息过程中出现严重错误:`, outerError);
   }
 }
 

@@ -1,16 +1,29 @@
 import { MastraClient } from '@mastra/client-js';
 import { Agent, GenerateConfig, Message } from './types';
 
+// 读取环境变量的帮助函数
+const getEnv = (key: string, defaultValue: string = ''): string => {
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || defaultValue;
+  }
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || defaultValue;
+  }
+  return defaultValue;
+};
+
 // 判断环境变量
 const getMastraApiUrl = () => {
   // 优先使用NEXT_PUBLIC前缀的环境变量，适配Next.js
-  if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_MASTRA_API_URL) {
-    return process.env.NEXT_PUBLIC_MASTRA_API_URL;
+  const nextPublicUrl = getEnv('NEXT_PUBLIC_MASTRA_API_URL');
+  if (nextPublicUrl) {
+    return nextPublicUrl;
   }
   
   // 支持Vite环境变量
-  if (import.meta.env?.VITE_MASTRA_API_URL) {
-    return import.meta.env.VITE_MASTRA_API_URL;
+  const viteUrl = getEnv('VITE_MASTRA_API_URL');
+  if (viteUrl) {
+    return viteUrl;
   }
   
   // 默认本地开发地址

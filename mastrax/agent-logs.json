@@ -1,0 +1,12 @@
+[
+  {
+    "agentId": "all",
+    "operation": "getAll",
+    "timestamp": 1742820652641,
+    "details": {
+      "count": 0
+    },
+    "status": "success",
+    "id": "log-1742820652641-ape1cqakz"
+  }
+]

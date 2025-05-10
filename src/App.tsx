@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import SettingDialog from './pages/SettingDialog'
 import ChatConfigWindow from './pages/ChatConfigWindow'
 import CleanWidnow from './pages/CleanWindow'
@@ -10,14 +10,25 @@ import Toasts from './components/Toasts'
 import RemoteDialogWindow from './pages/RemoteDialogWindow'
 import { useSystemLanguageWhenInit } from './hooks/useDefaultSystemLanguage'
 import MainPane from './MainPane'
-import { useAtom, useAtomValue } from 'jotai'
+import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import * as atoms from './stores/atoms'
 import Sidebar from './Sidebar'
 import * as premiumActions from './stores/premiumActions'
 import { tauriBridge, initializeTauriEvents } from './tauri-bridge'
 import platform from './packages/platform'
 import { ThemeProvider } from './components/ui/theme-provider'
-import ShadcnTest from './components/ShadcnTest'
+import Workspace from './components/Workspace'
+import * as defaults from './shared/defaults'
+import ErrorBoundary from './components/ErrorBoundary'
+import { TauriAPI } from './shared/tauri-types'
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom'
+import WhiteboardPage from './pages/WhiteboardPage'
+import HomePage from './pages/HomePage'
+import ChatPage from './pages/ChatPage'
+import AgentsPage from './pages/AgentsPage'
+import WorkflowPage from './pages/WorkflowPage'
+import WorkflowEditorPage from './pages/WorkflowEditorPage'
+import WorkflowRunPage from './pages/WorkflowRunPage'
 
 // The Window interface is now defined in window.d.ts
 
@@ -26,35 +37,100 @@ function Main() {
     const [openSettingWindow, setOpenSettingWindow] = useAtom(atoms.openSettingDialogAtom)
     const [openAboutWindow, setOpenAboutWindow] = React.useState(false)
     const [openCopilotWindow, setOpenCopilotWindow] = React.useState(false)
-    const [showShadcnTest, setShowShadcnTest] = React.useState(false)
+    const [showLegacyUI, setShowLegacyUI] = React.useState(false)
+    const [sidebarVisible, setSidebarVisible] = useState(true)
+    const currentSession = useAtomValue(atoms.currentSessionAtom);
+    // Get the current route/page from URL
+    const [currentPage, setCurrentPage] = useState(() => {
+        const path = window.location.pathname;
+        if (path.includes('/chat')) return 'chat';
+        if (path.includes('/agents')) return 'agents';
+        if (path.includes('/whiteboard')) return 'whiteboard';
+        if (path.includes('/workflow')) return 'workflow';
+        return 'home';
+    });
+    
+    // Listen for route changes
+    useEffect(() => {
+        const handleRouteChange = () => {
+            const path = window.location.pathname;
+            if (path.includes('/chat')) setCurrentPage('chat');
+            else if (path.includes('/agents')) setCurrentPage('agents');
+            else if (path.includes('/whiteboard')) setCurrentPage('whiteboard');
+            else if (path.includes('/workflow')) setCurrentPage('workflow');
+            else setCurrentPage('home');
+        };
+        
+        window.addEventListener('popstate', handleRouteChange);
+        return () => window.removeEventListener('popstate', handleRouteChange);
+    }, []);
+
+    // 开发模式下，可以通过URL参数强制显示新UI
+    const [forceNewUI] = useState(() => {
+        // 检查URL参数或localStorage
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasNewUIParam = urlParams.has('newui');
+        const newUIValue = urlParams.get('newui');
+        
+        // 如果URL中有newui参数
+        if (hasNewUIParam) {
+            const shouldForce = newUIValue === '1' || newUIValue === 'true';
+            // 存储到localStorage以便持久化
+            localStorage.setItem('force_new_ui', shouldForce ? 'true' : 'false');
+            return shouldForce;
+        }
+        
+        // 否则从localStorage读取
+        return localStorage.getItem('force_new_ui') === 'true';
+    });
+
+    // 显示新界面条件
+    const shouldShowNewUI = forceNewUI && !showLegacyUI;
+
+    // 切换回传统UI并清除hash
+    const switchToLegacyUI = () => {
+        // 更新状态
+        setShowLegacyUI(true);
+        
+        // 确保localStorage中的标志也被重置
+        localStorage.setItem('force_new_ui', 'false');
+        
+        // 清除hash
+        if (window.location.hash) {
+            // 清除hash但不刷新页面
+            history.pushState("", document.title, window.location.pathname + window.location.search);
+        }
+        
+        // 可选：刷新页面以确保状态完全重置
+        // window.location.reload();
+    };
 
     return (
-        <div className="box-border App" spellCheck={spellCheck}>
-            {showShadcnTest ? (
-                <div className="h-full flex flex-col">
-                    <div className="p-4 bg-primary text-primary-foreground flex justify-between items-center">
-                        <h1 className="text-xl font-bold">Shadcn UI 测试</h1>
-                        <button 
-                            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md"
-                            onClick={() => setShowShadcnTest(false)}
-                        >
-                            返回应用
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-auto">
-                        <ShadcnTest />
-                    </div>
+        <div className="box-border App w-full h-full" spellCheck={spellCheck}>
+            {shouldShowNewUI ? (
+                <div className="h-full w-full">
+                    <Workspace currentPage={currentPage} />
                 </div>
             ) : (
                 <>
-                    <div className="h-full flex">
-                        <Sidebar
-                            openCopilotWindow={() => setOpenCopilotWindow(true)}
-                            openAboutWindow={() => setOpenAboutWindow(true)}
-                            setOpenSettingWindow={setOpenSettingWindow}
-                            openShadcnTest={() => setShowShadcnTest(true)}
-                        />
-                        <MainPane />
+                    <div className="h-full w-full flex">
+                        <ErrorBoundary>
+                            <Sidebar
+                                openCopilotWindow={() => setOpenCopilotWindow(true)}
+                                openAboutWindow={() => setOpenAboutWindow(true)}
+                                setOpenSettingWindow={setOpenSettingWindow}
+                                openShadcnTest={() => setShowLegacyUI(false)}
+                                onToggleVisibility={(visible) => setSidebarVisible(visible)}
+                                currentPage={currentPage}
+                            />
+                        </ErrorBoundary>
+                        <ErrorBoundary>
+                            <MainPane 
+                                sidebarVisible={sidebarVisible} 
+                                onSwitchToNewUI={() => setShowLegacyUI(false)}
+                                currentPage={currentPage}
+                            />
+                        </ErrorBoundary>
                     </div>
                     <SettingDialog
                         open={!!openSettingWindow}
@@ -79,25 +155,44 @@ export default function App() {
     useSystemLanguageWhenInit()
     const theme = useAppTheme()
     const [initialized, setInitialized] = React.useState(false);
+    const setSessions = useSetAtom(atoms.sessionsAtom);
 
     useEffect(() => {
         const initialize = async () => {
             try {
-                // Expose the Tauri bridge to the window object
+                const shouldUseDefaults = localStorage.getItem('_force_use_defaults') === 'true';
+                if (shouldUseDefaults) {
+                    console.log('Force using default sessions after cache cleaning');
+                    setSessions(defaults.sessions());
+                    localStorage.removeItem('_force_use_defaults');
+                }
+                
                 if (!window.tauriAPI) {
                     window.tauriAPI = tauriBridge;
                 }
                 
-                // Initialize the platform with tauriAPI
                 if (platform.tauriAPI !== tauriBridge) {
                     platform.tauriAPI = tauriBridge;
                 }
                 
-                // Initialize tauri events using our improved function
-                initializeTauriEvents();
-                
-                // Initialize store and test store operations
                 try {
+                    // 运行函数但不使用返回值
+                    initializeTauriEvents();
+                } catch (error) {
+                    console.error('Failed to initialize Tauri events:', error);
+                }
+                
+                if (typeof window.__clearAllCache !== 'function') {
+                    try {
+                        // 导入注册模块，自动注册清理函数到window
+                        await import('./utils/registerCacheClearFunctions');
+                    } catch (e) {
+                        console.warn('Failed to register cache clearing functions:', e);
+                    }
+                }
+                
+                try {
+                    // 运行函数但不使用返回值
                     await tauriBridge.getStoreValue("test-init");
                 } catch (e) {
                     console.warn("Store initialization test failed:", e);
@@ -105,27 +200,43 @@ export default function App() {
                 
                 setInitialized(true);
             } catch (error) {
-                console.error('Failed to initialize Tauri events:', error);
-                // Set initialized even if there was an error to avoid frozen UI
+                console.error('Failed to initialize app:', error);
                 setInitialized(true);
             }
         };
         
-        initialize();
-    }, []);
+        initialize().catch(error => {
+            console.error('Initialization failed:', error);
+            setInitialized(true);
+        });
+    }, [setSessions]);
 
-    // Show loading indicator if not initialized
     if (!initialized) {
         return (
-            <div className="flex justify-center items-center h-screen">
+            <div className="flex justify-center items-center h-screen w-full">
                 <div>Initializing application...</div>
             </div>
         );
     }
 
     return (
-        <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-            <Main />
-        </ThemeProvider>
+        <ErrorBoundary>
+            <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+                <div className="w-full h-full overflow-hidden tauri-window-container">
+                    <Router>
+                        <Routes>
+                            <Route path="/" element={<Main />} />
+                            <Route path="/whiteboard" element={<Main />} />
+                            <Route path="/chat" element={<Main />} />
+                            <Route path="/agents" element={<Main />} />
+                            <Route path="/workflow" element={<Main />} />
+                            <Route path="/workflow/editor/:id" element={<WorkflowEditorPage />} />
+                            <Route path="/workflow/run/:id" element={<WorkflowRunPage />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                    </Router>
+                </div>
+            </ThemeProvider>
+        </ErrorBoundary>
     )
 }

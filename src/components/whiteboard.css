@@ -1,0 +1,120 @@
+/* 白板容器样式 */
+.whiteboard-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.whiteboard-container > div {
+  width: 100%;
+  height: 100%;
+}
+
+.whiteboard-container .excalidraw {
+  --color-primary: #6366f1;
+  --color-primary-darker: #4338ca;
+  --color-primary-darkest: #312e81;
+  --color-primary-light: #818cf8;
+  --color-primary-lighter: #a5b4fc;
+  
+  height: 100% !important;
+  width: 100% !important;
+  position: absolute;
+}
+
+/* 确保白板内容撑满容器 */
+.excalidraw-wrapper,
+.excalidraw .layer-ui__wrapper {
+  height: 100% !important;
+  width: 100% !important;
+}
+
+/* 隐藏协作锁图标 */
+.CollabButton--lock,
+[data-testid="lock-button"] {
+  display: none !important;
+}
+
+/* 自适应移动设备 */
+@media (max-width: 767px) {
+  .whiteboard-container {
+    touch-action: none;
+  }
+  
+  .whiteboard-container .excalidraw .App-menu_top {
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+/* Tauri窗口内整体样式 */
+.tauri-window-container {
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+:root {
+  --vh: 1vh;
+}
+
+/* 优化滚动行为 */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 覆盖Excalidraw默认样式 */
+.excalidraw {
+  --color-primary: #1a1a1a;
+  --color-primary-darker: #333333;
+  --color-primary-darkest: #222222;
+  --color-primary-light: #444444;
+  
+  /* 确保Excalidraw填充整个容器 */
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  touch-action: none;
+}
+
+/* 确保canvas元素尺寸正确 */
+.excalidraw .excalidraw-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* 减小锁图标大小（如果还出现） */
+.excalidraw .App-menu__left {
+  z-index: 1;
+}
+
+/* 消除不必要的边框 */
+.excalidraw .App {
+  border: none !important;
+}
+
+/* 兼容Tauri应用 */
+.excalidraw .FixedSideContainer {
+  z-index: 2;
+  pointer-events: auto;
+}
+
+/* 处理按钮显示 */
+.excalidraw button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 修复可能的初始化问题 */
+.excalidraw .encrypted-icon {
+  display: none !important;
+}
+
+/* 修复协作图标可能导致的问题 */
+.excalidraw-app .CollabButton,
+.CollabButton--lock,
+.CollabButton {
+  display: none !important;
+} 

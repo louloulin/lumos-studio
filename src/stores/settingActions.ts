@@ -14,7 +14,7 @@ export function modify(update: Partial<Settings>) {
 export function needEditSetting() {
     const store = getDefaultStore()
     const settings = store.get(atoms.settingsAtom)
-    if (settings.aiProvider === 'chatbox-ai' && !settings.licenseKey) {
+    if (settings.aiProvider === 'lumos-ai' && !settings.licenseKey) {
         return true
     }
     if (

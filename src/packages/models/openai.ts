@@ -1,5 +1,5 @@
 import { Message } from '@/shared/types'
-import { ApiError, ChatboxAIAPIError } from './errors'
+import { ApiError, LumosAIAPIError } from './errors'
 import Base, { onResultChange } from './base'
 
 interface Options {
@@ -35,7 +35,7 @@ export default class OpenAI extends Base {
             return await this._callChatCompletion(rawMessages, signal, onResultChange)
         } catch (e) {
             if (e instanceof ApiError && e.message.includes('Invalid content type. image_url is only supported by certain models.')) {
-                throw ChatboxAIAPIError.fromCodeName('model_not_support_image', 'model_not_support_image')
+                throw LumosAIAPIError.fromCodeName('model_not_support_image', 'model_not_support_image')
             }
             throw e
         }
@@ -119,8 +119,8 @@ export default class OpenAI extends Base {
             'Content-Type': 'application/json',
         }
         if (this.options.apiHost.includes('openrouter.ai')) {
-            headers['HTTP-Referer'] = 'https://chatboxai.app'
-            headers['X-Title'] = 'Chatbox AI'
+            headers['HTTP-Referer'] = 'https://lumosai.app'
+            headers['X-Title'] = 'Lumos AI'
         }
         return headers
     }

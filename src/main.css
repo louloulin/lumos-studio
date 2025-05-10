@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full w-full m-0 p-0 overflow-hidden;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer components {
+  /* 基础容器样式 */
+  .tauri-window-container {
+    @apply h-full w-full flex flex-col overflow-hidden;
+  }
+
+  /* 适应Tauri窗口的滚动区域 */
+  .tauri-scrollable-content {
+    @apply overflow-y-auto overflow-x-hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 确保内容能够正确撑满高度 */
+  .full-height-container {
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+/* 处理iOS和MacOS Safari的视口高度问题 */
+:root {
+  --vh: 1vh;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .h-screen {
+    height: calc(var(--vh) * 100);
+  }
+  
+  .tauri-window-container {
+    height: calc(var(--vh) * 100);
+  }
+}
+
+/* 确保文本和图标在高DPI屏幕上渲染清晰 */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 修复触摸设备上可能的点击延迟问题 */
+a, button, [role="button"] {
+  touch-action: manipulation;
+} 

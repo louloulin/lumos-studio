@@ -1,6 +1,6 @@
 import { ModelProvider, ModelSettings } from '@/shared/types'
 import OpenAISetting from './OpenAISetting'
-import ChatboxAISetting from './ChatboxAISetting'
+import LumosAISetting from './LumosAISetting'
 import AIProviderSelect from '@/components/AIProviderSelect'
 import { OllamaHostInput, OllamaModelSelect } from './OllamaSetting'
 import { LMStudioHostInput, LMStudioModelSelect } from './LMStudioSetting'
@@ -9,6 +9,7 @@ import MaxContextMessageCountSlider from '@/components/MaxContextMessageCountSli
 import TemperatureSlider from '@/components/TemperatureSlider'
 import ClaudeSetting from './ClaudeSetting'
 import PPIOSetting from './PPIOSetting'
+import MastraSetting from './MastraSetting'
 import { Separator } from "@/components/ui/separator"
 
 interface ModelConfigProps {
@@ -28,8 +29,8 @@ export default function ModelSettingTab(props: ModelConfigProps) {
             {settingsEdit.aiProvider === ModelProvider.OpenAI && (
                 <OpenAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
-            {settingsEdit.aiProvider === ModelProvider.ChatboxAI && (
-                <ChatboxAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
+            {settingsEdit.aiProvider === ModelProvider.LumosAI && (
+                <LumosAISetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
             {settingsEdit.aiProvider === ModelProvider.Ollama && (
                 <div className="space-y-4">
@@ -84,6 +85,9 @@ export default function ModelSettingTab(props: ModelConfigProps) {
             )}
             {settingsEdit.aiProvider === ModelProvider.PPIO && (
                 <PPIOSetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
+            )}
+            {settingsEdit.aiProvider === ModelProvider.Mastra && (
+                <MastraSetting settingsEdit={settingsEdit} setSettingsEdit={setSettingsEdit} />
             )}
         </div>
     )
